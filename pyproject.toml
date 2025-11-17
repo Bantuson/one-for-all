@@ -1,0 +1,17 @@
+[project]
+name = "one_for_all"
+version = "0.1.0"
+description = "CrewAI-powered South African university & NSFAS automation assistant"
+authors = [{name="Your Name"}]
+dependencies = [
+    "crewai",
+    "crewai-tools",
+    "python-dotenv",
+    "supabase",
+    "requests",
+    "langchain",
+    "langchain-community",
+]
+
+[tool.setuptools.package-data]
+"one_for_all.config" = ["*.yaml"]

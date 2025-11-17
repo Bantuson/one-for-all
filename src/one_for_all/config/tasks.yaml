@@ -1,0 +1,184 @@
+account_creation_task:
+  description: >
+    Collect username, email, and cellphone number from the user.
+    Ask which verification method they prefer (email or SMS).
+    Your final answer MUST include:
+    1. username
+    2. email
+    3. cellphone
+    4. chosen_otp_method
+  expected_output: >
+    A structured JSON object with user credentials ready for OTP sending.
+  agent: identity_auth_agent
+
+otp_verification_task:
+  description: >
+    Send the OTP based on the user's selected method (email or SMS).
+    Prompt the user to provide the OTP they received.
+    Verify the OTP using Supabase.
+    After verification, create a user account and 24hr session record.
+    Your final answer MUST confirm successful account creation.
+  expected_output: >
+    Confirmation message + session token.
+  agent: identity_auth_agent
+
+collect_personal_info_task:
+  description: >
+    Collect SA-compliant personal information:
+    - Full Name
+    - South African ID or Passport
+    - Date of Birth
+    - Gender
+    - Citizenship (SA/SADC/International)
+    - Home Address
+    - Email + Cellphone
+    Your final answer MUST return a structured JSON object.
+  expected_output: >
+    SA-standardised applicant personal information.
+  agent: application_intake_agent
+
+collect_academic_info_task:
+  description: >
+    Collect academic background:
+    - Matric/NSC subjects & percentages
+    - Highest qualification (if applicable)
+    - Previous institution details
+    Your final answer MUST be a JSON object that matches SA university requirements.
+  expected_output: >
+    Detailed SA academic history JSON.
+  agent: application_intake_agent
+
+collect_documents_task:
+  description: >
+    Request all SA-required application documents:
+    - ID document
+    - Matric certificate / NSC results
+    - Academic transcript (if applicable)
+    - Proof of residence
+    - Proof of payment (application fee)
+    Store upload metadata using Supabase tools.
+    Your final answer MUST confirm all documents collected.
+  expected_output: >
+    Document metadata JSON for all uploaded files.
+  agent: application_intake_agent
+
+program_selection_task:
+  description: >
+    Ask the user to choose one or more universities they want to apply to.
+    For each selected university, collect:
+    - University name
+    - Faculty
+    - Qualification type (Undergrad/Postgrad)
+    - Program
+    - Year of application
+    Your final answer MUST return a list of universities, each with its own
+    program selection details.
+  expected_output: >
+    JSON list of selected universities with program metadata.
+  agent: application_intake_agent
+
+rag_research_task:
+  description: >
+    For each university in the user's selection:
+      1. Query the Supabase vector store using supabase_rag_query.
+      2. If information exists, use it immediately.
+      3. If not, use WebsiteSearchTool to fetch missing data.
+      4. Embed and store newly gathered information using supabase_rag_store.
+    Your final answer MUST provide a combined summary for ALL universities.
+  expected_output: >
+    Multi-university course information summary with citations.
+  agent: rag_specialist_agent
+
+application_compilation_task:
+  description: >
+    Compile:
+    - personal info
+    - academic info
+    - documents
+    - program selection
+    - university selection
+    - RAG-enhanced requirements
+    Validate everything and prepare final submission JSON.
+    Your final answer MUST be a single validated application payload.
+  expected_output: >
+    Full validated SA university application JSON.
+  agent: submission_agent
+
+application_submission_task:
+  description: >
+    Submit the compiled student application to ALL selected universities.
+    For each university:
+      - generate a validated application payload
+      - submit it using application_submission_tool
+    Your final answer MUST include:
+      - list of universities submitted to
+      - their application_ids
+      - statuses
+  expected_output: >
+    JSON list of submissions for all universities.
+  agent: submission_agent
+
+ask_if_apply_for_nsfas_task:
+  description: >
+    Ask the user whether they would like to apply for NSFAS funding in addition
+    to their university applications. If yes, proceed with the NSFAS workflow.
+    Your final answer MUST be:
+      - "YES_NSFAS"
+      - "NO_NSFAS"
+  expected_output: >
+    YES_NSFAS or NO_NSFAS
+  agent: application_intake_agent
+
+nsfas_collection_task:
+  description: >
+    Collect all NSFAS-required information while reusing the applicant’s
+    verified personal details, academic records, household address,
+    identification documents, and any overlapping university application info.
+    
+    Additional NSFAS-specific information that must be collected:
+      - Parent/guardian full names, ID numbers, contact details
+      - Household composition (members, relationship, age)
+      - Income per household member with proof document metadata
+      - NSFAS consent form upload
+      - Bank account details (for allowances)
+      - Living situation (home, university residence, private)
+    
+    For each NSFAS document uploaded, store metadata using
+    supabase_nsfas_documents_store.
+    
+    Your final answer MUST be a complete and valid NSFAS funding application
+    JSON suitable for backend submission.
+  expected_output: >
+    Fully structured NSFAS application JSON.
+  agent: nsfas_agent
+
+nsfas_submission_task:
+  description: >
+    Submit the completed NSFAS application payload to the backend API using
+    nsfas_application_submission_tool. Capture and return:
+      - nsfas_application_id
+      - submission status or confirmation message
+    Store the resulting application metadata in Supabase where applicable.
+  expected_output: >
+    NSFAS submission confirmation including nsfas_application_id.
+  agent: nsfas_agent
+
+univeristy_status_check_task:
+  description: >
+    Retrieve status updates for university applications using
+    application_status_tool.
+    Your final answer MUST summarise the latest known status.
+  expected_output: >
+    Latest status update.
+  agent: submission_agent
+
+nsfas_status_check_task:
+  description: >
+    Retrieve the latest NSFAS application status using nsfas_status_tool.
+    Your final answer MUST summarise:
+      - current NSFAS status
+      - any outstanding requirements
+      - next steps for the student
+  expected_output: >
+    Latest NSFAS status summary.
+  agent: nsfas_agent
