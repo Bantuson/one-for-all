@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --border: 214.3 31.8% 91.4%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+  }
+}
+
+body {
+  background-color: #fdfcf9;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.3) 1.4px, transparent 1.4px);
+  background-size: 32px 32px;
+}
+
+.dark body {
+  background-color: #0a0a0a;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.3) 1.4px, transparent 1.4px);
+  background-size: 32px 32px;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Logo sizing */
+.logo-large {
+  max-width: 990px !important;
+}
+
+/* Reversible Right-to-Left Scroll Animation */
+.slide-card {
+  opacity: 0;
+  transform: translateX(100px);
+  transition: opacity 600ms ease-out, transform 600ms ease-out;
+}
+
+.slide-card.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.slide-card.delay-100 {
+  transition-delay: 100ms;
+}
+
+.slide-card.delay-200 {
+  transition-delay: 200ms;
+}
