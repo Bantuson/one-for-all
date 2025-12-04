@@ -1,11 +1,15 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Logo } from '../branding/Logo'
 import { Button } from '../ui/Button'
+import { RegistrationModal } from '../modals/RegistrationModal'
+import { LoginModal } from '../modals/LoginModal'
 
 export function Hero() {
   const cardsRef = useRef<(HTMLDivElement | null)[]>([])
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -48,13 +52,29 @@ export function Hero() {
 
       {/* CTA Buttons */}
       <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
-        <Button size="lg" className="min-w-[160px]">
+        <Button
+          size="lg"
+          className="min-w-[160px]"
+          onClick={() => setShowRegistrationModal(true)}
+        >
           Register
         </Button>
-        <Button size="lg" variant="outline" className="min-w-[160px]">
+        <Button
+          size="lg"
+          variant="outline"
+          className="min-w-[160px]"
+          onClick={() => setShowLoginModal(true)}
+        >
           Sign in
         </Button>
       </div>
+
+      {/* Modals */}
+      <RegistrationModal
+        open={showRegistrationModal}
+        onOpenChange={setShowRegistrationModal}
+      />
+      <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
 
       {/* Feature Description */}
       <div className="mt-12 max-w-4xl text-center">

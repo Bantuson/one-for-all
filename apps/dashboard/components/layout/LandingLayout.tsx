@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import { Footer } from '../landing/Footer'
 

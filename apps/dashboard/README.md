@@ -1,167 +1,182 @@
-# One For All - Admissions Dashboard
+# One For All Dashboard
 
-Multi-tenant admissions management platform with AI-powered agents.
+> Multi-tenant admissions management platform powered by AI agents
 
 ## 🚀 Quick Start
 
-### Prerequisites
+**All documentation is located in the `/docs` folder.**
 
-- Node.js 18+
-- pnpm 8+
+### New to the project?
+Start here: **[`docs/QUICK_START.md`](docs/QUICK_START.md)** (20-minute setup)
 
-### Installation
+### Want the complete overview?
+See: **[`docs/README_FINAL.md`](docs/README_FINAL.md)**
 
-```bash
-# Install dependencies
-pnpm install
+---
 
-# Copy environment variables
-cp .env.example .env.local
+## 📚 Documentation Index
 
-# Start development server
-pnpm dev
-```
+### Getting Started
+- **[Quick Start Guide](docs/QUICK_START.md)** - 20-minute setup
+- **[Convex Setup Manual](docs/CONVEX_SETUP_MANUAL.md)** - Detailed Convex initialization
+- **[Setup Guide](docs/SETUP.md)** - Original comprehensive setup
 
-Visit [http://localhost:3000](http://localhost:3000) to see the landing page.
+### Architecture & Design
+- **[README Complete](docs/README_FINAL.md)** - Complete project overview
+- **[API Design](docs/API_DESIGN.md)** - Complete GraphQL API specification
+- **[Authentication Implementation](docs/AUTH_IMPLEMENTATION.md)** - Auth system details
+- **[Integration Status](docs/INTEGRATION_STATUS.md)** - Current implementation status
+
+### Migration Guides
+- **[GraphQL Migration Guide](docs/GRAPHQL_MIGRATION_GUIDE.md)** - Migrate to GraphQL API
+
+---
+
+## 📋 Project Status
+
+### ✅ Complete (Phase 1 & 2)
+- 43 UI components with dark/light themes
+- Multi-step registration wizard (4 steps)
+- **Clerk + Convex authentication (fully integrated)**
+- Multi-tenant database schema
+- RBAC system
+- Registration and sign-in functionality ready
+- GraphQL API architecture documented (for future use)
+
+### ⏳ Remaining (20 minutes)
+- Configure Clerk JWT template
+- Initialize Convex deployment
+- Add environment variables
+- Seed default roles
+
+**See [`docs/QUICK_START.md`](docs/QUICK_START.md) for setup instructions**
+
+---
 
 ## 🏗️ Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript 5.3
-- **Styling**: Tailwind CSS 3.4
-- **State Management**: Zustand
+- **Frontend**: Next.js 15, React, TypeScript, Tailwind CSS
+- **Authentication**: Clerk + Convex (complete)
+- **Backend**: Convex
+- **API**: GraphQL (future enhancement for complex nested queries)
+- **State**: Zustand
 - **Forms**: React Hook Form + Zod
-- **Database**: Supabase (PostgreSQL + Realtime)
-- **Testing**: Vitest + Testing Library
-- **Linting**: ESLint + Prettier
+- **UI**: Radix UI
+
+---
+
+## 🎯 Features
+
+- ✅ Multi-tenant institution management
+- ✅ Role-based access control (RBAC)
+- ✅ 4-step registration wizard
+- ✅ Dark/light theme support
+- ✅ Real-time database updates
+- ✅ Secure authentication flow
+- ✅ Type-safe end-to-end
+
+---
 
 ## 📁 Project Structure
 
 ```
-dashboard/
-├── app/                    # Next.js App Router pages
-│   ├── page.tsx            # Landing page
-│   ├── layout.tsx          # Root layout
-│   ├── globals.css         # Global styles
-│   └── providers.tsx       # Theme & state providers
-├── components/
-│   ├── ui/                 # Reusable UI components
-│   │   ├── Button.tsx
-│   │   └── ThemeToggle.tsx
-│   ├── layout/             # Layout components
-│   │   └── LandingLayout.tsx
-│   ├── landing/            # Landing page sections
-│   │   ├── Hero.tsx
-│   │   └── Footer.tsx
-│   └── branding/           # Brand assets
-│       └── Logo.tsx
-├── lib/
-│   ├── utils.ts            # Utility functions
-│   ├── hooks/              # Custom React hooks
-│   ├── stores/             # Zustand stores
-│   └── supabase/           # Supabase client config
-└── public/                 # Static assets
+apps/dashboard/
+├── app/                    # Next.js App Router
+├── components/             # React components
+│   ├── ui/                # Base UI components
+│   ├── auth/              # Authentication components
+│   ├── modals/            # Modal dialogs
+│   └── landing/           # Landing page
+├── convex/                # Convex backend functions
+│   ├── schema.ts          # Database schema
+│   ├── users.ts           # User management
+│   ├── institutions.ts    # Institution CRUD
+│   └── roles.ts           # RBAC system
+├── lib/                   # Utilities and helpers
+│   └── stores/            # Zustand state stores
+├── docs/                  # 📚 All documentation
+└── public/                # Static assets
 ```
 
-## 🎨 Features
+---
 
-### Landing Page
-
-- ✅ Light/Dark mode toggle
-- ✅ Dotted background pattern (starfield effect)
-- ✅ 3D bubble-letter logo with gradients
-- ✅ Responsive design
-- ✅ Register & Sign in CTAs
-
-### Theme System
-
-The app uses `next-themes` for seamless theme switching:
-
-```tsx
-import { useTheme } from 'next-themes'
-
-const { theme, setTheme } = useTheme()
-setTheme('dark') // or 'light'
-```
-
-Background pattern adapts automatically:
-- **Light mode**: Beige (#fdfcf9) with dark dots
-- **Dark mode**: Near-black (#0a0a0a) with light dots
-
-## 🔧 Development
-
-### Available Scripts
+## 🚦 Quick Commands
 
 ```bash
-pnpm dev          # Start development server
-pnpm build        # Production build
-pnpm start        # Start production server
-pnpm lint         # Run ESLint
-pnpm type-check   # TypeScript type checking
-pnpm format       # Format code with Prettier
-pnpm test         # Run tests
+# Development
+npm run dev
+
+# Build
+npm run build
+
+# Convex
+npx convex dev              # Initialize/develop
+npx convex logs             # View logs
+npx convex dashboard        # Open dashboard
+npx convex run roles:seedDefaultRoles  # Seed roles
 ```
 
-### Code Quality
+---
 
-Pre-commit hooks (Husky + lint-staged) automatically:
-- Format code with Prettier
-- Fix ESLint errors
-- Run type checking
+## 📖 Documentation Structure
 
-### Testing
-
-```bash
-# Run tests
-pnpm test
-
-# Watch mode
-pnpm test --watch
-
-# Coverage
-pnpm test --coverage
+```
+docs/
+├── QUICK_START.md                    # ⭐ Start here
+├── README_FINAL.md                   # Complete overview
+├── SETUP.md                          # Comprehensive setup guide
+├── CONVEX_SETUP_MANUAL.md           # Convex initialization
+├── API_DESIGN.md                     # GraphQL API specification
+├── GRAPHQL_MIGRATION_GUIDE.md       # GraphQL implementation
+├── AUTH_IMPLEMENTATION.md            # Authentication details
+└── INTEGRATION_STATUS.md             # Current status
 ```
 
-## 🗄️ Database Schema
+---
 
-The dashboard will connect to a multi-tenant Supabase database. See `apps/backend/docs/unified-schema-design.md` for the complete schema.
+## 🔐 Security
 
-### Environment Variables
+- Environment variables in root `.env.local` (gitignored)
+- Clerk JWT authentication
+- Row-level security via Convex
+- Security headers configured
+- Protected routes via middleware
 
-Create `.env.local` with:
+---
 
-```bash
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+## 🎨 Design System
 
-# API
-NEXT_PUBLIC_API_URL=http://localhost:3000
-```
+All components follow a consistent design system:
+- **Theme-aware**: Dark and light mode support
+- **Accessible**: ARIA labels, keyboard navigation
+- **Responsive**: Mobile-first approach
+- **Performant**: Optimized animations
 
-## 🚧 Roadmap
-
-- [ ] Implement Supabase Auth (login/register)
-- [ ] Add applicant dashboard (`/my-applications`)
-- [ ] Build institution dashboard (`/dashboard/[institution_slug]`)
-- [ ] Integrate React Flow sandbox
-- [ ] Add realtime application updates
-- [ ] Implement agent configuration UI
-
-## 📚 Documentation
-
-- [Frontend Architecture](../../apps/backend/docs/frontend-architecture.md)
-- [Multi-Tenant Schema](../../apps/backend/docs/unified-schema-design.md)
-- [Agent Customization](../../apps/backend/docs/dynamic-agent-loader-spec.md)
+---
 
 ## 🤝 Contributing
 
-1. Follow the existing code style
-2. Run `pnpm format` before committing
-3. Ensure all tests pass
-4. Add tests for new features
+1. Read the documentation in `/docs`
+2. Follow TypeScript strict mode
+3. Use conventional commits
+4. Test before submitting PRs
 
-## 📝 License
+---
 
-© 2025 One For All. All rights reserved.
+## 📞 Support
+
+**Documentation**: See [`/docs`](docs/) folder
+**Setup Issues**: Check [`docs/CONVEX_SETUP_MANUAL.md`](docs/CONVEX_SETUP_MANUAL.md)
+**API Reference**: See [`docs/API_DESIGN.md`](docs/API_DESIGN.md)
+
+---
+
+## 📄 License
+
+[Add your license here]
+
+---
+
+**Status**: Ready for Convex deployment! 🚀
+
+See [`docs/QUICK_START.md`](docs/QUICK_START.md) to get started.
