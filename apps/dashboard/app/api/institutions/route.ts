@@ -1,6 +1,6 @@
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 // GET /api/institutions - Get all institutions user is a member of
 export async function GET() {
@@ -80,10 +80,11 @@ export async function POST(req: Request) {
       )
     }
 
-    const supabase = await createClient()
+    // Use service role client for user lookup/sync operations (bypasses RLS)
+    const serviceSupabase = createServiceClient()
 
     // Get current user from Supabase
-    let { data: user, error: userError } = await supabase
+    let { data: user, error: userError } = await serviceSupabase
       .from('users')
       .select('id')
       .eq('clerk_user_id', userId)
@@ -110,8 +111,8 @@ export async function POST(req: Request) {
         )
       }
 
-      // Sync user to Supabase
-      const { data: syncedUserId, error: syncError } = await supabase.rpc(
+      // Sync user to Supabase using service client (bypasses RLS)
+      const { data: syncedUserId, error: syncError } = await serviceSupabase.rpc(
         'sync_clerk_user',
         {
           p_clerk_user_id: userId,
@@ -125,14 +126,15 @@ export async function POST(req: Request) {
 
       if (syncError) {
         console.error('Error syncing user from Clerk:', syncError)
+        console.error('Sync error details:', JSON.stringify(syncError, null, 2))
         return NextResponse.json(
-          { error: 'Failed to sync user' },
+          { error: 'Failed to sync user', details: syncError.message },
           { status: 500 }
         )
       }
 
-      // Fetch the newly created user
-      const { data: newUser, error: newUserError } = await supabase
+      // Fetch the newly created user using service client
+      const { data: newUser, error: newUserError } = await serviceSupabase
         .from('users')
         .select('id')
         .eq('clerk_user_id', userId)
@@ -154,8 +156,8 @@ export async function POST(req: Request) {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
 
-    // Create institution
-    const { data: institution, error: institutionError } = await supabase
+    // Create institution using service client (bypasses RLS for initial creation)
+    const { data: institution, error: institutionError } = await serviceSupabase
       .from('institutions')
       .insert({
         name,
@@ -171,6 +173,7 @@ export async function POST(req: Request) {
 
     if (institutionError) {
       console.error('Error creating institution:', institutionError)
+      console.error('Institution error details:', JSON.stringify(institutionError, null, 2))
 
       // Handle duplicate slug
       if (institutionError.code === '23505') {
@@ -181,7 +184,7 @@ export async function POST(req: Request) {
       }
 
       return NextResponse.json(
-        { error: 'Failed to create institution' },
+        { error: 'Failed to create institution', details: institutionError.message },
         { status: 500 }
       )
     }

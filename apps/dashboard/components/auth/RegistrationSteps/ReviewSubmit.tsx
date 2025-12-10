@@ -46,8 +46,18 @@ export function ReviewSubmit() {
         throw new Error(data.error || 'Failed to create institution')
       }
 
+      // Mark onboarding as complete in database
+      await fetch('/api/users/complete-onboarding', {
+        method: 'POST',
+      })
+
       // Reset registration state
       reset()
+
+      // Force clear localStorage to prevent state resurrection
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('registration-storage')
+      }
 
       // Navigate to dashboard
       router.push(`/dashboard/${data.institution.slug}`)

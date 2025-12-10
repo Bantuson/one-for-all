@@ -9,7 +9,9 @@ import { UserTypeSelection } from '@/components/auth/RegistrationSteps/UserTypeS
 import { InstitutionTypeSelection } from '@/components/auth/RegistrationSteps/InstitutionTypeSelection'
 import { InstitutionDetails } from '@/components/auth/RegistrationSteps/InstitutionDetails'
 import { ReviewSubmit } from '@/components/auth/RegistrationSteps/ReviewSubmit'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useUser } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
 
 interface RegistrationModalProps {
   open: boolean
@@ -18,6 +20,43 @@ interface RegistrationModalProps {
 
 export function RegistrationModal({ open, onOpenChange }: RegistrationModalProps) {
   const { currentStep, userType, reset } = useRegistrationStore()
+  const { isSignedIn } = useUser()
+  const [checkingInstitutions, setCheckingInstitutions] = useState(false)
+  const router = useRouter()
+
+  // Database-first check: If user is signed in when modal opens, check for existing institutions
+  useEffect(() => {
+    async function checkExistingInstitutions() {
+      if (open && isSignedIn && !checkingInstitutions) {
+        setCheckingInstitutions(true)
+        try {
+          const response = await fetch('/api/institutions')
+
+          // Only proceed if request was successful
+          if (!response.ok) {
+            console.error('Failed to fetch institutions:', response.status)
+            return
+          }
+
+          const data = await response.json()
+
+          if (data.institutions && data.institutions.length > 0) {
+            // User already has institutions, close modal and redirect
+            onOpenChange(false)
+            router.push(`/dashboard/${data.institutions[0].slug}`)
+          }
+        } catch (error) {
+          console.error('Error checking institutions:', error)
+          // Don't block the user from proceeding with registration
+          // Just log the error and continue
+        } finally {
+          setCheckingInstitutions(false)
+        }
+      }
+    }
+
+    checkExistingInstitutions()
+  }, [open, isSignedIn, onOpenChange, router, checkingInstitutions])
 
   // Reset store when modal closes
   useEffect(() => {

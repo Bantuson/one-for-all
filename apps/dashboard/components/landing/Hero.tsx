@@ -6,10 +6,23 @@ import { Button } from '../ui/Button'
 import { RegistrationModal } from '../modals/RegistrationModal'
 import { LoginModal } from '../modals/LoginModal'
 
-export function Hero() {
+interface HeroProps {
+  showRegistrationModal?: boolean
+}
+
+export function Hero({ showRegistrationModal: initialShowRegistration }: HeroProps) {
   const cardsRef = useRef<(HTMLDivElement | null)[]>([])
-  const [showRegistrationModal, setShowRegistrationModal] = useState(false)
+  const [showRegistrationModal, setShowRegistrationModal] = useState(
+    initialShowRegistration || false
+  )
   const [showLoginModal, setShowLoginModal] = useState(false)
+
+  // Open registration modal if URL param is set
+  useEffect(() => {
+    if (initialShowRegistration) {
+      setShowRegistrationModal(true)
+    }
+  }, [initialShowRegistration])
 
   useEffect(() => {
     const observer = new IntersectionObserver(

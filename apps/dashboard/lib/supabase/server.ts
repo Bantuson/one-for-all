@@ -1,40 +1,66 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
+/**
+ * Create a Supabase client for use in Server Components/Actions/Route Handlers with Clerk authentication
+ * Automatically passes Clerk session token to Supabase for RLS policy enforcement
+ *
+ * @example
+ * ```tsx
+ * import { createClient } from '@/lib/supabase/server'
+ *
+ * export async function GET() {
+ *   const supabase = await createClient()
+ *   const { data } = await supabase.from('institutions').select('*')
+ *   return Response.json({ data })
+ * }
+ * ```
+ */
 export async function createClient() {
-  const cookieStore = await cookies()
+  const { getToken } = await auth()
 
-  return createServerClient(
+  return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
+      global: {
+        headers: async () => {
+          const token = await getToken()
+          return token ? { Authorization: `Bearer ${token}` } : {}
         },
       },
     }
   )
 }
 
-// Service role client for admin operations (use cautiously)
+/**
+ * Create a Supabase client with service role credentials for admin operations
+ * **USE WITH CAUTION**: This bypasses all Row Level Security (RLS) policies
+ *
+ * Use this client only for:
+ * - User creation/sync operations (chicken-egg problem where user doesn't exist yet)
+ * - Administrative operations that need to bypass RLS
+ * - Background jobs/cron tasks
+ * - Server-side operations where user context isn't available
+ *
+ * @example
+ * ```tsx
+ * import { createServiceClient } from '@/lib/supabase/server'
+ *
+ * // Sync user from Clerk webhook
+ * const supabase = createServiceClient()
+ * await supabase.rpc('sync_clerk_user', { ... })
+ * ```
+ */
 export function createServiceClient() {
-  return createServerClient(
+  return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
-      cookies: {},
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
     }
   )
 }

@@ -54,6 +54,7 @@ CREATE INDEX IF NOT EXISTS idx_institutions_status ON public.institutions(status
 CREATE INDEX IF NOT EXISTS idx_institutions_created_by ON public.institutions(created_by);
 
 -- Updated_at trigger
+DROP TRIGGER IF EXISTS update_institutions_updated_at ON public.institutions;
 CREATE TRIGGER update_institutions_updated_at
     BEFORE UPDATE ON public.institutions
     FOR EACH ROW
@@ -80,6 +81,7 @@ CREATE TABLE IF NOT EXISTS public.campuses (
 CREATE INDEX IF NOT EXISTS idx_campuses_institution_id ON public.campuses(institution_id);
 CREATE INDEX IF NOT EXISTS idx_campuses_code ON public.campuses(institution_id, code);
 
+DROP TRIGGER IF EXISTS update_campuses_updated_at ON public.campuses;
 CREATE TRIGGER update_campuses_updated_at
     BEFORE UPDATE ON public.campuses
     FOR EACH ROW
@@ -107,6 +109,7 @@ CREATE INDEX IF NOT EXISTS idx_faculties_institution_id ON public.faculties(inst
 CREATE INDEX IF NOT EXISTS idx_faculties_campus_id ON public.faculties(campus_id);
 CREATE INDEX IF NOT EXISTS idx_faculties_code ON public.faculties(institution_id, code);
 
+DROP TRIGGER IF EXISTS update_faculties_updated_at ON public.faculties;
 CREATE TRIGGER update_faculties_updated_at
     BEFORE UPDATE ON public.faculties
     FOR EACH ROW
@@ -148,6 +151,7 @@ CREATE INDEX IF NOT EXISTS idx_courses_faculty_id ON public.courses(faculty_id);
 CREATE INDEX IF NOT EXISTS idx_courses_code ON public.courses(institution_id, code);
 CREATE INDEX IF NOT EXISTS idx_courses_status ON public.courses(status);
 
+DROP TRIGGER IF EXISTS update_courses_updated_at ON public.courses;
 CREATE TRIGGER update_courses_updated_at
     BEFORE UPDATE ON public.courses
     FOR EACH ROW
@@ -178,6 +182,7 @@ CREATE INDEX IF NOT EXISTS idx_institution_members_institution_id ON public.inst
 CREATE INDEX IF NOT EXISTS idx_institution_members_user_id ON public.institution_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_institution_members_role ON public.institution_members(role);
 
+DROP TRIGGER IF EXISTS update_institution_members_updated_at ON public.institution_members;
 CREATE TRIGGER update_institution_members_updated_at
     BEFORE UPDATE ON public.institution_members
     FOR EACH ROW
@@ -408,6 +413,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS auto_assign_admin ON public.institutions;
 CREATE TRIGGER auto_assign_admin
     AFTER INSERT ON public.institutions
     FOR EACH ROW
