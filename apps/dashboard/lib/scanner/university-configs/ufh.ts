@@ -94,6 +94,22 @@ export const UFH_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 5,
+    minCourses: 100,
+    minCampuses: 3,
+  },
+
+  scrapingConfig: {
+    maxPages: 70,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/study',
+    ],
+  },
+
   establishedYear: 1916,
   city: 'Alice',
   province: 'Eastern Cape',

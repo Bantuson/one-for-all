@@ -124,6 +124,22 @@ export const UMP_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 11,
+    minCourses: 100,
+    minCampuses: 2,
+  },
+
+  scrapingConfig: {
+    maxPages: 60,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/schools',
+    ],
+  },
+
   establishedYear: 2013,
   city: 'Mbombela',
   province: 'Mpumalanga',

@@ -68,6 +68,22 @@ export const UL_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 4,
+    minCourses: 150,
+    minCampuses: 1,
+  },
+
+  scrapingConfig: {
+    maxPages: 80,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/study',
+    ],
+  },
+
   establishedYear: 2005,
   city: 'Polokwane',
   province: 'Limpopo',

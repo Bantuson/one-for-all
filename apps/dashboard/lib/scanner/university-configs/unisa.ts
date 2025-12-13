@@ -114,6 +114,23 @@ export const UNISA_CONFIG: UniversityConfig = {
     programmeList: '.qualification-list, .programmes',
   },
 
+  targets: {
+    minFaculties: 8,
+    minCourses: 350,
+    minCampuses: 8,
+  },
+
+  scrapingConfig: {
+    maxPages: 200,
+    maxDepth: 4,
+    priorityUrls: [
+      '/qualifications',
+      '/programmes',
+      '/colleges',
+      '/study',
+    ],
+  },
+
   programmeCodePattern: /\b([A-Z]{3}\d{4}[A-Z]?)\b/, // UNISA uses codes like CTA1501
 
   establishedYear: 1873,

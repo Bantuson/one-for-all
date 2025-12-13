@@ -74,6 +74,22 @@ export const SMU_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 5,
+    minCourses: 50,
+    minCampuses: 1,
+  },
+
+  scrapingConfig: {
+    maxPages: 40,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/schools',
+      '/study',
+    ],
+  },
+
   establishedYear: 2014,
   city: 'Ga-Rankuwa',
   province: 'Gauteng',

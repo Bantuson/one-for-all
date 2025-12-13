@@ -99,6 +99,23 @@ export const UKZN_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .qualifications-list',
   },
 
+  targets: {
+    minFaculties: 4,
+    minCourses: 180,
+    minCampuses: 5,
+  },
+
+  scrapingConfig: {
+    maxPages: 100,
+    maxDepth: 4,
+    priorityUrls: [
+      '/programmes',
+      '/qualifications',
+      '/colleges',
+      '/study',
+    ],
+  },
+
   establishedYear: 2004,
   city: 'Durban',
   province: 'KwaZulu-Natal',

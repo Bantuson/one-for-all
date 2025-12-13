@@ -137,6 +137,23 @@ export const EDUVOS_CONFIG: UniversityConfig = {
     programmeList: '.programmes, .course-list',
   },
 
+  targets: {
+    minFaculties: 9,
+    minCourses: 20,
+    minCampuses: 12,
+  },
+
+  scrapingConfig: {
+    maxPages: 40,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/schools',
+      '/study-with-us',
+    ],
+  },
+
   establishedYear: 2019, // Rebranded from Pearson Institute/CTI/MGI
   city: 'Midrand',
   province: 'Gauteng',

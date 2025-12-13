@@ -82,6 +82,22 @@ export const UNIVEN_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 4,
+    minCourses: 120,
+    minCampuses: 1,
+  },
+
+  scrapingConfig: {
+    maxPages: 70,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/study',
+    ],
+  },
+
   establishedYear: 1982,
   city: 'Thohoyandou',
   province: 'Limpopo',

@@ -81,6 +81,22 @@ export const RHODES_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 6,
+    minCourses: 100,
+    minCampuses: 1,
+  },
+
+  scrapingConfig: {
+    maxPages: 60,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/study',
+    ],
+  },
+
   establishedYear: 1904,
   city: 'Makhanda',
   province: 'Eastern Cape',

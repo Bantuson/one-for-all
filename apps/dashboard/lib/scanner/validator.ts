@@ -450,3 +450,79 @@ export function validateAndClean(
       return { isValid: false, confidence: 0, reason: 'Unknown type' }
   }
 }
+
+/**
+ * Validate extraction results against targets.
+ * Throws error if below 80% of targets (hard enforcement).
+ */
+export function validateExtractionTargets(
+  results: { campuses: any[]; faculties?: any[]; courses?: any[] },
+  websiteUrl: string
+): void {
+  const config = getUniversityConfig(websiteUrl)
+  if (!config?.targets) {
+    console.log('[Validator] No targets configured, skipping validation')
+    return
+  }
+
+  // Count extracted items
+  const extracted = {
+    faculties:
+      results.faculties?.length ??
+      results.campuses.reduce(
+        (sum, c) => sum + (c.faculties?.length ?? 0),
+        0
+      ),
+    courses:
+      results.courses?.length ??
+      results.campuses.reduce(
+        (sum, c) =>
+          sum +
+          (c.faculties?.reduce(
+            (fsum: number, f: any) => fsum + (f.courses?.length ?? 0),
+            0
+          ) ?? 0),
+        0
+      ),
+    campuses: results.campuses.length,
+  }
+
+  const targets = config.targets
+  const threshold = 0.8 // 80% minimum
+
+  const facultyPercent = extracted.faculties / targets.minFaculties
+  const coursePercent = extracted.courses / targets.minCourses
+  const campusPercent = extracted.campuses / targets.minCampuses
+
+  const errors: string[] = []
+
+  if (facultyPercent < threshold) {
+    errors.push(
+      `Faculties: Expected ${targets.minFaculties}, got ${extracted.faculties} (${(facultyPercent * 100).toFixed(1)}%)`
+    )
+  }
+
+  if (coursePercent < threshold) {
+    errors.push(
+      `Courses: Expected ${targets.minCourses}, got ${extracted.courses} (${(coursePercent * 100).toFixed(1)}%)`
+    )
+  }
+
+  if (campusPercent < threshold) {
+    errors.push(
+      `Campuses: Expected ${targets.minCampuses}, got ${extracted.campuses} (${(campusPercent * 100).toFixed(1)}%)`
+    )
+  }
+
+  if (errors.length > 0) {
+    throw new Error(
+      `Scan failed to meet extraction targets for ${config.name}:\n` +
+        errors.join('\n') +
+        `\n\nPlease re-scan or adjust configuration.`
+    )
+  }
+
+  console.log(
+    `[Validator] ✓ Targets met: ${extracted.faculties} faculties, ${extracted.courses} courses, ${extracted.campuses} campuses`
+  )
+}

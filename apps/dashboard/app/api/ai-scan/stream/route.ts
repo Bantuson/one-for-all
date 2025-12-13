@@ -277,10 +277,17 @@ export async function POST(req: NextRequest) {
             })
 
             const { parsePage, findAcademicLinks } = await import('@/lib/scanner/parser')
+            const { getUniversityConfig } = await import('@/lib/scanner/university-configs')
+
+            // Get institution-specific scraping config or use conservative defaults
+            const config = getUniversityConfig(website_url)
+            const maxPages = config?.scrapingConfig.maxPages ?? 50
+            const maxDepth = config?.scrapingConfig.maxDepth ?? 3
+
+            console.log(`[Scraper] Config-based limits for ${config?.name ?? 'unknown institution'}: ${maxPages} pages, depth ${maxDepth}`)
+
             const visitedUrls = new Set<string>()
             const urlQueue: Array<{ url: string; depth: number }> = [{ url: website_url, depth: 0 }]
-            const maxPages = 15  // Reduced to stay within timeout (15 pages × 5-7s = ~90s analysis)
-            const maxDepth = 2   // homepage -> faculty -> course
 
             while (urlQueue.length > 0 && scrapedPages.length < maxPages) {
               const item = urlQueue.shift()
@@ -387,16 +394,33 @@ export async function POST(req: NextRequest) {
             const llmResults = await extractWithLLM(scrapedPages, website_url)
 
             if (llmResults) {
-              // LLM succeeded - send results
+              // LLM succeeded - validate and send results
               llmResults.totalTimeMs = Date.now() - parseInt(jobTimestamp, 10)
               llmResults.totalPagesScraped = scrapedPages.length
               llmResults.institutionId = institution_id
 
-              sendEvent({
-                type: 'complete',
-                results: llmResults,
-                timestamp: Date.now(),
-              })
+              // Validate against targets
+              try {
+                const { validateExtractionTargets } = await import('@/lib/scanner/validator')
+                validateExtractionTargets(llmResults, website_url)
+
+                sendEvent({
+                  type: 'complete',
+                  results: llmResults,
+                  timestamp: Date.now(),
+                })
+              } catch (validationError) {
+                sendEvent({
+                  type: 'error',
+                  message:
+                    validationError instanceof Error
+                      ? validationError.message
+                      : 'Target validation failed',
+                  recoverable: false,
+                  timestamp: Date.now(),
+                })
+                return
+              }
             } else {
               // LLM failed - fall back to validated regex
               console.log('[Scanner] LLM extraction failed, falling back to regex')
@@ -411,11 +435,28 @@ export async function POST(req: NextRequest) {
               const regexResults = await analyzeWithRegex(institution_id, website_url, scrapedPages)
               regexResults.totalTimeMs = Date.now() - parseInt(jobTimestamp, 10)
 
-              sendEvent({
-                type: 'complete',
-                results: regexResults,
-                timestamp: Date.now(),
-              })
+              // Validate against targets
+              try {
+                const { validateExtractionTargets } = await import('@/lib/scanner/validator')
+                validateExtractionTargets(regexResults, website_url)
+
+                sendEvent({
+                  type: 'complete',
+                  results: regexResults,
+                  timestamp: Date.now(),
+                })
+              } catch (validationError) {
+                sendEvent({
+                  type: 'error',
+                  message:
+                    validationError instanceof Error
+                      ? validationError.message
+                      : 'Target validation failed',
+                  recoverable: false,
+                  timestamp: Date.now(),
+                })
+                return
+              }
             }
           } else {
             // No DeepSeek - use validated regex extraction
@@ -430,11 +471,28 @@ export async function POST(req: NextRequest) {
             const regexResults = await analyzeWithRegex(institution_id, website_url, scrapedPages)
             regexResults.totalTimeMs = Date.now() - parseInt(jobTimestamp, 10)
 
-            sendEvent({
-              type: 'complete',
-              results: regexResults,
-              timestamp: Date.now(),
-            })
+            // Validate against targets
+            try {
+              const { validateExtractionTargets } = await import('@/lib/scanner/validator')
+              validateExtractionTargets(regexResults, website_url)
+
+              sendEvent({
+                type: 'complete',
+                results: regexResults,
+                timestamp: Date.now(),
+              })
+            } catch (validationError) {
+              sendEvent({
+                type: 'error',
+                message:
+                  validationError instanceof Error
+                    ? validationError.message
+                    : 'Target validation failed',
+                recoverable: false,
+                timestamp: Date.now(),
+              })
+              return
+            }
           }
         } catch (error) {
           const message =

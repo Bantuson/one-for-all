@@ -120,6 +120,22 @@ export const NWU_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .programs-listing',
   },
 
+  targets: {
+    minFaculties: 9,
+    minCourses: 180,
+    minCampuses: 3,
+  },
+
+  scrapingConfig: {
+    maxPages: 100,
+    maxDepth: 4,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/study',
+    ],
+  },
+
   establishedYear: 2004,
   city: 'Potchefstroom',
   province: 'North West',

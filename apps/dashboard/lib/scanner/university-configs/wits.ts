@@ -132,6 +132,24 @@ export const WITS_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .course-list',
   },
 
+  targets: {
+    minFaculties: 5,
+    minCourses: 2500,
+    minCampuses: 6,
+  },
+
+  scrapingConfig: {
+    maxPages: 250,
+    maxDepth: 4,
+    priorityUrls: [
+      '/academic-programmes',
+      '/faculties-and-schools',
+      '/study',
+      '/undergraduate',
+      '/postgraduate',
+    ],
+  },
+
   establishedYear: 1922,
   city: 'Johannesburg',
   province: 'Gauteng',

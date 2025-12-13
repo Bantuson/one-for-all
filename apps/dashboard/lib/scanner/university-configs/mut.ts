@@ -57,6 +57,22 @@ export const MUT_CONFIG: UniversityConfig = {
     programmeList: '.programmes, .courses, .qualification-list',
   },
 
+  targets: {
+    minFaculties: 3,
+    minCourses: 80,
+    minCampuses: 2,
+  },
+
+  scrapingConfig: {
+    maxPages: 50,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/qualifications',
+    ],
+  },
+
   establishedYear: 1979,
   city: 'Durban',
   province: 'KwaZulu-Natal',

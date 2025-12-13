@@ -83,6 +83,22 @@ export const UNIZULU_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 4,
+    minCourses: 120,
+    minCampuses: 2,
+  },
+
+  scrapingConfig: {
+    maxPages: 70,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/qualifications',
+    ],
+  },
+
   establishedYear: 1960,
   city: 'KwaDlangezwa',
   province: 'KwaZulu-Natal',

@@ -62,6 +62,22 @@ export const CUT_CONFIG: UniversityConfig = {
     programmeList: '.programmes, .courses, .qualification-list',
   },
 
+  targets: {
+    minFaculties: 4,
+    minCourses: 100,
+    minCampuses: 2,
+  },
+
+  scrapingConfig: {
+    maxPages: 60,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/qualifications',
+    ],
+  },
+
   establishedYear: 1981,
   city: 'Bloemfontein',
   province: 'Free State',

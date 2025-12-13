@@ -106,6 +106,24 @@ export const UCT_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses',
   },
 
+  targets: {
+    minFaculties: 6,
+    minCourses: 250,
+    minCampuses: 6,
+  },
+
+  scrapingConfig: {
+    maxPages: 120,
+    maxDepth: 4,
+    priorityUrls: [
+      '/study',
+      '/faculties',
+      '/programmes',
+      '/undergraduate',
+      '/postgraduate',
+    ],
+  },
+
   establishedYear: 1829,
   city: 'Cape Town',
   province: 'Western Cape',

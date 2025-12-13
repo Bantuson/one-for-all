@@ -94,6 +94,22 @@ export const CPUT_CONFIG: UniversityConfig = {
     programmeList: '.programmes, .courses, .qualification-list',
   },
 
+  targets: {
+    minFaculties: 6,
+    minCourses: 200,
+    minCampuses: 6,
+  },
+
+  scrapingConfig: {
+    maxPages: 100,
+    maxDepth: 4,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/qualifications',
+    ],
+  },
+
   establishedYear: 2005,
   city: 'Cape Town',
   province: 'Western Cape',

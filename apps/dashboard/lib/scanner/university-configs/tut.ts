@@ -114,6 +114,22 @@ export const TUT_CONFIG: UniversityConfig = {
     programmeList: '.programmes, .courses, .qualification-list',
   },
 
+  targets: {
+    minFaculties: 7,
+    minCourses: 350,
+    minCampuses: 9,
+  },
+
+  scrapingConfig: {
+    maxPages: 180,
+    maxDepth: 4,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/qualifications',
+    ],
+  },
+
   establishedYear: 2004,
   city: 'Pretoria',
   province: 'Gauteng',

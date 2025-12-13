@@ -47,6 +47,20 @@ export interface UniversityConfig {
     courseCard?: string
   }
 
+  // Extraction targets for hard validation
+  targets: {
+    minFaculties: number  // Minimum faculties expected
+    minCourses: number    // Minimum courses/programmes expected
+    minCampuses: number   // Minimum campuses expected
+  }
+
+  // Institution-specific scraping configuration
+  scrapingConfig: {
+    maxPages: number         // How many pages to crawl
+    maxDepth: number         // Crawl depth (home=0, faculty=1, course=2, etc.)
+    priorityUrls: string[]   // Known listing page URLs to prioritize
+  }
+
   // Additional metadata
   programmeCodePattern?: RegExp
   establishedYear?: number

@@ -78,6 +78,22 @@ export const SPU_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 4,
+    minCourses: 40,
+    minCampuses: 3,
+  },
+
+  scrapingConfig: {
+    maxPages: 40,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/study',
+    ],
+  },
+
   establishedYear: 2014,
   city: 'Kimberley',
   province: 'Northern Cape',

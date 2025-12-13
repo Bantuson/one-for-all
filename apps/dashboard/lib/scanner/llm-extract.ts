@@ -86,9 +86,11 @@ export async function extractWithLLM(
           p.type === 'programme' ||
           p.type === 'campus' ||
           p.type === 'home' ||
-          p.links.length > 5
+          p.links.length > 5 ||
+          p.url.includes('/programme') ||
+          p.url.includes('/course')
       )
-      .slice(0, 12)
+      .slice(0, 50)
 
     if (relevantPages.length === 0) {
       console.log('[LLM] No relevant pages found')
@@ -109,7 +111,7 @@ export async function extractWithLLM(
       ],
       response_format: { type: 'json_object' },
       temperature: 0.1,
-      max_tokens: 3000,
+      max_tokens: 8000,
     })
 
     const content = response.choices[0]?.message?.content
@@ -165,6 +167,12 @@ ${config.faculties.map((f) => `- ${f.name}`).join('\n')}
 KNOWN CAMPUSES (use these exact names if found):
 ${config.campuses.map((c) => `- ${c.name}${c.location ? ` (${c.location})` : ''}`).join('\n')}
 
+EXTRACTION TARGETS (aim to extract at least this many):
+- Faculties: ${config.targets.minFaculties}
+- Courses/Programmes: ${config.targets.minCourses}
+- Campuses: ${config.targets.minCampuses}
+
+If you don't see enough content to meet these targets, extract everything you can find.
 If you find content that matches a known faculty/campus, use the EXACT name from above.
 `
   } else {

@@ -135,6 +135,22 @@ export const WSU_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 7,
+    minCourses: 150,
+    minCampuses: 4,
+  },
+
+  scrapingConfig: {
+    maxPages: 90,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/study',
+    ],
+  },
+
   establishedYear: 2005,
   city: 'Mthatha',
   province: 'Eastern Cape',

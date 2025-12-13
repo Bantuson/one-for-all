@@ -121,6 +121,23 @@ export const UP_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .programmes-listing',
   },
 
+  targets: {
+    minFaculties: 9,
+    minCourses: 1000,
+    minCampuses: 7,
+  },
+
+  scrapingConfig: {
+    maxPages: 180,
+    maxDepth: 4,
+    priorityUrls: [
+      '/postgraduate-studies/article/3182123/faculties-and-programmes',
+      '/schools-and-departments',
+      '/undergraduate',
+      '/faculties',
+    ],
+  },
+
   programmeCodePattern: /\b(\d{8})\b/, // UP uses 8-digit programme codes
 
   establishedYear: 1908,

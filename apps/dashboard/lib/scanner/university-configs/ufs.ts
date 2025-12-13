@@ -109,6 +109,22 @@ export const UFS_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 7,
+    minCourses: 150,
+    minCampuses: 3,
+  },
+
+  scrapingConfig: {
+    maxPages: 80,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/study-at-the-ufs',
+    ],
+  },
+
   establishedYear: 1904,
   city: 'Bloemfontein',
   province: 'Free State',

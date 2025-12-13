@@ -121,6 +121,24 @@ export const UJ_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 8,
+    minCourses: 300,
+    minCampuses: 4,
+  },
+
+  scrapingConfig: {
+    maxPages: 140,
+    maxDepth: 4,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/study',
+      '/undergraduate',
+      '/postgraduate',
+    ],
+  },
+
   establishedYear: 2005,
   city: 'Johannesburg',
   province: 'Gauteng',

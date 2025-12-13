@@ -147,6 +147,22 @@ export const NMU_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 7,
+    minCourses: 200,
+    minCampuses: 7,
+  },
+
+  scrapingConfig: {
+    maxPages: 120,
+    maxDepth: 4,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/study',
+    ],
+  },
+
   establishedYear: 2005,
   city: 'Gqeberha',
   province: 'Eastern Cape',

@@ -72,6 +72,22 @@ export const VUT_CONFIG: UniversityConfig = {
     programmeList: '.programmes, .courses, .qualification-list',
   },
 
+  targets: {
+    minFaculties: 4,
+    minCourses: 120,
+    minCampuses: 4,
+  },
+
+  scrapingConfig: {
+    maxPages: 70,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/qualifications',
+    ],
+  },
+
   establishedYear: 2004,
   city: 'Vanderbijlpark',
   province: 'Gauteng',

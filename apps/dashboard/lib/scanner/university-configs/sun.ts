@@ -125,6 +125,24 @@ export const SUN_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .courses-list',
   },
 
+  targets: {
+    minFaculties: 10,
+    minCourses: 200,
+    minCampuses: 5,
+  },
+
+  scrapingConfig: {
+    maxPages: 120,
+    maxDepth: 4,
+    priorityUrls: [
+      '/faculties',
+      '/programmes',
+      '/study',
+      '/undergraduate',
+      '/postgraduate',
+    ],
+  },
+
   establishedYear: 1918,
   city: 'Stellenbosch',
   province: 'Western Cape',

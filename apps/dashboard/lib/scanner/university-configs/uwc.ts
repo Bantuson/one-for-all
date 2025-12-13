@@ -79,6 +79,22 @@ export const UWC_CONFIG: UniversityConfig = {
     programmeList: '.programme-list, .programs',
   },
 
+  targets: {
+    minFaculties: 7,
+    minCourses: 120,
+    minCampuses: 2,
+  },
+
+  scrapingConfig: {
+    maxPages: 80,
+    maxDepth: 3,
+    priorityUrls: [
+      '/programmes',
+      '/faculties',
+      '/study',
+    ],
+  },
+
   establishedYear: 1959,
   city: 'Cape Town',
   province: 'Western Cape',
