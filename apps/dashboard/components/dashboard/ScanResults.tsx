@@ -14,9 +14,11 @@ import {
   RefreshCw,
   ExternalLink,
   AlertTriangle,
+  LayoutGrid,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useScanStore } from '@/lib/stores/scanStore'
+import { DashboardPreview } from './DashboardPreview'
 import type { ScanResults as ScanResultsType, Campus, Faculty, Course } from '@/lib/scanner/types'
 
 interface ScanResultsProps {
@@ -34,6 +36,7 @@ export function ScanResults({
   onCancel,
   onRescan,
 }: ScanResultsProps) {
+  const [showPreview, setShowPreview] = useState(false)
   const {
     expandedCampuses,
     expandedFaculties,
@@ -60,6 +63,18 @@ export function ScanResults({
     0
   )
 
+  // Show Dashboard Preview mode
+  if (showPreview) {
+    return (
+      <DashboardPreview
+        results={results}
+        institutionSlug={institutionSlug}
+        onBack={() => setShowPreview(false)}
+        onAccept={onAccept}
+      />
+    )
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -76,6 +91,14 @@ export function ScanResults({
               <Button variant="outline" size="sm" onClick={onRescan}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Rescan
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPreview(true)}
+              >
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                Preview Dashboard
               </Button>
               <Button variant="ghost" size="sm" onClick={onCancel}>
                 Cancel
@@ -115,9 +138,9 @@ export function ScanResults({
             <EmptyState onRescan={onRescan} />
           ) : (
             <div className="space-y-4">
-              {results.campuses.map((campus) => (
+              {results.campuses.map((campus, campusIndex) => (
                 <CampusItem
-                  key={campus.id}
+                  key={campus.id || `campus-${campusIndex}`}
                   campus={campus}
                   isExpanded={expandedCampuses.has(campus.id)}
                   expandedFaculties={expandedFaculties}
@@ -294,9 +317,9 @@ function CampusItem({
               No faculties found for this campus
             </div>
           ) : (
-            campus.faculties.map((faculty) => (
+            campus.faculties.map((faculty, facultyIndex) => (
               <FacultyItem
-                key={faculty.id}
+                key={faculty.id || `faculty-${facultyIndex}`}
                 faculty={faculty}
                 isExpanded={expandedFaculties.has(faculty.id)}
                 editingItemId={editingItemId}
@@ -428,9 +451,9 @@ function FacultyItem({
               No courses found for this faculty
             </div>
           ) : (
-            faculty.courses.map((course) => (
+            faculty.courses.map((course, courseIndex) => (
               <CourseItem
-                key={course.id}
+                key={course.id || `course-${courseIndex}`}
                 course={course}
                 editingItemId={editingItemId}
                 onEdit={onEdit}

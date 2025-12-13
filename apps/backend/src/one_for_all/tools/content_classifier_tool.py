@@ -5,7 +5,7 @@ Classifies web page content to identify academic page types
 (campus, faculty, department, course, etc.)
 """
 
-from crewai_tools import tool
+from crewai.tools import tool
 import re
 import json
 from typing import Dict, List, Tuple

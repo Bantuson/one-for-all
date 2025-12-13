@@ -6,3 +6,10 @@ node_modules
 .venv
 claude.md
 docs
+
+# Screenshots
+Screenshot*.png
+*.png
+*.jpg
+*.jpeg
+*.gif

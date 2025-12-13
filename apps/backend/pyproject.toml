@@ -4,13 +4,17 @@ version = "0.1.0"
 description = "CrewAI-powered South African university & NSFAS automation assistant"
 authors = [{name="Your Name"}]
 dependencies = [
-    "crewai",
+    "crewai>=0.63.0",
     "crewai-tools",
     "python-dotenv",
     "supabase",
     "requests",
     "langchain",
     "langchain-community",
+    "litellm>=1.0.0",
+    "arize-phoenix>=4.0.0",
+    "openinference-instrumentation-crewai>=0.1.0",
+    "openinference-instrumentation-litellm>=0.1.0",
 ]
 
 [tool.setuptools.package-data]

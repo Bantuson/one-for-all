@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import { ThreeColumnLayout } from '@/components/dashboard/ThreeColumnLayout'
 import { EmptyStatePrompt } from '@/components/dashboard/EmptyStatePrompt'
-import { Building2, Sparkles } from 'lucide-react'
 
 export default async function InstitutionDashboardPage({
   params,
@@ -73,16 +72,14 @@ export default async function InstitutionDashboardPage({
           description="Get started by adding your institution's campuses, faculties, and courses. You can do this manually or let our AI agent scan your website to auto-populate the structure."
           actions={[
             {
-              label: 'Add Manually',
+              command: 'add --campus',
               href: `/dashboard/${institution_slug}/campuses/new`,
-              variant: 'default',
-              icon: <Building2 className="h-4 w-4 mr-2" />,
+              variant: 'primary',
             },
             {
-              label: 'Scan Website (AI)',
+              command: 'scan --website',
               href: `/dashboard/${institution_slug}/agent-populate`,
-              variant: 'outline',
-              icon: <Sparkles className="h-4 w-4 mr-2" />,
+              variant: 'purple',
             },
           ]}
         />

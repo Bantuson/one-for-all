@@ -1,7 +1,8 @@
 import os
-from supabase import create_client, AsyncClient
+from supabase import create_client, Client
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
-supabase: AsyncClient = create_client(SUPABASE_URL, SUPABASE_KEY, is_async=True)
+# Use sync client for now (CrewAI tools use asyncio.run internally)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None

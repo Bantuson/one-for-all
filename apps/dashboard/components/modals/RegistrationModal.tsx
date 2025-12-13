@@ -81,7 +81,10 @@ export function RegistrationModal({ open, onOpenChange }: RegistrationModalProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0" hideCloseButton>
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 bg-card bg-[radial-gradient(rgba(255,255,255,0.08)_1.4px,transparent_1.4px)] dark:bg-[radial-gradient(rgba(255,255,255,0.15)_1.4px,transparent_1.4px)] bg-[length:32px_32px]"
+        hideCloseButton
+      >
         <ModalHeader title="Create Your Account" onClose={() => onOpenChange(false)} />
 
         <div className="px-8 py-4">

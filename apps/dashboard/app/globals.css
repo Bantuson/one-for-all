@@ -1,18 +1,163 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    /* Background & Foreground */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
+
+    /* Primary - Warm Amber/Brown (replaces navy blue) */
+    --primary: 36 60% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 9% 46%;
+
+    /* Card surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    /* Muted/secondary text */
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    /* Accent (for hover states) */
+    --accent: 36 40% 96%;
+    --accent-foreground: 36 60% 35%;
+
+    /* Destructive/error */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Border */
     --border: 214.3 31.8% 91.4%;
+
+    /* Input borders */
+    --input: 214.3 31.8% 91.4%;
+
+    /* Focus ring */
+    --ring: 36 60% 55%;
+
+    /* Popover/dropdown */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    /* Chart colors (for data visualization) */
+    --chart-1: 36 60% 55%;
+    --chart-2: 142 71% 45%;
+    --chart-3: 48 96% 53%;
+    --chart-4: 0 84% 60%;
+    --chart-5: 262 83% 58%;
+
+    /* Traffic light colors */
+    --traffic-red: 0 84% 60%;
+    --traffic-yellow: 48 96% 53%;
+    --traffic-green: 142 71% 45%;
+
+    /* Syntax highlighting colors (for code-style UI) */
+    --syntax-key: 36 60% 60%;           /* #c9a76c amber - JSON keys, "name": */
+    --syntax-key-alt: 292 84% 72%;      /* #e879f9 pink/magenta - alternative key color */
+    --syntax-string: 142 71% 56%;       /* #4ade80 green - string values */
+    --syntax-number: 48 96% 53%;        /* #facc15 yellow - numbers */
+    --syntax-comment: 220 9% 46%;       /* gray - for comment text */
+    --syntax-command: 215 20% 65%;      /* #94a3b8 light gray - commands */
+    --syntax-export: 292 84% 72%;       /* #e879f9 pink - export keyword */
+    --syntax-from: 142 71% 56%;         /* #4ade80 green - from keyword */
+    --syntax-dollar: 36 60% 60%;        /* #c9a76c amber - $ prefix */
+
+    /* Sidebar (if needed) */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 36 60% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 36 40% 96%;
+    --sidebar-accent-foreground: 36 60% 35%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 36 60% 55%;
+
+    /* Border radius */
+    --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
+    /* Background & Foreground */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+
+    /* Primary - Slightly brighter in dark mode */
+    --primary: 36 60% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary */
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 98%;
+
+    /* Card surfaces */
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 98%;
+
+    /* Muted/secondary text */
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 64%;
+
+    /* Accent (for hover states) */
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 98%;
+
+    /* Destructive/error */
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Border */
+    --border: 0 0% 20%;
+
+    /* Input borders */
+    --input: 0 0% 20%;
+
+    /* Focus ring */
+    --ring: 36 60% 60%;
+
+    /* Popover/dropdown */
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Chart colors (for data visualization) */
+    --chart-1: 36 60% 60%;
+    --chart-2: 142 71% 56%;
+    --chart-3: 48 96% 53%;
+    --chart-4: 0 84% 60%;
+    --chart-5: 262 83% 68%;
+
+    /* Traffic light colors (same in dark) */
+    --traffic-red: 0 84% 60%;
+    --traffic-yellow: 48 96% 53%;
+    --traffic-green: 142 71% 45%;
+
+    /* Syntax highlighting colors (brighter in dark mode) */
+    --syntax-key: 36 60% 65%;           /* amber - brighter in dark */
+    --syntax-key-alt: 292 84% 75%;      /* pink/magenta */
+    --syntax-string: 142 71% 60%;       /* green - brighter */
+    --syntax-number: 48 96% 55%;        /* yellow */
+    --syntax-comment: 220 9% 55%;       /* gray - more visible in dark */
+    --syntax-command: 215 20% 70%;      /* light gray */
+    --syntax-export: 292 84% 75%;       /* pink */
+    --syntax-from: 142 71% 60%;         /* green */
+    --syntax-dollar: 36 60% 65%;        /* amber */
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 36 60% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 36 60% 60%;
   }
 }
 

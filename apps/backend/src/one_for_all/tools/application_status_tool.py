@@ -1,7 +1,7 @@
 import os
 import asyncio
 import aiohttp
-from crewai_tools import tool
+from crewai.tools import tool
 
 BACKEND_URL = os.getenv("BACKEND_URL")
 

@@ -1,7 +1,7 @@
 import os
 import asyncio
 import aiohttp
-from crewai_tools import tool
+from crewai.tools import tool
 
 TWILIO_SID = os.getenv("TWILIO_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")

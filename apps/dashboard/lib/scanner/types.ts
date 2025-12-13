@@ -116,6 +116,8 @@ export type ScanEventType =
   | 'page_error'
   | 'analysis_start'
   | 'item_extracted'
+  | 'preview_results'
+  | 'refining'
   | 'complete'
   | 'error'
   | 'cancelled'
@@ -168,6 +170,17 @@ export interface ItemExtractedEvent extends ScanEventBase {
   item: Campus | Faculty | Course
 }
 
+export interface PreviewResultsEvent extends ScanEventBase {
+  type: 'preview_results'
+  results: ScanResults
+  isPreview: true
+}
+
+export interface RefiningEvent extends ScanEventBase {
+  type: 'refining'
+  message: string
+}
+
 export interface CompleteEvent extends ScanEventBase {
   type: 'complete'
   results: ScanResults
@@ -193,6 +206,8 @@ export type ScanEvent =
   | PageErrorEvent
   | AnalysisStartEvent
   | ItemExtractedEvent
+  | PreviewResultsEvent
+  | RefiningEvent
   | CompleteEvent
   | ErrorEvent
   | CancelledEvent

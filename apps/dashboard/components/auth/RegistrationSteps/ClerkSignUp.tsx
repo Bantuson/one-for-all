@@ -5,8 +5,7 @@ import { useUser } from '@clerk/nextjs'
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { useRegistrationStore } from '@/lib/stores/registrationStore'
-import { Button } from '@/components/ui/Button'
-import { CheckCircle2 } from 'lucide-react'
+import { CommandButton } from '@/components/ui/CommandButton'
 import { ClerkErrorBoundary } from '../ClerkErrorBoundary'
 
 export function ClerkSignUp() {
@@ -65,21 +64,31 @@ export function ClerkSignUp() {
   if (isSignedIn) {
     return (
       <div className="space-y-6 py-8">
-        <div className="text-center">
-          <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">You're Signed In!</h3>
-          <p className="text-sm text-foreground/60 mb-1">
-            Welcome back, {user.firstName || user.emailAddresses[0]?.emailAddress}
+        <div className="text-center font-mono">
+          <div className="flex justify-center mb-4">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-md bg-traffic-green/10 border border-traffic-green/30">
+              <span className="h-2 w-2 rounded-full bg-traffic-green animate-pulse" />
+              <span className="text-traffic-green text-sm">authenticated</span>
+            </div>
+          </div>
+          <h3 className="text-lg mb-2">
+            <span className="text-syntax-export">export</span>
+            <span className="text-syntax-key ml-2">session.active</span>
+          </h3>
+          <p className="text-sm text-muted-foreground mb-1">
+            <span className="text-traffic-green">//</span> Welcome back, {user.firstName || user.emailAddresses[0]?.emailAddress}
           </p>
-          <p className="text-sm text-foreground/60">
-            Click continue to proceed with institution registration
+          <p className="text-sm text-muted-foreground">
+            <span className="text-traffic-green">//</span> Click continue to proceed
           </p>
         </div>
 
         <div className="flex justify-center">
-          <Button onClick={handleContinue} size="lg">
-            Continue to Registration →
-          </Button>
+          <CommandButton
+            command="continue --registration"
+            variant="primary"
+            onClick={handleContinue}
+          />
         </div>
       </div>
     )
@@ -110,17 +119,20 @@ export function ClerkSignUp() {
                   headerTitle: 'hidden',
                   headerSubtitle: 'hidden',
                   footer: 'bg-transparent border-t-0',
-                  formButtonPrimary: 'bg-foreground hover:bg-foreground/90 text-background',
+                  formButtonPrimary: 'bg-amber-700 hover:bg-amber-800 text-white font-mono border-0 border-transparent',
                   footerActionLink: { display: 'none' },
                   formContainer: 'w-full',
                   form: 'w-full space-y-4',
-                  formFieldLabel: 'text-foreground text-sm font-medium mb-2',
-                  formFieldInput: 'w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground/40 focus:outline-none focus:ring-2 focus:ring-foreground',
-                  formFieldLabelRow: '[&>label]:text-foreground [&>p]:hidden',
-                  identityPreviewText: 'text-foreground',
+                  formFieldLabel: 'text-foreground text-sm font-mono mb-2',
+                  formFieldInput: 'w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground font-mono placeholder:text-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/50',
+                  formFieldLabelRow: '[&>label]:text-foreground [&>label]:font-mono [&>p]:hidden',
+                  identityPreviewText: 'text-foreground font-mono',
                   formFieldInputShowPasswordButton: 'text-foreground',
-                  socialButtonsBlockButton: 'border border-border text-foreground hover:bg-foreground/10',
+                  socialButtonsBlockButton: 'border border-border text-foreground hover:bg-muted transition-colors font-mono',
                   socialButtonsBlockButtonText: 'text-foreground',
+                  footerActionText: 'font-mono text-muted-foreground text-xs',
+                  footerPagesLink: 'font-mono text-syntax-key hover:text-syntax-key/80',
+                  badge: 'font-mono text-xs bg-amber-700/20 text-amber-600 border border-amber-700/30 rounded px-2 py-0.5',
                 },
               }}
               routing="virtual"
@@ -138,17 +150,20 @@ export function ClerkSignUp() {
                   headerTitle: 'hidden',
                   headerSubtitle: 'hidden',
                   footer: 'bg-transparent border-t-0',
-                  formButtonPrimary: 'bg-foreground hover:bg-foreground/90 text-background',
+                  formButtonPrimary: 'bg-amber-700 hover:bg-amber-800 text-white font-mono border-0 border-transparent',
                   footerActionLink: { display: 'none' },
                   formContainer: 'w-full',
                   form: 'w-full space-y-4',
-                  formFieldLabel: 'text-foreground text-sm font-medium mb-2',
-                  formFieldInput: 'w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground/40 focus:outline-none focus:ring-2 focus:ring-foreground',
-                  formFieldLabelRow: '[&>label]:text-foreground [&>p]:hidden',
-                  identityPreviewText: 'text-foreground',
+                  formFieldLabel: 'text-foreground text-sm font-mono mb-2',
+                  formFieldInput: 'w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground font-mono placeholder:text-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/50',
+                  formFieldLabelRow: '[&>label]:text-foreground [&>label]:font-mono [&>p]:hidden',
+                  identityPreviewText: 'text-foreground font-mono',
                   formFieldInputShowPasswordButton: 'text-foreground',
-                  socialButtonsBlockButton: 'border border-border text-foreground hover:bg-foreground/10',
+                  socialButtonsBlockButton: 'border border-border text-foreground hover:bg-muted transition-colors font-mono',
                   socialButtonsBlockButtonText: 'text-foreground',
+                  footerActionText: 'font-mono text-muted-foreground text-xs',
+                  footerPagesLink: 'font-mono text-syntax-key hover:text-syntax-key/80',
+                  badge: 'font-mono text-xs bg-amber-700/20 text-amber-600 border border-amber-700/30 rounded px-2 py-0.5',
                 },
               }}
               routing="virtual"
@@ -167,15 +182,17 @@ export function ClerkSignUp() {
       <div className="mt-6 text-center w-full">
         <button
           onClick={() => setShowSignIn(!showSignIn)}
-          className="text-sm text-foreground/60 hover:text-foreground transition-colors"
+          className="text-sm font-mono text-muted-foreground hover:text-foreground transition-colors"
         >
           {showSignIn ? (
             <>
-              Don't have an account? <span className="font-medium">Sign up</span>
+              <span className="text-traffic-green">//</span> Don&apos;t have an account?{' '}
+              <span className="text-syntax-key font-medium">Sign up</span>
             </>
           ) : (
             <>
-              Already have an account? <span className="font-medium">Sign in</span>
+              <span className="text-traffic-green">//</span> Already have an account?{' '}
+              <span className="text-syntax-key font-medium">Sign in</span>
             </>
           )}
         </button>

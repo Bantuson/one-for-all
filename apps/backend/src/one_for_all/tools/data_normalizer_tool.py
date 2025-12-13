@@ -5,7 +5,7 @@ Normalizes and validates extracted academic data to ensure consistency
 and database compatibility.
 """
 
-from crewai_tools import tool
+from crewai.tools import tool
 import re
 import json
 import uuid

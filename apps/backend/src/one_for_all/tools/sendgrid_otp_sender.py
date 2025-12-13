@@ -1,7 +1,7 @@
 import os
 import asyncio
 import aiohttp
-from crewai_tools import tool
+from crewai.tools import tool
 
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 

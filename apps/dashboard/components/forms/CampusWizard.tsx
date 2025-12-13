@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Stepper } from '@/components/ui/Stepper'
-import { Card, CardContent } from '@/components/ui/card'
+import { CodeCard, CodeCardHeader } from '@/components/ui/CodeCard'
 import { CampusInfoStep, CampusInfoFormData } from './steps/CampusInfoStep'
 import { FacultiesStep, Faculty } from './steps/FacultiesStep'
 import { CoursesStep, Course } from './steps/CoursesStep'
@@ -14,8 +14,8 @@ import {
   clearCampusWizardData,
   CampusWizardData,
 } from '@/lib/localStorage'
-import { Button } from '@/components/ui/Button'
-import { AlertCircle, ArrowLeft, Building2 } from 'lucide-react'
+import { CommandButton } from '@/components/ui/CommandButton'
+import { AlertCircle, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import {
   AlertDialog,
@@ -218,28 +218,27 @@ export function CampusWizard({ institutionId, institutionSlug }: CampusWizardPro
 
   return (
     <div className="flex flex-col flex-1">
-      {/* Sticky Sub-header */}
-      <div className="p-4 border-b bg-white dark:bg-black sticky top-16 z-10">
+      {/* Sub-header - Terminal Style */}
+      <div className="p-4 border-b border-border bg-gradient-to-r from-card via-muted/30 to-card">
         <div className="container mx-auto max-w-4xl flex items-center gap-4">
           <Link href={`/dashboard/${institutionSlug}`}>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            <CommandButton command="cd .." variant="ghost" size="sm" />
           </Link>
-          <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-muted-foreground" />
-            <h1 className="font-semibold">Create New Campus</h1>
+          <div className="flex items-center gap-2 font-mono">
+            <span className="text-syntax-export">export</span>
+            <span className="text-syntax-key">campus-wizard</span>
           </div>
         </div>
       </div>
 
       <div className="container mx-auto pb-8 px-4 pt-6">
         <div className="max-w-4xl mx-auto">
-          {/* Description */}
+          {/* Description - Comment Style */}
           <div className="mb-8">
-            <p className="text-muted-foreground">
-              Set up your campus structure with faculties, courses, and team members.
-              Your progress is automatically saved.
+            <p className="font-mono text-sm text-traffic-green">
+              // Set up your campus structure with faculties, courses, and team members.
+              <br />
+              // Your progress is automatically saved.
             </p>
           </div>
 
@@ -248,22 +247,27 @@ export function CampusWizard({ institutionId, institutionSlug }: CampusWizardPro
           <Stepper steps={steps} currentStep={currentStep} />
         </div>
 
-        {/* Error Display */}
+        {/* Error Display - Terminal Style */}
         {error && (
-          <div className="mb-6 p-4 border border-red-200 bg-red-50 dark:bg-red-950 dark:border-red-800 rounded-lg">
+          <div className="mb-6 p-4 border border-traffic-red/50 bg-traffic-red/5 rounded-lg">
             <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-red-900 dark:text-red-100">Error</h3>
-                <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
+              <AlertCircle className="h-5 w-5 text-traffic-red flex-shrink-0 mt-0.5" />
+              <div className="font-mono">
+                <h3 className="text-sm text-traffic-red">// Error</h3>
+                <p className="text-sm text-foreground mt-1">{error}</p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Step Content */}
-        <Card>
-          <CardContent className="p-6">
+        {/* Step Content - CodeCard Style */}
+        <CodeCard>
+          <CodeCardHeader
+            filename="campus-wizard.form"
+            status="active"
+            badge={<span className="font-mono text-xs text-muted-foreground">step {currentStep + 1}/4</span>}
+          />
+          <div className="p-6">
             {currentStep === 0 && (
               <CampusInfoStep
                 initialData={campusInfo}
@@ -300,8 +304,8 @@ export function CampusWizard({ institutionId, institutionSlug }: CampusWizardPro
                 isSubmitting={isSubmitting}
               />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </CodeCard>
         </div>
       </div>
 

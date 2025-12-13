@@ -4,7 +4,7 @@ HTML Parser Tool for CrewAI Scanner Agents
 Parses HTML content and extracts structured information for academic content analysis.
 """
 
-from crewai_tools import tool
+from crewai.tools import tool
 from bs4 import BeautifulSoup
 import re
 import json

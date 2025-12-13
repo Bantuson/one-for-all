@@ -1,5 +1,5 @@
 import asyncio
-from crewai_tools import tool
+from crewai.tools import tool
 from .supabase_client import supabase
 
 @tool

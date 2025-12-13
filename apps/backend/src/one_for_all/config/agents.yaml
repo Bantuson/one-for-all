@@ -7,7 +7,7 @@ identity_auth_agent:
   backstory: >
     You verify identities using OTP (email or SMS), manage user sessions,
     handle re-logins, and ensure session validity with TTL checks.
-  llm: gpt-3.5-turbo
+  llm: deepseek/deepseek-chat
   memory: true
   tools:
     - sendgrid_otp_sender
@@ -30,7 +30,7 @@ application_intake_agent:
     You collect key applicant information: NSC/matric results, SA ID/passport,
     proof of residence, academic history, program selection,
     and application-fee receipt uploads.
-  llm: gpt-3.5-turbo
+  llm: deepseek/deepseek-chat
   memory: true
   tools:
     - supabase_application_store
@@ -48,7 +48,7 @@ rag_specialist_agent:
     You extract course details & requirements, deadlines, fees and faculty details, then 
     embed the information in a Supabase vector store.
     You provide precise, verifiable answers to students.
-  llm: gpt-3.5-turbo
+  llm: deepseek/deepseek-chat
   memory: true
   tools:
     - website_search_tool
@@ -64,7 +64,7 @@ submission_agent:
   backstory: >
     You automate high-volume submissions by generating multiple validated
     application payloads and sending each one to the backend API.
-  llm: gpt-3.5-turbo
+  llm: deepseek/deepseek-chat
   memory: false
   tools:
     - application_submission_tool
@@ -84,7 +84,7 @@ nsfas_agent:
     household data when available. You only collect missing NSFAS-specific
     fields such as guardian details, income proof, consent form, bank details
     and living situation. You ensure accurate, compliant submissions.
-  llm: gpt-3.5-turbo
+  llm: deepseek/deepseek-chat
   memory: true
   tools:
     - supabase_nsfas_store

@@ -40,6 +40,7 @@ interface ScanState {
 interface ScanActions {
   // Lifecycle
   startScan: (institutionId: string, websiteUrl: string) => Promise<void>
+  startTestScan: (institutionId: string) => Promise<void>
   cancelScan: () => void
   reset: () => void
 
@@ -200,6 +201,97 @@ export const useScanStore = create<ScanState & ScanActions>()(
         }
       },
 
+      startTestScan: async (institutionId: string) => {
+        const state = get()
+
+        // Clean up existing connection
+        if (state.eventSource) {
+          state.eventSource.close()
+        }
+
+        set({
+          status: 'connecting',
+          progress: {
+            ...createEmptyProgress(),
+            stage: 'Connecting',
+            message: 'Starting test scan...',
+          },
+          error: null,
+          rawResults: null,
+          editedResults: null,
+        })
+
+        try {
+          // Use the GET endpoint for SSE streaming test mode
+          const response = await fetch(
+            `/api/ai-scan/test?institution_id=${encodeURIComponent(institutionId)}`,
+            { method: 'GET' }
+          )
+
+          if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to start test scan')
+          }
+
+          const reader = response.body?.getReader()
+          if (!reader) {
+            throw new Error('No response stream')
+          }
+
+          set({ status: 'scraping', isConnected: true })
+
+          // Read the stream
+          const decoder = new TextDecoder()
+          let buffer = ''
+
+          const processStream = async () => {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+
+              buffer += decoder.decode(value, { stream: true })
+              const lines = buffer.split('\n')
+              buffer = lines.pop() || ''
+
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const event = JSON.parse(line.slice(6)) as ScanEvent
+                    get().handleEvent(event)
+                  } catch {
+                    // Skip invalid JSON
+                  }
+                }
+              }
+            }
+
+            // Process any remaining buffer
+            if (buffer.startsWith('data: ')) {
+              try {
+                const event = JSON.parse(buffer.slice(6)) as ScanEvent
+                get().handleEvent(event)
+              } catch {
+                // Skip invalid JSON
+              }
+            }
+          }
+
+          processStream().catch((error) => {
+            set({
+              status: 'error',
+              error: error.message,
+              isConnected: false,
+            })
+          })
+        } catch (error) {
+          set({
+            status: 'error',
+            error: error instanceof Error ? error.message : 'Unknown error',
+            isConnected: false,
+          })
+        }
+      },
+
       cancelScan: () => {
         const state = get()
         if (state.eventSource) {
@@ -300,6 +392,34 @@ export const useScanStore = create<ScanState & ScanActions>()(
                 itemsExtracted: state.progress.itemsExtracted + 1,
               },
             }))
+            break
+
+          case 'preview_results':
+            // Instant preview from regex extraction
+            set({
+              status: 'preview',
+              rawResults: event.results,
+              editedResults: JSON.parse(JSON.stringify(event.results)), // Deep clone
+              progress: {
+                ...get().progress,
+                stage: 'Preview',
+                percent: 85,
+                message: `Preview: ${event.results.campuses.length} campuses found (AI refining...)`,
+              },
+            })
+            break
+
+          case 'refining':
+            // LLM is refining the results
+            set({
+              status: 'analyzing',
+              progress: {
+                ...get().progress,
+                stage: 'Refining',
+                percent: 92,
+                message: event.message,
+              },
+            })
             break
 
           case 'complete':

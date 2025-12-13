@@ -5,10 +5,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/Label'
-import { Button } from '@/components/ui/Button'
-import { Select } from '@/components/ui/Select'
-import { BookOpen, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { CommandButton } from '@/components/ui/CommandButton'
+import { BookOpen, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Faculty } from './FacultiesStep'
 import {
   AlertDialog,
@@ -43,6 +41,17 @@ interface CoursesStepProps {
   onNext: (courses: Record<string, Course[]>) => void
   onBack: () => void
   onCancel: () => void
+}
+
+// JSON-style label component
+function SyntaxLabel({ name, required }: { name: string; required?: boolean }) {
+  return (
+    <label className="block font-mono text-sm mb-1.5">
+      <span className="text-syntax-key">"{name}"</span>
+      <span className="text-foreground"> :</span>
+      {required && <span className="text-destructive ml-1">*</span>}
+    </label>
+  )
 }
 
 export function CoursesStep({
@@ -119,14 +128,17 @@ export function CoursesStep({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <BookOpen className="h-6 w-6 text-primary" />
-        <h2 className="text-2xl font-semibold">Add Courses</h2>
+      {/* Header - Code Style */}
+      <div className="flex items-center gap-3 mb-6">
+        <BookOpen className="h-5 w-5 text-syntax-key" />
+        <h2 className="font-mono text-lg">
+          <span className="text-syntax-export">export</span>
+          <span className="text-syntax-key ml-2">Courses</span>
+        </h2>
       </div>
 
-      <p className="text-sm text-muted-foreground mb-6">
-        Add courses for each faculty. You can add multiple courses per faculty.
-        Total courses added: <span className="font-semibold">{getTotalCourses()}</span>
+      <p className="font-mono text-xs text-traffic-green mb-6">
+        // Add courses for each faculty. Total: <span className="text-syntax-string">{getTotalCourses()}</span>
       </p>
 
       {/* Faculties with Courses */}
@@ -137,7 +149,7 @@ export function CoursesStep({
           const isAdding = addingToFaculty === faculty.id
 
           return (
-            <div key={faculty.id} className="border rounded-lg overflow-hidden">
+            <div key={faculty.id} className="border border-border rounded-lg overflow-hidden">
               {/* Faculty Header */}
               <div
                 className="flex items-center justify-between p-4 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
@@ -145,18 +157,18 @@ export function CoursesStep({
               >
                 <div className="flex items-center gap-3">
                   {isExpanded ? (
-                    <ChevronUp className="h-5 w-5" />
+                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
                   ) : (
-                    <ChevronDown className="h-5 w-5" />
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
                   )}
-                  <div>
-                    <h3 className="font-semibold">{faculty.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {facultyCourses.length} course{facultyCourses.length !== 1 ? 's' : ''}
+                  <div className="font-mono">
+                    <h3 className="text-syntax-key">"{faculty.name}"</h3>
+                    <p className="text-xs text-traffic-green">
+                      // {facultyCourses.length} course{facultyCourses.length !== 1 ? 's' : ''}
                     </p>
                   </div>
                 </div>
-                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                <span className="text-xs bg-syntax-key/10 text-syntax-key px-2 py-1 rounded font-mono">
                   {faculty.code}
                 </span>
               </div>
@@ -168,41 +180,39 @@ export function CoursesStep({
                   {facultyCourses.map((course) => (
                     <div
                       key={course.id}
-                      className="flex items-start justify-between p-3 border rounded-lg bg-background"
+                      className="flex items-start justify-between p-3 border border-border rounded-lg bg-background"
                     >
-                      <div className="flex-1">
+                      <div className="flex-1 font-mono">
                         <div className="flex items-center gap-2">
-                          <h4 className="font-medium">{course.name}</h4>
-                          <span className="text-xs bg-secondary px-2 py-1 rounded">
+                          <span className="text-syntax-key">"{course.name}"</span>
+                          <span className="text-xs bg-muted px-2 py-1 rounded">
                             {course.code}
                           </span>
                           <span
                             className={`text-xs px-2 py-1 rounded ${
                               course.status === 'active'
-                                ? 'bg-green-100 text-green-700'
+                                ? 'bg-traffic-green/10 text-traffic-green'
                                 : course.status === 'draft'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-gray-100 text-gray-700'
+                                ? 'bg-traffic-yellow/10 text-traffic-yellow'
+                                : 'bg-muted text-muted-foreground'
                             }`}
                           >
                             {course.status}
                           </span>
                         </div>
                         {course.requirements && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Requirements: {course.requirements}
+                          <p className="text-xs text-traffic-green mt-1">
+                            // Requirements: {course.requirements}
                           </p>
                         )}
                       </div>
-                      <Button
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="icon"
                         onClick={() => handleRemoveCourse(faculty.id, course.id)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        className="p-2 text-traffic-red hover:bg-traffic-red/10 rounded transition-colors"
                       >
                         <Trash2 className="h-4 w-4" />
-                      </Button>
+                      </button>
                     </div>
                   ))}
 
@@ -210,92 +220,84 @@ export function CoursesStep({
                   {isAdding ? (
                     <form
                       onSubmit={handleSubmit((data) => handleAddCourse(faculty.id, data))}
-                      className="space-y-4 p-4 border rounded-lg bg-muted/10"
+                      className="space-y-4 p-4 border border-border rounded-lg bg-muted/10"
                     >
-                      <h4 className="font-medium">New Course for {faculty.name}</h4>
+                      <h4 className="font-mono text-sm text-traffic-green">// New Course for {faculty.name}</h4>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor={`name-${faculty.id}`}>
-                            Course Name <span className="text-red-500">*</span>
-                          </Label>
+                        <div className="space-y-1">
+                          <SyntaxLabel name="Course Name" required />
                           <Input
                             id={`name-${faculty.id}`}
-                            placeholder="e.g., Computer Science, Mathematics"
+                            placeholder="Computer Science"
+                            className="font-mono"
                             {...register('name')}
                           />
                           {errors.name && (
-                            <p className="text-sm text-red-500">{errors.name.message}</p>
+                            <p className="font-mono text-xs text-destructive">// Error: {errors.name.message}</p>
                           )}
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor={`code-${faculty.id}`}>
-                            Course Code <span className="text-red-500">*</span>
-                          </Label>
+                        <div className="space-y-1">
+                          <SyntaxLabel name="Course Code" required />
                           <Input
                             id={`code-${faculty.id}`}
-                            placeholder="e.g., CS101, MATH201"
+                            placeholder="CS101"
+                            className="font-mono uppercase"
                             {...register('code')}
                           />
                           {errors.code && (
-                            <p className="text-sm text-red-500">{errors.code.message}</p>
+                            <p className="font-mono text-xs text-destructive">// Error: {errors.code.message}</p>
                           )}
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor={`requirements-${faculty.id}`}>
-                          Requirements (Optional)
-                        </Label>
+                      <div className="space-y-1">
+                        <SyntaxLabel name="Requirements" />
                         <Input
                           id={`requirements-${faculty.id}`}
-                          placeholder="e.g., Matric with Math and Science"
+                          placeholder="Matric with Math and Science"
+                          className="font-mono"
                           {...register('requirements')}
                         />
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor={`status-${faculty.id}`}>Status</Label>
+                      <div className="space-y-1">
+                        <SyntaxLabel name="Status" />
                         <select
                           id={`status-${faculty.id}`}
                           {...register('status')}
-                          className="w-full px-3 py-2 border rounded-lg bg-background"
+                          className="w-full px-3 py-2 border border-input rounded-lg bg-background font-mono text-sm"
                         >
-                          <option value="active">Active</option>
-                          <option value="draft">Draft</option>
-                          <option value="inactive">Inactive</option>
+                          <option value="active">active</option>
+                          <option value="draft">draft</option>
+                          <option value="inactive">inactive</option>
                         </select>
                       </div>
 
                       <div className="flex gap-2">
-                        <Button type="submit" size="sm">
-                          Add Course
-                        </Button>
-                        <Button
+                        <CommandButton type="submit" command="add" variant="primary" size="sm" />
+                        <CommandButton
                           type="button"
-                          variant="outline"
+                          command="cancel"
+                          variant="ghost"
                           size="sm"
                           onClick={() => {
                             setAddingToFaculty(null)
                             reset()
                           }}
-                        >
-                          Cancel
-                        </Button>
+                        />
                       </div>
                     </form>
                   ) : (
-                    <Button
+                    <CommandButton
                       type="button"
+                      command={`add --course "${faculty.name}"`}
                       variant="outline"
                       size="sm"
                       onClick={() => setAddingToFaculty(faculty.id)}
-                      className="w-full"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Course to {faculty.name}
-                    </Button>
+                      className="w-full justify-center"
+                    />
                   )}
                 </div>
               )}
@@ -304,23 +306,20 @@ export function CoursesStep({
         })}
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex justify-between pt-6 border-t">
+      {/* Action Buttons - Command Style */}
+      <div className="flex justify-between pt-6 border-t border-border">
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={onBack}>
-            Back
-          </Button>
-          <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
+          <CommandButton type="button" command="back" variant="outline" onClick={onBack} />
+          <CommandButton type="button" command="cancel" variant="ghost" onClick={onCancel} />
         </div>
-        <Button
+        <CommandButton
           type="button"
+          command="next --team"
+          variant="primary"
+          arrow
           onClick={handleNext}
           disabled={getTotalCourses() === 0}
-        >
-          Next: Invite Team Members
-        </Button>
+        />
       </div>
 
       {/* Validation Dialog */}

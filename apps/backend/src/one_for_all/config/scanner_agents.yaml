@@ -14,7 +14,7 @@ content_analyzer_agent:
     patterns like "Faculty of...", "School of...", "Department of...", course codes,
     program names, and admission requirements. You can distinguish between
     campus pages, faculty pages, and course/program pages based on content and URL patterns.
-  llm: gpt-4o-mini
+  llm: deepseek/deepseek-chat
   memory: false
   tools:
     - html_parser_tool
@@ -32,7 +32,7 @@ data_structurer_agent:
     You can infer missing codes, generate appropriate identifiers, and ensure
     data consistency. You also calculate confidence scores based on how well
     the extracted data matches expected patterns.
-  llm: gpt-4o-mini
+  llm: deepseek/deepseek-chat
   memory: false
   tools:
     - data_normalizer_tool
@@ -48,7 +48,7 @@ schema_mapper_agent:
     institutions, campuses, faculties, and courses. You ensure extracted data
     maps correctly to database fields, generate appropriate codes where missing,
     and validate that the data structure is ready for database insertion.
-  llm: gpt-4o-mini
+  llm: deepseek/deepseek-chat
   memory: false
   tools:
     - data_normalizer_tool

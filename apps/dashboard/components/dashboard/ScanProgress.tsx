@@ -16,18 +16,22 @@ const STAGE_ICONS: Record<string, typeof Loader2> = {
   Initializing: Globe,
   Scraping: FileSearch,
   Analyzing: Sparkles,
+  Refining: Sparkles,
+  Preview: CheckCircle2,
   Complete: CheckCircle2,
   Cancelled: XCircle,
   Error: AlertCircle,
 }
 
 const STAGE_COLORS: Record<string, string> = {
-  Initializing: 'text-blue-500',
-  Scraping: 'text-amber-500',
+  Initializing: 'text-primary',
+  Scraping: 'text-traffic-yellow',
   Analyzing: 'text-purple-500',
-  Complete: 'text-green-500',
-  Cancelled: 'text-gray-500',
-  Error: 'text-red-500',
+  Refining: 'text-blue-500',
+  Preview: 'text-traffic-green',
+  Complete: 'text-traffic-green',
+  Cancelled: 'text-muted-foreground',
+  Error: 'text-destructive',
 }
 
 export function ScanProgress({
@@ -59,6 +63,8 @@ export function ScanProgress({
   const StageIcon = STAGE_ICONS[progress.stage] || Loader2
   const stageColor = STAGE_COLORS[progress.stage] || 'text-primary'
   const isActive = status === 'connecting' || status === 'scraping' || status === 'analyzing'
+  const isRefining = progress.stage === 'Refining'
+  const isPreview = status === 'preview'
 
   return (
     <div className="w-full max-w-md mx-auto">

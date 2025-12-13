@@ -4,8 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/Label'
-import { Button } from '@/components/ui/Button'
+import { CommandButton } from '@/components/ui/CommandButton'
 import { Building2 } from 'lucide-react'
 
 const campusInfoSchema = z.object({
@@ -23,6 +22,17 @@ interface CampusInfoStepProps {
   initialData?: CampusInfoFormData
   onNext: (data: CampusInfoFormData) => void
   onCancel: () => void
+}
+
+// JSON-style label component
+function SyntaxLabel({ name, required }: { name: string; required?: boolean }) {
+  return (
+    <label className="block font-mono text-sm mb-1.5">
+      <span className="text-syntax-key">"{name}"</span>
+      <span className="text-foreground"> :</span>
+      {required && <span className="text-destructive ml-1">*</span>}
+    </label>
+  )
 }
 
 export function CampusInfoStep({
@@ -45,116 +55,124 @@ export function CampusInfoStep({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Building2 className="h-6 w-6 text-primary" />
-        <h2 className="text-2xl font-semibold">Campus Information</h2>
+      {/* Header - Code Style */}
+      <div className="flex items-center gap-3 mb-6">
+        <Building2 className="h-5 w-5 text-syntax-key" />
+        <h2 className="font-mono text-lg">
+          <span className="text-syntax-export">export</span>
+          <span className="text-syntax-key ml-2">Campus Information</span>
+        </h2>
       </div>
 
-      <p className="text-sm text-muted-foreground mb-6">
-        Provide basic information about your campus. This will help identify and
-        organize your institution's structure.
+      <p className="font-mono text-xs text-traffic-green mb-6">
+        // Provide basic information about your campus
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Campus Name */}
-        <div className="space-y-2">
-          <Label htmlFor="name">
-            Campus Name <span className="text-red-500">*</span>
-          </Label>
+        <div className="space-y-1">
+          <SyntaxLabel name="Campus Name" required />
           <Input
             id="name"
-            placeholder="e.g., Main Campus, North Campus"
+            placeholder="Main Campus"
+            className="font-mono"
             {...register('name')}
           />
           {errors.name && (
-            <p className="text-sm text-red-500">{errors.name.message}</p>
+            <p className="font-mono text-xs text-destructive">// Error: {errors.name.message}</p>
           )}
         </div>
 
         {/* Campus Code */}
-        <div className="space-y-2">
-          <Label htmlFor="code">
-            Campus Code <span className="text-red-500">*</span>
-          </Label>
+        <div className="space-y-1">
+          <SyntaxLabel name="Campus Code" required />
           <Input
             id="code"
-            placeholder="e.g., MC, NC, APK"
+            placeholder="MC"
+            className="font-mono uppercase"
             {...register('code')}
           />
-          {errors.code && (
-            <p className="text-sm text-red-500">{errors.code.message}</p>
+          {errors.code ? (
+            <p className="font-mono text-xs text-destructive">// Error: {errors.code.message}</p>
+          ) : (
+            <p className="font-mono text-xs text-traffic-green">// A short unique identifier</p>
           )}
-          <p className="text-xs text-muted-foreground">
-            A short unique identifier for this campus
-          </p>
         </div>
       </div>
 
       {/* Address Section */}
-      <div className="space-y-4 pt-4 border-t">
-        <h3 className="text-lg font-medium">Campus Address</h3>
+      <div className="space-y-4 pt-4 border-t border-border">
+        <h3 className="font-mono text-sm text-traffic-green">// Campus Address</h3>
 
-        <div className="space-y-2">
-          <Label htmlFor="street">
-            Street Address <span className="text-red-500">*</span>
-          </Label>
+        <div className="space-y-1">
+          <SyntaxLabel name="Street Address" required />
           <Input
             id="street"
             placeholder="123 University Avenue"
+            className="font-mono"
             {...register('street')}
           />
           {errors.street && (
-            <p className="text-sm text-red-500">{errors.street.message}</p>
+            <p className="font-mono text-xs text-destructive">// Error: {errors.street.message}</p>
           )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="city">
-              City <span className="text-red-500">*</span>
-            </Label>
-            <Input id="city" placeholder="Pretoria" {...register('city')} />
+          <div className="space-y-1">
+            <SyntaxLabel name="City" required />
+            <Input
+              id="city"
+              placeholder="Pretoria"
+              className="font-mono"
+              {...register('city')}
+            />
             {errors.city && (
-              <p className="text-sm text-red-500">{errors.city.message}</p>
+              <p className="font-mono text-xs text-destructive">// Error: {errors.city.message}</p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="province">
-              Province <span className="text-red-500">*</span>
-            </Label>
+          <div className="space-y-1">
+            <SyntaxLabel name="Province" required />
             <Input
               id="province"
               placeholder="Gauteng"
+              className="font-mono"
               {...register('province')}
             />
             {errors.province && (
-              <p className="text-sm text-red-500">{errors.province.message}</p>
+              <p className="font-mono text-xs text-destructive">// Error: {errors.province.message}</p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="postalCode">
-              Postal Code <span className="text-red-500">*</span>
-            </Label>
+          <div className="space-y-1">
+            <SyntaxLabel name="Postal Code" required />
             <Input
               id="postalCode"
               placeholder="0002"
+              className="font-mono"
               {...register('postalCode')}
             />
             {errors.postalCode && (
-              <p className="text-sm text-red-500">{errors.postalCode.message}</p>
+              <p className="font-mono text-xs text-destructive">// Error: {errors.postalCode.message}</p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex justify-between pt-6 border-t">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit">Next: Add Faculties</Button>
+      {/* Action Buttons - Command Style */}
+      <div className="flex justify-between pt-6 border-t border-border">
+        <CommandButton
+          type="button"
+          command="cancel"
+          variant="ghost"
+          onClick={onCancel}
+        />
+        <CommandButton
+          type="submit"
+          command="next --faculties"
+          variant="primary"
+          arrow
+        />
       </div>
     </form>
   )

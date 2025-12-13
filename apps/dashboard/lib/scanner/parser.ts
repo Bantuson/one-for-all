@@ -159,14 +159,57 @@ function extractBreadcrumbs(html: string): string[] {
 // ============================================================================
 
 /**
- * Extract campus information from a page
+ * SA University Campus URL Patterns (URL-path based, NOT title-based)
+ * Only match if the URL path explicitly indicates a campus page.
+ */
+const SA_CAMPUS_URL_PATTERNS = [
+  // URL path patterns (must be in URL, not page title)
+  '/campus/', '/campuses/',
+  '/campus-', '-campus',
+]
+
+/**
+ * Known SA campus names - must appear in URL path to qualify
+ */
+const SA_CAMPUS_NAMES = [
+  // UKZN Campuses
+  'edgewood', 'howard-college', 'medical-school', 'pietermaritzburg', 'westville',
+  // TUT Campuses
+  'arcadia', 'polokwane', 'emalahleni', 'ga-rankuwa', 'mbombela', 'soshanguve',
+  // EDUVOS Campuses
+  'midrand', 'mowbray', 'vanderbijlpark', 'nelspruit', 'bedfordview', 'potchefstroom',
+  // UFS Campuses
+  'qwaqwa', 'south-campus',
+  // NWU Campuses
+  'mafikeng', 'vaal-triangle',
+  // UCT Campuses
+  'upper-campus', 'middle-campus', 'lower-campus', 'hiddingh',
+  // Stellenbosch Campuses
+  'tygerberg', 'bellville-park', 'saldanha',
+]
+
+/**
+ * Extract campus information from a page.
+ *
+ * IMPORTANT: Only extract if URL explicitly indicates a campus page.
+ * Avoid matching "campus" in page titles (e.g., "University of Pretoria Campus").
  */
 export function extractCampusFromPage(page: ScrapedPage): Campus | null {
-  if (page.pageType !== 'campus' && !page.url.toLowerCase().includes('campus')) {
+  const urlLower = page.url.toLowerCase()
+  const urlPath = new URL(page.url).pathname.toLowerCase()
+
+  // STRICT: Only match campus pages by URL path, NOT by title/text content
+  const isCampusPage =
+    // Check explicit URL patterns
+    SA_CAMPUS_URL_PATTERNS.some((p) => urlPath.includes(p)) ||
+    // Check known campus names in URL path
+    SA_CAMPUS_NAMES.some((name) => urlPath.includes(name))
+
+  if (!isCampusPage) {
     return null
   }
 
-  const name = extractCampusName(page)
+  const name = extractCampusName(page, urlPath)
   if (!name) return null
 
   const location = extractLocation(page)
@@ -182,34 +225,44 @@ export function extractCampusFromPage(page: ScrapedPage): Campus | null {
       hasTitle: !!name,
       hasDescription: !!location,
       hasCode: true,
-      matchesPattern: page.pageType === 'campus',
-      sourceReliability: 0.8,
+      matchesPattern: true,
+      sourceReliability: 0.9,
     }),
     faculties: [],
   }
 }
 
-function extractCampusName(page: ScrapedPage): string | null {
-  // Try title first
-  if (page.title) {
-    // Remove common suffixes
-    const cleaned = page.title
-      .replace(/\s*[-|]\s*.*$/i, '')
-      .replace(/campus/i, '')
-      .trim()
-
-    if (cleaned.length > 2 && cleaned.length < 100) {
-      return cleaned + ' Campus'
+function extractCampusName(page: ScrapedPage, urlPath: string): string | null {
+  // First, check if any known campus name is in the URL
+  for (const campusName of SA_CAMPUS_NAMES) {
+    if (urlPath.includes(campusName)) {
+      // Convert URL-style name to proper case
+      const properName = campusName
+        .split('-')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ')
+      return properName + ' Campus'
     }
   }
 
-  // Try h1
+  // Try h1 if URL doesn't give us a name
   const h1Match = page.html.match(/<h1[^>]*>([^<]+)<\/h1>/i)
   if (h1Match && h1Match[1]) {
     const text = cleanText(h1Match[1])
-    if (text.length > 2 && text.length < 100) {
+    // Only use h1 if it's short and specific
+    if (text.length > 2 && text.length < 50 && !text.toLowerCase().includes('university')) {
       return text.includes('Campus') ? text : text + ' Campus'
     }
+  }
+
+  // Extract from URL path segment
+  const segments = urlPath.split('/').filter(Boolean)
+  const campusSegment = segments.find((s) => s.includes('campus'))
+  if (campusSegment) {
+    const name = campusSegment
+      .replace(/-/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+    return name.includes('Campus') ? name : name + ' Campus'
   }
 
   return null
@@ -239,19 +292,66 @@ function extractLocation(page: ScrapedPage): string | null {
 // ============================================================================
 
 /**
- * Extract faculty information from a page
+ * Invalid faculty name patterns - reject these
+ */
+const INVALID_FACULTY_NAMES = [
+  'faculties', 'faculty of faculties', 'schools', 'departments',
+  'colleges', 'home', 'index', 'overview', 'about', 'contact',
+  'welcome', 'all faculties', 'our faculties',
+]
+
+/**
+ * Known SA university faculties for validation
+ */
+const KNOWN_SA_FACULTIES = [
+  // Common faculty disciplines
+  'engineering', 'science', 'humanities', 'commerce', 'law', 'medicine',
+  'health sciences', 'education', 'arts', 'natural sciences',
+  'economic and management sciences', 'business', 'agriculture',
+  'veterinary science', 'theology', 'dentistry', 'pharmacy',
+  'information technology', 'computing', 'applied sciences',
+  // EDUVOS faculties
+  'applied science', 'humanities and arts', 'commerce and business',
+]
+
+/**
+ * Extract faculty information from a page.
+ *
+ * Uses URL-based detection and validates extracted names against known patterns.
  */
 export function extractFacultyFromPage(page: ScrapedPage): Faculty | null {
+  const urlPath = new URL(page.url).pathname.toLowerCase()
+
+  // Only match faculty/school/department pages by URL path
+  const isFacultyPage =
+    urlPath.includes('/facult') ||
+    urlPath.includes('/school') ||
+    urlPath.includes('/college') ||
+    urlPath.includes('/department')
+
+  if (!isFacultyPage) {
+    return null
+  }
+
+  // Don't extract from listing pages - they list multiple faculties
   if (
-    page.pageType !== 'faculty' &&
-    page.pageType !== 'department' &&
-    !page.url.toLowerCase().match(/facult|school|department/)
+    urlPath.endsWith('/faculties') ||
+    urlPath.endsWith('/faculties/') ||
+    urlPath.endsWith('/schools') ||
+    urlPath.endsWith('/schools/') ||
+    urlPath.match(/\/faculties?\/?$/) ||
+    urlPath.match(/\/schools?\/?$/)
   ) {
     return null
   }
 
-  const name = extractFacultyName(page)
+  const name = extractFacultyName(page, urlPath)
   if (!name) return null
+
+  // Validate the name is not garbage
+  if (INVALID_FACULTY_NAMES.includes(name.toLowerCase())) {
+    return null
+  }
 
   const description = extractDescription(page)
   const code = generateCode(name, 6)
@@ -266,46 +366,124 @@ export function extractFacultyFromPage(page: ScrapedPage): Faculty | null {
       hasTitle: !!name,
       hasDescription: !!description,
       hasCode: true,
-      matchesPattern: page.pageType === 'faculty',
-      sourceReliability: 0.8,
+      matchesPattern: true,
+      sourceReliability: 0.85,
     }),
     courses: [],
   }
 }
 
-function extractFacultyName(page: ScrapedPage): string | null {
-  // Try title first
+function extractFacultyName(page: ScrapedPage, urlPath: string): string | null {
+  // 1. Try to extract from URL path (most reliable)
+  const urlName = extractFacultyNameFromUrl(urlPath)
+  if (urlName && isValidFacultyName(urlName)) {
+    return urlName
+  }
+
+  // 2. Try h1 with validation
+  const h1Match = page.html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
+  if (h1Match && h1Match[1]) {
+    const text = cleanText(extractTextContent(h1Match[1]))
+    if (text.length > 5 && text.length < 100 && isValidFacultyName(text)) {
+      return normalizeFacultyName(text)
+    }
+  }
+
+  // 3. Try title with strict validation
   if (page.title) {
     const cleaned = page.title
       .replace(/\s*[-|]\s*.*$/i, '')
       .trim()
 
-    // Check if it looks like a faculty name
-    if (
-      cleaned.length > 5 &&
-      cleaned.length < 100 &&
-      (cleaned.toLowerCase().includes('faculty') ||
-        cleaned.toLowerCase().includes('school of') ||
-        cleaned.toLowerCase().includes('department'))
-    ) {
-      return cleaned
-    }
-  }
-
-  // Try h1
-  const h1Match = page.html.match(/<h1[^>]*>([^<]+)<\/h1>/i)
-  if (h1Match && h1Match[1]) {
-    const text = cleanText(h1Match[1])
-    if (text.length > 5 && text.length < 100) {
-      // Ensure it sounds like a faculty
-      if (!text.toLowerCase().includes('faculty')) {
-        return 'Faculty of ' + text
-      }
-      return text
+    if (cleaned.length > 5 && cleaned.length < 80 && isValidFacultyName(cleaned)) {
+      return normalizeFacultyName(cleaned)
     }
   }
 
   return null
+}
+
+function extractFacultyNameFromUrl(urlPath: string): string | null {
+  // Get the last meaningful segment
+  const segments = urlPath.split('/').filter((s): s is string => Boolean(s))
+
+  // Find the segment after 'faculty', 'faculties', 'school', etc.
+  for (let i = 0; i < segments.length - 1; i++) {
+    const seg = segments[i]
+    if (seg && seg.match(/^facult|^school|^college|^department/)) {
+      const nextSeg = segments[i + 1]
+      if (nextSeg && nextSeg.length > 2 && !nextSeg.match(/^(home|index|about|contact)$/)) {
+        return convertUrlToFacultyName(nextSeg)
+      }
+    }
+  }
+
+  // If no pattern found, check if last segment looks like a faculty
+  const lastSeg = segments[segments.length - 1]
+  if (lastSeg && lastSeg.length > 3) {
+    const name = convertUrlToFacultyName(lastSeg)
+    if (KNOWN_SA_FACULTIES.some((f) => name.toLowerCase().includes(f))) {
+      return name
+    }
+  }
+
+  return null
+}
+
+function convertUrlToFacultyName(urlSegment: string): string {
+  // Convert URL segment to proper faculty name
+  const name = urlSegment
+    .replace(/-/g, ' ')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim()
+
+  // Add "Faculty of" prefix if not already present
+  if (
+    !name.toLowerCase().startsWith('faculty') &&
+    !name.toLowerCase().startsWith('school') &&
+    !name.toLowerCase().startsWith('college') &&
+    !name.toLowerCase().startsWith('department')
+  ) {
+    return 'Faculty of ' + name
+  }
+
+  return name
+}
+
+function isValidFacultyName(name: string): boolean {
+  const lower = name.toLowerCase()
+
+  // Reject invalid names
+  if (INVALID_FACULTY_NAMES.some((inv) => lower === inv || lower.includes(inv))) {
+    return false
+  }
+
+  // Must contain a discipline keyword or be a known faculty
+  const hasKnownDiscipline = KNOWN_SA_FACULTIES.some((f) => lower.includes(f))
+  const hasStructuralWord = ['faculty', 'school', 'college', 'department'].some((w) =>
+    lower.includes(w)
+  )
+
+  return hasKnownDiscipline || hasStructuralWord
+}
+
+function normalizeFacultyName(name: string): string {
+  // Remove redundant words and clean up
+  let normalized = name
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  // Ensure proper capitalization
+  if (normalized.toLowerCase().startsWith('faculty of')) {
+    normalized = 'Faculty of ' + normalized.slice(11).trim()
+  } else if (normalized.toLowerCase().startsWith('school of')) {
+    normalized = 'School of ' + normalized.slice(10).trim()
+  } else if (normalized.toLowerCase().startsWith('college of')) {
+    normalized = 'College of ' + normalized.slice(11).trim()
+  }
+
+  return normalized
 }
 
 function extractDescription(page: ScrapedPage): string | null {
@@ -331,19 +509,69 @@ function extractDescription(page: ScrapedPage): string | null {
 // ============================================================================
 
 /**
- * Extract course information from a page
+ * Invalid course names - reject these generic terms
+ */
+const INVALID_COURSE_NAMES = [
+  'undergraduate', 'postgraduate', 'programmes', 'courses', 'qualifications',
+  'degrees', 'study', 'studies', 'academic', 'prospectus', 'home', 'index',
+  'apply', 'application', 'admissions', 'registration', 'overview',
+  'all programmes', 'all courses', 'all qualifications', 'our programmes',
+]
+
+/**
+ * Course degree prefixes - used to validate actual course names
+ */
+const COURSE_DEGREE_PREFIXES = [
+  // Full names
+  'bachelor of', 'master of', 'doctor of', 'diploma in', 'certificate in',
+  'honours in', 'postgraduate diploma', 'advanced diploma', 'higher certificate',
+  // Abbreviations
+  'bsc', 'ba', 'bcom', 'beng', 'llb', 'mb', 'bba', 'bed', 'btech', 'bpharm',
+  'msc', 'ma', 'mcom', 'meng', 'llm', 'mba', 'med', 'mtech', 'mpharm',
+  'phd', 'dphil', 'dcom', 'deng',
+  // National Diploma/Certificate (SA specific)
+  'nd', 'nc', 'national diploma', 'national certificate',
+]
+
+/**
+ * Extract course information from a page.
+ *
+ * Uses URL-based detection and validates course names against degree patterns.
  */
 export function extractCourseFromPage(page: ScrapedPage): Course | null {
+  const urlPath = new URL(page.url).pathname.toLowerCase()
+
+  // Only match course/programme pages by URL path
+  const isCoursePage =
+    urlPath.includes('/course') ||
+    urlPath.includes('/programme') ||
+    urlPath.includes('/program') ||
+    urlPath.includes('/qualification') ||
+    urlPath.includes('/degree')
+
+  if (!isCoursePage) {
+    return null
+  }
+
+  // Don't extract from listing pages
   if (
-    page.pageType !== 'course' &&
-    page.pageType !== 'programme' &&
-    !page.url.toLowerCase().match(/course|programme|program|qualification|degree/)
+    urlPath.match(/\/programmes?\/?$/) ||
+    urlPath.match(/\/courses?\/?$/) ||
+    urlPath.match(/\/qualifications?\/?$/) ||
+    urlPath.match(/\/degrees?\/?$/) ||
+    urlPath.includes('/undergraduate/') && urlPath.endsWith('/') ||
+    urlPath.includes('/postgraduate/') && urlPath.endsWith('/')
   ) {
     return null
   }
 
-  const name = extractCourseName(page)
+  const name = extractCourseName(page, urlPath)
   if (!name) return null
+
+  // Validate it's not a generic term
+  if (INVALID_COURSE_NAMES.some((inv) => name.toLowerCase() === inv)) {
+    return null
+  }
 
   const code = extractCourseCode(page) || generateCode(name, 10)
   const description = extractDescription(page)
@@ -362,52 +590,116 @@ export function extractCourseFromPage(page: ScrapedPage): Course | null {
       hasTitle: !!name,
       hasDescription: !!description,
       hasCode: !!code,
-      matchesPattern: page.pageType === 'course' || page.pageType === 'programme',
-      sourceReliability: 0.8,
+      matchesPattern: true,
+      sourceReliability: 0.85,
     }),
   }
 }
 
-function extractCourseName(page: ScrapedPage): string | null {
-  // Try title first
+function extractCourseName(page: ScrapedPage, urlPath: string): string | null {
+  // 1. Try h1 first (most reliable for course pages)
+  const h1Match = page.html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
+  if (h1Match && h1Match[1]) {
+    const text = cleanText(extractTextContent(h1Match[1]))
+    if (isValidCourseName(text)) {
+      return normalizeCourseName(text)
+    }
+  }
+
+  // 2. Try title with degree prefix validation
   if (page.title) {
     const cleaned = page.title.replace(/\s*[-|]\s*.*$/i, '').trim()
+    if (isValidCourseName(cleaned)) {
+      return normalizeCourseName(cleaned)
+    }
+  }
 
-    // Check if it looks like a course name
-    if (cleaned.length > 5 && cleaned.length < 200) {
-      // Common course prefixes
-      const prefixes = [
-        'Bachelor',
-        'Master',
-        'Doctor',
-        'PhD',
-        'Diploma',
-        'Certificate',
-        'Honours',
-        'BSc',
-        'BA',
-        'BCom',
-        'BEng',
-        'LLB',
-        'MB',
-      ]
+  // 3. Try to extract from URL path
+  const urlName = extractCourseNameFromUrl(urlPath)
+  if (urlName && urlName.length > 5) {
+    return urlName
+  }
 
-      if (prefixes.some((p) => cleaned.includes(p))) {
-        return cleaned
+  // 4. Look for degree patterns in page content
+  const degreePattern = /(?:Bachelor|Master|Doctor|Diploma|Certificate|Honours|BSc|BA|BCom|BEng|BBA|BEd|BTech)\s+(?:of\s+)?[\w\s&,]+(?:Sciences?|Arts?|Engineering|Commerce|Business|Education|Law|Medicine|Technology|Management)?/gi
+  const matches = page.text.match(degreePattern)
+  if (matches && matches.length > 0) {
+    // Take the first match that's a reasonable length
+    for (const match of matches) {
+      const cleaned = cleanText(match)
+      if (cleaned.length > 10 && cleaned.length < 150) {
+        return normalizeCourseName(cleaned)
       }
     }
   }
 
-  // Try h1
-  const h1Match = page.html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
-  if (h1Match && h1Match[1]) {
-    const text = cleanText(extractTextContent(h1Match[1]))
-    if (text.length > 5 && text.length < 200) {
-      return text
+  return null
+}
+
+function extractCourseNameFromUrl(urlPath: string): string | null {
+  const segments = urlPath.split('/').filter((s): s is string => Boolean(s))
+
+  // Look for a meaningful segment after programme/course/qualification
+  for (let i = 0; i < segments.length - 1; i++) {
+    const seg = segments[i]
+    if (seg && seg.match(/^(programme|course|qualification|degree)/)) {
+      const nextSeg = segments[i + 1]
+      if (nextSeg && nextSeg.length > 5 && !nextSeg.match(/^(home|index|about|overview)$/)) {
+        const name = nextSeg
+          .replace(/-/g, ' ')
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase())
+          .trim()
+        // Only return if it doesn't look like a generic term
+        if (!INVALID_COURSE_NAMES.includes(name.toLowerCase())) {
+          return name
+        }
+      }
     }
   }
 
   return null
+}
+
+function isValidCourseName(name: string): boolean {
+  const lower = name.toLowerCase()
+
+  // Reject invalid/generic names
+  if (INVALID_COURSE_NAMES.some((inv) => lower === inv || lower.startsWith(inv + ' '))) {
+    return false
+  }
+
+  // Must be reasonable length
+  if (name.length < 8 || name.length > 150) {
+    return false
+  }
+
+  // Should contain a degree prefix/pattern
+  const hasDegreePrefix = COURSE_DEGREE_PREFIXES.some((p) => lower.includes(p))
+
+  // Or should look like a specific discipline
+  const disciplines = [
+    'science', 'engineering', 'commerce', 'business', 'law', 'medicine',
+    'education', 'arts', 'humanities', 'technology', 'computing', 'accounting',
+    'management', 'nursing', 'pharmacy', 'architecture', 'economics',
+  ]
+  const hasDiscipline = disciplines.some((d) => lower.includes(d))
+
+  return hasDegreePrefix || hasDiscipline
+}
+
+function normalizeCourseName(name: string): string {
+  // Clean up whitespace
+  let normalized = name.replace(/\s+/g, ' ').trim()
+
+  // Capitalize degree abbreviations
+  const abbreviations = ['BSc', 'BA', 'BCom', 'BEng', 'LLB', 'MB', 'BBA', 'BEd', 'BTech', 'MSc', 'MA', 'MCom', 'MBA', 'PhD']
+  for (const abbr of abbreviations) {
+    const regex = new RegExp(`\\b${abbr}\\b`, 'gi')
+    normalized = normalized.replace(regex, abbr)
+  }
+
+  return normalized
 }
 
 function extractCourseCode(page: ScrapedPage): string | null {
@@ -502,33 +794,308 @@ function extractDuration(page: ScrapedPage): number | null {
 // ============================================================================
 
 /**
- * Extract all relevant items from a collection of pages
+ * Extract all relevant items from a collection of pages.
+ *
+ * Strategy:
+ * 1. First, find listing pages (/faculties, /programmes, etc.)
+ * 2. Extract entities from links on listing pages
+ * 3. Then supplement with individual page extraction
  */
 export function extractAllFromPages(pages: ScrapedPage[]): {
   campuses: Campus[]
   faculties: Faculty[]
   courses: Course[]
 } {
-  const campuses: Campus[] = []
-  const faculties: Faculty[] = []
-  const courses: Course[] = []
+  const campusesMap = new Map<string, Campus>()
+  const facultiesMap = new Map<string, Faculty>()
+  const coursesMap = new Map<string, Course>()
 
+  // Phase 1: Extract from listing pages (most reliable)
   for (const page of pages) {
-    const campus = extractCampusFromPage(page)
-    if (campus) campuses.push(campus)
+    const urlPath = new URL(page.url).pathname.toLowerCase()
 
-    const faculty = extractFacultyFromPage(page)
-    if (faculty) faculties.push(faculty)
+    // Faculty listing pages
+    if (
+      urlPath.match(/\/faculties?\/?$/) ||
+      urlPath.match(/\/schools?\/?$/) ||
+      urlPath.match(/\/colleges?\/?$/)
+    ) {
+      const facultiesFromListing = extractFacultiesFromListingPage(page)
+      for (const faculty of facultiesFromListing) {
+        if (!facultiesMap.has(faculty.name.toLowerCase())) {
+          facultiesMap.set(faculty.name.toLowerCase(), faculty)
+        }
+      }
+    }
 
-    const course = extractCourseFromPage(page)
-    if (course) courses.push(course)
+    // Course/Programme listing pages
+    if (
+      urlPath.match(/\/programmes?\/?$/) ||
+      urlPath.match(/\/courses?\/?$/) ||
+      urlPath.match(/\/qualifications?\/?$/) ||
+      urlPath.includes('/undergraduate') ||
+      urlPath.includes('/postgraduate')
+    ) {
+      const coursesFromListing = extractCoursesFromListingPage(page)
+      for (const course of coursesFromListing) {
+        if (!coursesMap.has(course.name.toLowerCase())) {
+          coursesMap.set(course.name.toLowerCase(), course)
+        }
+      }
+    }
+
+    // Campus listing pages
+    if (urlPath.match(/\/campuses?\/?$/)) {
+      const campusesFromListing = extractCampusesFromListingPage(page)
+      for (const campus of campusesFromListing) {
+        if (!campusesMap.has(campus.name.toLowerCase())) {
+          campusesMap.set(campus.name.toLowerCase(), campus)
+        }
+      }
+    }
   }
 
-  return { campuses, faculties, courses }
+  // Phase 2: Extract from individual pages (supplement)
+  for (const page of pages) {
+    const campus = extractCampusFromPage(page)
+    if (campus && !campusesMap.has(campus.name.toLowerCase())) {
+      campusesMap.set(campus.name.toLowerCase(), campus)
+    }
+
+    const faculty = extractFacultyFromPage(page)
+    if (faculty && !facultiesMap.has(faculty.name.toLowerCase())) {
+      facultiesMap.set(faculty.name.toLowerCase(), faculty)
+    }
+
+    const course = extractCourseFromPage(page)
+    if (course && !coursesMap.has(course.name.toLowerCase())) {
+      coursesMap.set(course.name.toLowerCase(), course)
+    }
+  }
+
+  return {
+    campuses: Array.from(campusesMap.values()),
+    faculties: Array.from(facultiesMap.values()),
+    courses: Array.from(coursesMap.values()),
+  }
 }
 
 /**
- * Find links that likely lead to academic content
+ * Extract faculties from a listing page (e.g., /faculties)
+ */
+function extractFacultiesFromListingPage(page: ScrapedPage): Faculty[] {
+  const faculties: Faculty[] = []
+  const seen = new Set<string>()
+
+  // Look for links that point to faculty pages
+  for (const link of page.links) {
+    const linkUrl = link.href.toLowerCase()
+    const linkText = link.text.trim()
+
+    // Check if link points to a faculty page
+    if (
+      linkUrl.includes('/facult') ||
+      linkUrl.includes('/school') ||
+      linkUrl.includes('/college')
+    ) {
+      // Validate the link text looks like a faculty name
+      if (linkText.length > 5 && linkText.length < 100 && isValidFacultyName(linkText)) {
+        const normalizedName = normalizeFacultyName(linkText)
+        const key = normalizedName.toLowerCase()
+
+        if (!seen.has(key)) {
+          seen.add(key)
+          faculties.push({
+            id: generateId('faculty'),
+            name: normalizedName,
+            code: generateCode(normalizedName, 6),
+            sourceUrl: link.href,
+            confidence: 0.9,
+            courses: [],
+          })
+        }
+      }
+    }
+  }
+
+  // Also look for faculty names in headings/lists on the page
+  const facultyPatterns = [
+    /Faculty of ([\w\s&]+)/gi,
+    /School of ([\w\s&]+)/gi,
+    /College of ([\w\s&]+)/gi,
+  ]
+
+  for (const pattern of facultyPatterns) {
+    const matches = page.text.matchAll(pattern)
+    for (const match of matches) {
+      if (match[1] && match[1].length > 3 && match[1].length < 60) {
+        const name = pattern.source.includes('Faculty')
+          ? 'Faculty of ' + match[1].trim()
+          : pattern.source.includes('School')
+            ? 'School of ' + match[1].trim()
+            : 'College of ' + match[1].trim()
+        const key = name.toLowerCase()
+
+        if (!seen.has(key) && !INVALID_FACULTY_NAMES.includes(key)) {
+          seen.add(key)
+          faculties.push({
+            id: generateId('faculty'),
+            name,
+            code: generateCode(name, 6),
+            sourceUrl: page.url,
+            confidence: 0.8,
+            courses: [],
+          })
+        }
+      }
+    }
+  }
+
+  return faculties
+}
+
+/**
+ * Extract courses from a listing page (e.g., /programmes)
+ */
+function extractCoursesFromListingPage(page: ScrapedPage): Course[] {
+  const courses: Course[] = []
+  const seen = new Set<string>()
+
+  // Look for links that point to course/programme pages
+  for (const link of page.links) {
+    const linkUrl = link.href.toLowerCase()
+    const linkText = link.text.trim()
+
+    // Check if link points to a course page
+    if (
+      linkUrl.includes('/course') ||
+      linkUrl.includes('/programme') ||
+      linkUrl.includes('/qualification') ||
+      linkUrl.includes('/degree')
+    ) {
+      // Validate the link text looks like a course name
+      if (linkText.length > 8 && linkText.length < 150 && isValidCourseName(linkText)) {
+        const normalizedName = normalizeCourseName(linkText)
+        const key = normalizedName.toLowerCase()
+
+        if (!seen.has(key)) {
+          seen.add(key)
+          courses.push({
+            id: generateId('course'),
+            name: normalizedName,
+            code: generateCode(normalizedName, 10),
+            sourceUrl: link.href,
+            confidence: 0.85,
+          })
+        }
+      }
+    }
+  }
+
+  // Also look for degree names in the page content
+  const degreePattern = /(?:Bachelor|Master|Doctor|Diploma|Certificate|Honours|BSc|BA|BCom|BEng|BBA|BTech)\s+(?:of\s+|in\s+)?[\w\s&,]+/gi
+  const matches = page.text.matchAll(degreePattern)
+
+  for (const match of matches) {
+    const name = cleanText(match[0])
+    if (name.length > 10 && name.length < 150 && isValidCourseName(name)) {
+      const normalizedName = normalizeCourseName(name)
+      const key = normalizedName.toLowerCase()
+
+      if (!seen.has(key)) {
+        seen.add(key)
+        courses.push({
+          id: generateId('course'),
+          name: normalizedName,
+          code: generateCode(normalizedName, 10),
+          sourceUrl: page.url,
+          confidence: 0.7,
+        })
+      }
+    }
+  }
+
+  return courses
+}
+
+/**
+ * Extract campuses from a listing page (e.g., /campuses)
+ */
+function extractCampusesFromListingPage(page: ScrapedPage): Campus[] {
+  const campuses: Campus[] = []
+  const seen = new Set<string>()
+
+  // Look for links that point to campus pages
+  for (const link of page.links) {
+    const linkUrl = link.href.toLowerCase()
+    const linkText = link.text.trim()
+
+    // Check if link points to a campus page
+    if (linkUrl.includes('/campus') || SA_CAMPUS_NAMES.some((c) => linkUrl.includes(c))) {
+      // Validate the link text looks like a campus name
+      if (linkText.length > 3 && linkText.length < 50) {
+        const name = linkText.includes('Campus') ? linkText : linkText + ' Campus'
+        const key = name.toLowerCase()
+
+        if (!seen.has(key)) {
+          seen.add(key)
+          campuses.push({
+            id: generateId('campus'),
+            name,
+            code: generateCode(name, 6),
+            sourceUrl: link.href,
+            confidence: 0.9,
+            faculties: [],
+          })
+        }
+      }
+    }
+  }
+
+  return campuses
+}
+
+/**
+ * Find ALL internal links from a page (for broader crawling)
+ */
+export function findAllInternalLinks(page: ScrapedPage): ExtractedLink[] {
+  return page.links.filter((link) => {
+    if (!link.isInternal) return false
+
+    // Skip common non-content links
+    const url = link.href.toLowerCase()
+    const skipPatterns = [
+      // Auth & User
+      '/login', '/logout', '/register', '/signin', '/signup',
+      '/cart', '/checkout', '/search', '/profile', '/account',
+
+      // Non-academic content
+      '/staff/', '/news/', '/events/', '/media/', '/blog/',
+      '/yearbook', '/alumni', '/about/', '/press/', '/social/',
+      '/athletics', '/sports/', '/library/', '/research/',
+      '/vacancies', '/careers', '/jobs/', '/contact/',
+      '/gallery/', '/photos/', '/videos/', '/podcast/',
+      '/donate/', '/giving/', '/support-us/', '/foundation/',
+      '/governance/', '/council/', '/senate/', '/policies/',
+      '/student-life/', '/residence/', '/accommodation/',
+      '/parking/', '/shuttle/', '/transport/', '/map/',
+      '/calendar/', '/notices/', '/tender/', '/procurement/',
+
+      // File types
+      '.pdf', '.doc', '.docx', '.zip', '.jpg', '.png', '.gif',
+      '.xls', '.xlsx', '.ppt', '.pptx',
+
+      // Non-HTTP
+      'javascript:', 'mailto:', 'tel:', '#',
+    ]
+
+    return !skipPatterns.some((p) => url.includes(p))
+  })
+}
+
+/**
+ * Find links that likely lead to academic content.
+ * Includes comprehensive patterns for all 14 SA public universities + EDUVOS.
  */
 export function findAcademicLinks(page: ScrapedPage): ExtractedLink[] {
   return page.links.filter((link) => {
@@ -537,20 +1104,69 @@ export function findAcademicLinks(page: ScrapedPage): ExtractedLink[] {
     const url = link.href.toLowerCase()
     const text = link.text.toLowerCase()
 
-    // Academic URL patterns
+    // Comprehensive academic URL patterns for SA universities
     const urlPatterns = [
-      'campus',
-      'faculty',
-      'school',
-      'department',
-      'course',
-      'programme',
-      'program',
-      'qualification',
-      'undergraduate',
-      'postgraduate',
-      'degree',
-      'study',
+      // Common patterns (all universities)
+      'campus', 'campuses',
+      'faculty', 'faculties',
+      'school', 'schools',
+      'department', 'departments',
+      'course', 'courses',
+      'programme', 'programmes', 'program', 'programs',
+      'qualification', 'qualifications',
+      'undergraduate', 'postgraduate',
+      'degree', 'degrees',
+      'study', 'academics', 'academic',
+      'admission', 'admissions', 'apply',
+      'prospectus', 'handbook',
+      'college', 'colleges',
+
+      // UP (up.ac.za)
+      'schools-and-departments', 'postgraduate-studies',
+
+      // UCT (uct.ac.za)
+      'postgraduate-hub', 'courses-faculty',
+
+      // Wits (wits.ac.za)
+      'faculties-and-schools', 'academic-programmes',
+
+      // UKZN (ukzn.ac.za)
+      'our-colleges', 'organisational-structure',
+
+      // Stellenbosch (sun.ac.za)
+      'facultiesanddepartments', 'pgstudies',
+
+      // UJ (uj.ac.za)
+      'courses-and-programmes', 'undergraduate-programmes', 'postgraduate-programmes',
+
+      // UFS (ufs.ac.za)
+      'departments-and-divisions',
+
+      // NWU (nwu.ac.za)
+      'our-faculties', 'fields-study', 'fields-of-study',
+
+      // Rhodes (ru.ac.za)
+      'admissiongateway', 'departmentsandfaculties', 'listofdepartments',
+      'courseandcurriculum',
+
+      // UNISA (unisa.ac.za)
+      'all-qualifications', 'short-learning-programmes',
+
+      // TUT (tut.ac.za)
+      'i-want-to-study', 'online-programmes',
+
+      // DUT (dut.ac.za)
+      'degrees-offered',
+
+      // CPUT (cput.ac.za)
+      'academic/faculties', 'search/prospectus',
+
+      // VUT (vut.ac.za)
+      'faculty-of-',
+
+      // EDUVOS (eduvos.com) - Private College
+      'programmes/degree', 'applied-science', 'humanities-and-arts',
+      'commerce-and-business', 'technology',
     ]
 
     // Check URL

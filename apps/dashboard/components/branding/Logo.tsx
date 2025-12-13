@@ -10,7 +10,7 @@ export function Logo({ className }: { className?: string }) {
         width={990}
         height={247}
         priority
-        className="logo-large block h-auto w-full"
+        className="logo-large block h-auto w-full max-w-[600px]"
         unoptimized
       />
     </div>

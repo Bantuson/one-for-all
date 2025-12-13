@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
-from crewai_tools import tool
+from crewai.tools import tool
 from .supabase_client import supabase
 
 @tool

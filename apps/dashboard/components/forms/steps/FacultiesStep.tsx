@@ -5,8 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/Label'
-import { Button } from '@/components/ui/Button'
+import { CommandButton } from '@/components/ui/CommandButton'
 import { GraduationCap, Plus, Trash2 } from 'lucide-react'
 import {
   AlertDialog,
@@ -38,6 +37,17 @@ interface FacultiesStepProps {
   onNext: (faculties: Faculty[]) => void
   onBack: () => void
   onCancel: () => void
+}
+
+// JSON-style label component
+function SyntaxLabel({ name, required }: { name: string; required?: boolean }) {
+  return (
+    <label className="block font-mono text-sm mb-1.5">
+      <span className="text-syntax-key">"{name}"</span>
+      <span className="text-foreground"> :</span>
+      {required && <span className="text-destructive ml-1">*</span>}
+    </label>
+  )
 }
 
 export function FacultiesStep({
@@ -85,49 +95,50 @@ export function FacultiesStep({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <GraduationCap className="h-6 w-6 text-primary" />
-        <h2 className="text-2xl font-semibold">Add Faculties</h2>
+      {/* Header - Code Style */}
+      <div className="flex items-center gap-3 mb-6">
+        <GraduationCap className="h-5 w-5 text-syntax-key" />
+        <h2 className="font-mono text-lg">
+          <span className="text-syntax-export">export</span>
+          <span className="text-syntax-key ml-2">Faculties</span>
+        </h2>
       </div>
 
-      <p className="text-sm text-muted-foreground mb-6">
-        Add the faculties or departments within this campus. You'll be able to add
-        courses for each faculty in the next step.
+      <p className="font-mono text-xs text-traffic-green mb-6">
+        // Add the faculties or departments within this campus
       </p>
 
       {/* List of Added Faculties */}
       {faculties.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground">
-            Added Faculties ({faculties.length})
+          <h3 className="font-mono text-xs text-traffic-green">
+            // Added Faculties ({faculties.length})
           </h3>
           {faculties.map((faculty) => (
             <div
               key={faculty.id}
-              className="flex items-start justify-between p-4 border rounded-lg bg-muted/30"
+              className="flex items-start justify-between p-4 border border-border rounded-lg bg-muted/30"
             >
-              <div className="flex-1">
+              <div className="flex-1 font-mono">
                 <div className="flex items-center gap-2">
-                  <h4 className="font-semibold">{faculty.name}</h4>
-                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                  <span className="text-syntax-key">"{faculty.name}"</span>
+                  <span className="text-xs bg-syntax-key/10 text-syntax-key px-2 py-1 rounded">
                     {faculty.code}
                   </span>
                 </div>
                 {faculty.description && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {faculty.description}
+                  <p className="text-xs text-traffic-green mt-1">
+                    // {faculty.description}
                   </p>
                 )}
               </div>
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
                 onClick={() => handleRemoveFaculty(faculty.id)}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                className="p-2 text-traffic-red hover:bg-traffic-red/10 rounded transition-colors"
               >
                 <Trash2 className="h-4 w-4" />
-              </Button>
+              </button>
             </div>
           ))}
         </div>
@@ -135,94 +146,85 @@ export function FacultiesStep({
 
       {/* Add Faculty Form */}
       {isAddingFaculty ? (
-        <form onSubmit={handleSubmit(handleAddFaculty)} className="space-y-4 p-6 border rounded-lg bg-muted/10">
-          <h3 className="text-lg font-medium">New Faculty</h3>
+        <form onSubmit={handleSubmit(handleAddFaculty)} className="space-y-4 p-6 border border-border rounded-lg bg-muted/10">
+          <h3 className="font-mono text-sm text-traffic-green">// New Faculty</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                Faculty Name <span className="text-red-500">*</span>
-              </Label>
+            <div className="space-y-1">
+              <SyntaxLabel name="Faculty Name" required />
               <Input
                 id="name"
-                placeholder="e.g., Engineering, Arts, Science"
+                placeholder="Engineering"
+                className="font-mono"
                 {...register('name')}
               />
               {errors.name && (
-                <p className="text-sm text-red-500">{errors.name.message}</p>
+                <p className="font-mono text-xs text-destructive">// Error: {errors.name.message}</p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="code">
-                Faculty Code <span className="text-red-500">*</span>
-              </Label>
+            <div className="space-y-1">
+              <SyntaxLabel name="Faculty Code" required />
               <Input
                 id="code"
-                placeholder="e.g., ENG, ART, SCI"
+                placeholder="ENG"
+                className="font-mono uppercase"
                 {...register('code')}
               />
               {errors.code && (
-                <p className="text-sm text-red-500">{errors.code.message}</p>
+                <p className="font-mono text-xs text-destructive">// Error: {errors.code.message}</p>
               )}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Description (Optional)</Label>
+          <div className="space-y-1">
+            <SyntaxLabel name="Description" />
             <Input
               id="description"
               placeholder="Brief description of this faculty"
+              className="font-mono"
               {...register('description')}
             />
           </div>
 
           <div className="flex gap-2">
-            <Button type="submit" size="sm">
-              Add Faculty
-            </Button>
-            <Button
+            <CommandButton type="submit" command="add" variant="primary" size="sm" />
+            <CommandButton
               type="button"
-              variant="outline"
+              command="cancel"
+              variant="ghost"
               size="sm"
               onClick={() => {
                 setIsAddingFaculty(false)
                 reset()
               }}
-            >
-              Cancel
-            </Button>
+            />
           </div>
         </form>
       ) : (
-        <Button
+        <CommandButton
           type="button"
+          command="add --faculty"
           variant="outline"
           onClick={() => setIsAddingFaculty(true)}
-          className="w-full"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Faculty
-        </Button>
+          className="w-full justify-center"
+        />
       )}
 
-      {/* Action Buttons */}
-      <div className="flex justify-between pt-6 border-t">
+      {/* Action Buttons - Command Style */}
+      <div className="flex justify-between pt-6 border-t border-border">
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={onBack}>
-            Back
-          </Button>
-          <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
+          <CommandButton type="button" command="back" variant="outline" onClick={onBack} />
+          <CommandButton type="button" command="cancel" variant="ghost" onClick={onCancel} />
         </div>
-        <Button
+        <CommandButton
           type="button"
+          command="next --courses"
+          variant="primary"
+          arrow
           onClick={handleNext}
           disabled={faculties.length === 0}
-        >
-          Next: Add Courses
-        </Button>
+        />
       </div>
 
       {/* Validation Dialog */}

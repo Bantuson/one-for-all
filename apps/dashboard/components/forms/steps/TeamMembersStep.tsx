@@ -5,9 +5,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/Label'
-import { Button } from '@/components/ui/Button'
-import { Users, Plus, Trash2, Mail, Shield } from 'lucide-react'
+import { CommandButton } from '@/components/ui/CommandButton'
+import { Users, Trash2, Mail, Shield } from 'lucide-react'
 
 const teamMemberSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -47,6 +46,17 @@ const availablePermissions = [
   { value: 'invite_members', label: 'Invite Members' },
   { value: 'view_analytics', label: 'View Analytics' },
 ]
+
+// JSON-style label component
+function SyntaxLabel({ name, required }: { name: string; required?: boolean }) {
+  return (
+    <label className="block font-mono text-sm mb-1.5">
+      <span className="text-syntax-key">"{name}"</span>
+      <span className="text-foreground"> :</span>
+      {required && <span className="text-destructive ml-1">*</span>}
+    </label>
+  )
+}
 
 export function TeamMembersStep({
   initialData = [],
@@ -103,43 +113,45 @@ export function TeamMembersStep({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Users className="h-6 w-6 text-primary" />
-        <h2 className="text-2xl font-semibold">Invite Team Members</h2>
+      {/* Header - Code Style */}
+      <div className="flex items-center gap-3 mb-6">
+        <Users className="h-5 w-5 text-syntax-key" />
+        <h2 className="font-mono text-lg">
+          <span className="text-syntax-export">export</span>
+          <span className="text-syntax-key ml-2">Team Members</span>
+        </h2>
       </div>
 
-      <p className="text-sm text-muted-foreground mb-6">
-        Invite team members to help manage this campus. They'll receive an email
-        invitation and will be automatically assigned to this campus when they create
-        their account. You can skip this step and invite members later.
+      <p className="font-mono text-xs text-traffic-green mb-6">
+        // Invite team members to help manage this campus (optional)
       </p>
 
       {/* List of Added Team Members */}
       {teamMembers.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground">
-            Team Members ({teamMembers.length})
+          <h3 className="font-mono text-xs text-traffic-green">
+            // Team Members ({teamMembers.length})
           </h3>
           {teamMembers.map((member) => (
             <div
               key={member.id}
-              className="flex items-start justify-between p-4 border rounded-lg bg-muted/30"
+              className="flex items-start justify-between p-4 border border-border rounded-lg bg-muted/30"
             >
-              <div className="flex-1">
+              <div className="flex-1 font-mono">
                 <div className="flex items-center gap-2 mb-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{member.email}</span>
+                  <Mail className="h-4 w-4 text-syntax-key" />
+                  <span className="text-syntax-string">"{member.email}"</span>
                 </div>
                 <div className="flex items-center gap-2 mb-2">
-                  <Shield className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm capitalize">{member.role}</span>
+                  <Shield className="h-4 w-4 text-syntax-key" />
+                  <span className="text-sm text-syntax-key">{member.role}</span>
                 </div>
                 {member.permissions.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {member.permissions.map((perm) => (
                       <span
                         key={perm}
-                        className="text-xs bg-primary/10 text-primary px-2 py-1 rounded"
+                        className="text-xs bg-syntax-key/10 text-syntax-key px-2 py-1 rounded"
                       >
                         {availablePermissions.find((p) => p.value === perm)?.label || perm}
                       </span>
@@ -147,15 +159,13 @@ export function TeamMembersStep({
                   </div>
                 )}
               </div>
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
                 onClick={() => handleRemoveMember(member.id)}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                className="p-2 text-traffic-red hover:bg-traffic-red/10 rounded transition-colors"
               >
                 <Trash2 className="h-4 w-4" />
-              </Button>
+              </button>
             </div>
           ))}
         </div>
@@ -165,35 +175,32 @@ export function TeamMembersStep({
       {isAddingMember ? (
         <form
           onSubmit={handleSubmit(handleAddMember)}
-          className="space-y-6 p-6 border rounded-lg bg-muted/10"
+          className="space-y-6 p-6 border border-border rounded-lg bg-muted/10"
         >
-          <h3 className="text-lg font-medium">Invite New Member</h3>
+          <h3 className="font-mono text-sm text-traffic-green">// Invite New Member</h3>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">
-              Email Address <span className="text-red-500">*</span>
-            </Label>
+          <div className="space-y-1">
+            <SyntaxLabel name="Email Address" required />
             <Input
               id="email"
               type="email"
               placeholder="colleague@university.edu"
+              className="font-mono"
               {...register('email')}
             />
             {errors.email && (
-              <p className="text-sm text-red-500">{errors.email.message}</p>
+              <p className="font-mono text-xs text-destructive">// Error: {errors.email.message}</p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="role">
-              Role <span className="text-red-500">*</span>
-            </Label>
+          <div className="space-y-1">
+            <SyntaxLabel name="Role" required />
             <select
               id="role"
               {...register('role')}
-              className="w-full px-3 py-2 border rounded-lg bg-background"
+              className="w-full px-3 py-2 border border-input rounded-lg bg-background font-mono text-sm"
             >
-              <option value="">Select a role...</option>
+              <option value="">// Select a role...</option>
               {availableRoles.map((role) => (
                 <option key={role.value} value={role.value}>
                   {role.label} - {role.description}
@@ -201,21 +208,21 @@ export function TeamMembersStep({
               ))}
             </select>
             {errors.role && (
-              <p className="text-sm text-red-500">{errors.role.message}</p>
+              <p className="font-mono text-xs text-destructive">// Error: {errors.role.message}</p>
             )}
           </div>
 
           {selectedRole && (
             <div className="space-y-3">
-              <Label>Custom Permissions (Optional)</Label>
-              <p className="text-sm text-muted-foreground">
-                Select additional permissions for this role
+              <SyntaxLabel name="Custom Permissions" />
+              <p className="font-mono text-xs text-traffic-green">
+                // Select additional permissions for this role
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {availablePermissions.map((permission) => (
                   <label
                     key={permission.value}
-                    className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                    className="flex items-center gap-2 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors font-mono text-sm"
                   >
                     <input
                       type="checkbox"
@@ -223,7 +230,7 @@ export function TeamMembersStep({
                       onChange={() => togglePermission(permission.value)}
                       className="h-4 w-4"
                     />
-                    <span className="text-sm">{permission.label}</span>
+                    <span className="text-syntax-key">{permission.label}</span>
                   </label>
                 ))}
               </div>
@@ -231,59 +238,49 @@ export function TeamMembersStep({
           )}
 
           <div className="flex gap-2">
-            <Button type="submit" size="sm">
-              Add Member
-            </Button>
-            <Button
+            <CommandButton type="submit" command="add" variant="primary" size="sm" />
+            <CommandButton
               type="button"
-              variant="outline"
+              command="cancel"
+              variant="ghost"
               size="sm"
               onClick={() => {
                 setIsAddingMember(false)
                 setSelectedPermissions([])
                 reset()
               }}
-            >
-              Cancel
-            </Button>
+            />
           </div>
         </form>
       ) : (
-        <Button
+        <CommandButton
           type="button"
+          command="invite --member"
           variant="outline"
           onClick={() => setIsAddingMember(true)}
-          className="w-full"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Invite Team Member
-        </Button>
+          className="w-full justify-center"
+        />
       )}
 
-      {/* Action Buttons */}
-      <div className="flex justify-between pt-6 border-t">
+      {/* Action Buttons - Command Style */}
+      <div className="flex justify-between pt-6 border-t border-border">
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={onBack}>
-            Back
-          </Button>
-          <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
+          <CommandButton type="button" command="back" variant="outline" onClick={onBack} />
+          <CommandButton type="button" command="cancel" variant="ghost" onClick={onCancel} />
         </div>
-        <Button
+        <CommandButton
           type="button"
+          command={isSubmitting ? "populating..." : "populate --dashboard"}
+          variant="primary"
           onClick={handleFinalSubmit}
           disabled={isSubmitting}
-          className="min-w-[200px]"
-        >
-          {isSubmitting ? 'Populating Dashboard...' : 'Populate Dashboard'}
-        </Button>
+        />
       </div>
 
       {teamMembers.length === 0 && (
-        <div className="text-center p-6 border-t">
-          <p className="text-sm text-muted-foreground">
-            You can skip inviting team members for now and add them later from settings.
+        <div className="text-center p-6 border-t border-border">
+          <p className="font-mono text-xs text-traffic-green">
+            // You can skip inviting team members and add them later
           </p>
         </div>
       )}
