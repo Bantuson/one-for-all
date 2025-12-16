@@ -1,0 +1,98 @@
+{
+  "runId": "baseline-2024-12-16",
+  "timestamp": "2024-12-16T15:38:00.000Z",
+  "note": "Initial baseline from manual scraper runs",
+  "results": {
+    "UP": {
+      "status": "tested",
+      "pagesScraped": 9,
+      "pageTypes": {
+        "faculty": 9,
+        "campus": 2,
+        "department": 28,
+        "programme": 1,
+        "unknown": 9
+      },
+      "targets": {
+        "minFaculties": 9,
+        "minCourses": 800,
+        "minCampuses": 7
+      },
+      "coverage": {
+        "facultyFound": 9,
+        "campusFound": 2,
+        "courseFound": 0,
+        "facultyPercent": 100,
+        "campusPercent": 28.6,
+        "coursePercent": 0
+      },
+      "notes": "Scraped successfully. Faculties discovered. Need to scrape /programmes/* for courses."
+    },
+    "UCT": {
+      "status": "tested",
+      "pagesScraped": 4,
+      "pageTypes": {
+        "campus": 1,
+        "unknown": 3
+      },
+      "targets": {
+        "minFaculties": 6,
+        "minCourses": 250,
+        "minCampuses": 6
+      },
+      "coverage": {
+        "facultyFound": 0,
+        "campusFound": 1,
+        "courseFound": 0,
+        "facultyPercent": 0,
+        "campusPercent": 16.7,
+        "coursePercent": 0
+      },
+      "notes": "60s timeout on homepage. Need priorityUrls for faculties."
+    },
+    "Wits": {
+      "status": "timeout",
+      "pagesScraped": 0,
+      "notes": "Homepage times out. Need research on URL structure."
+    },
+    "SUN": {
+      "status": "untested",
+      "notes": "Not yet tested"
+    },
+    "UKZN": {
+      "status": "untested",
+      "notes": "Not yet tested"
+    },
+    "UJ": {
+      "status": "untested",
+      "notes": "Not yet tested"
+    },
+    "UFS": {
+      "status": "untested",
+      "notes": "Not yet tested"
+    },
+    "TUT": {
+      "status": "untested",
+      "notes": "Not yet tested"
+    },
+    "UNISA": {
+      "status": "untested",
+      "notes": "Not yet tested"
+    },
+    "NWU": {
+      "status": "untested",
+      "notes": "Not yet tested"
+    },
+    "Eduvos": {
+      "status": "timeout",
+      "pagesScraped": 0,
+      "notes": "Homepage times out. Need priorityUrls research."
+    }
+  },
+  "summary": {
+    "tested": 4,
+    "untested": 7,
+    "passing": 0,
+    "failing": 4
+  }
+}

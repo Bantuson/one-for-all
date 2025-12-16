@@ -127,13 +127,35 @@ export const NWU_CONFIG: UniversityConfig = {
   },
 
   scrapingConfig: {
-    maxPages: 100,
+    maxPages: 120,
     maxDepth: 4,
+    timeoutMs: 90000, // NWU site can be slow
     priorityUrls: [
+      // NWU uses studies.nwu.ac.za subdomain for academic info
+      // Main portal priorityUrls (will be relative to www.nwu.ac.za)
       '/programmes',
       '/faculties',
       '/study',
+      // Studies portal paths (note: may need separate subdomain scraping)
+      '/studies/our-faculties',
+      '/studies/our-campuses',
+      '/studies/faculties/economic-and-management-sciences',
+      '/studies/faculties/education',
+      '/studies/faculties/engineering',
+      '/studies/faculties/health-sciences',
+      '/studies/faculties/humanities',
+      '/studies/faculties/law',
+      '/studies/faculties/natural-and-agricultural-sciences',
+      '/studies/faculties/theology',
+      '/studies/faculties/business-school',
+      // Campus information
+      '/about/campuses/',
+      '/about/potchefstroom-campus/',
+      '/about/mahikeng-campus/',
+      '/about/vanderbijlpark-campus/',
     ],
+    // Note: NWU has separate subdomain studies.nwu.ac.za
+    // Main site www.nwu.ac.za may redirect to studies portal
   },
 
   establishedYear: 2004,

@@ -123,11 +123,27 @@ export const UNISA_CONFIG: UniversityConfig = {
   scrapingConfig: {
     maxPages: 200,
     maxDepth: 4,
+    timeoutMs: 90000, // UNISA site can be slow
     priorityUrls: [
+      // Main college listings (UNISA uses SharePoint-style URLs)
+      '/sites/corporate/default/Colleges',
+      '/sites/corporate/default/Colleges/Agriculture-Environmental-Sciences',
+      '/sites/corporate/default/Colleges/Economic-and-Management-Sciences',
+      '/sites/corporate/default/Colleges/Education',
+      '/sites/corporate/default/Colleges/Human-Sciences',
+      '/sites/corporate/default/Colleges/Law',
+      '/sites/corporate/default/Colleges/Science,-Engineering-and-Technology',
+      '/sites/corporate/default/Colleges/Graduate-Studies',
+      '/sites/corporate/default/Colleges/Graduate-School-of-Business-Leadership',
+      // Registration portal
+      '/sites/corporate/default/Register-to-study',
+      '/sites/corporate/default/Register-to-study/Qualifications',
+      // Study portal
+      '/sites/corporate/default/Study',
+      '/sites/corporate/default/Apply-for-admission',
+      // Qualifications
       '/qualifications',
       '/programmes',
-      '/colleges',
-      '/study',
     ],
   },
 

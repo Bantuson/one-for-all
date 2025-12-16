@@ -16,8 +16,10 @@ import json
 from crewai import Agent, Task, Crew, Process, LLM
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from monorepo root
+# Path: apps/backend/src/one_for_all/ → root/.env.local (4 levels up)
+root_env = Path(__file__).resolve().parents[4] / '.env.local'
+load_dotenv(dotenv_path=root_env)
 
 # Import custom tools
 from .tools.html_parser_tool import html_parser_tool

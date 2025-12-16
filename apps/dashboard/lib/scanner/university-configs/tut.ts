@@ -123,10 +123,39 @@ export const TUT_CONFIG: UniversityConfig = {
   scrapingConfig: {
     maxPages: 180,
     maxDepth: 4,
+    timeoutMs: 90000, // TUT site can be slow
     priorityUrls: [
+      // Main faculty listing
+      '/faculties/',
+      // Faculty-specific programme pages (7 faculties)
+      '/faculties/arts/about',
+      '/faculties/arts/programmes/programme',
+      '/faculties/economics-and-finance/about',
+      '/faculties/economics-and-finance/programmes/programme',
+      '/faculties/engineering-and-the-built-environment/about',
+      '/faculties/engineering-and-the-built-environment/programmes/programme',
+      '/faculties/humanities/about',
+      '/faculties/humanities/programmes/programme',
+      '/faculties/information-and-communication-technology/about',
+      '/faculties/information-and-communication-technology/programmes/programme',
+      '/faculties/management-sciences/about',
+      '/faculties/management-sciences/programmes/programme',
+      '/faculties/science/about',
+      '/faculties/science/programmes/programme',
+      // General programme listings
       '/programmes',
-      '/faculties',
       '/qualifications',
+      // Campus information (9 campuses)
+      '/other/campuses/',
+      '/other/campuses/pretoria-campus/',
+      '/other/campuses/arcadia-campus/',
+      '/other/campuses/arts-campus/',
+      '/other/campuses/soshanguve-south-campus/',
+      '/other/campuses/soshanguve-north-campus/',
+      '/other/campuses/ga-rankuwa-campus/',
+      '/other/campuses/emalahleni-campus/',
+      '/other/campuses/mbombela-campus/',
+      '/other/campuses/polokwane-campus/',
     ],
   },
 

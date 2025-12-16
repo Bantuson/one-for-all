@@ -130,12 +130,26 @@ export const UJ_CONFIG: UniversityConfig = {
   scrapingConfig: {
     maxPages: 140,
     maxDepth: 4,
+    timeoutMs: 90000, // UJ site can be slow
     priorityUrls: [
+      // Main faculty listing
+      '/faculties/',
+      // Faculty-specific programme pages
+      '/faculties/art-design-architecture/courses-and-programmes/',
+      '/faculties/education/courses-and-programmes/',
+      '/faculties/engineering-and-the-built-environment/courses-and-programmes/',
+      '/faculties/health-sciences/courses-and-programmes/',
+      '/faculties/humanities/courses-and-programmes/',
+      '/faculties/law/courses-and-programmes/',
+      '/faculties/science/courses-and-programmes/',
+      '/faculties/college-of-business-and-economics/courses-and-programmes/',
+      // Programme discovery
       '/programmes',
-      '/faculties',
       '/study',
       '/undergraduate',
       '/postgraduate',
+      // Campus info
+      '/about/campuses/',
     ],
   },
 

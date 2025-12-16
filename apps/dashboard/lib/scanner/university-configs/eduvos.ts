@@ -70,7 +70,7 @@ export const EDUVOS_CONFIG: UniversityConfig = {
     },
     {
       name: 'Pretoria Campus',
-      location: 'Menlo Park, Pretoria, Gauteng',
+      location: 'Pretoria, Gauteng',
       aliases: ['Pretoria', 'Menlo Park'],
     },
     {
@@ -95,8 +95,8 @@ export const EDUVOS_CONFIG: UniversityConfig = {
     },
     {
       name: 'Durban Campus',
-      location: 'Durban, KwaZulu-Natal',
-      aliases: ['Durban'],
+      location: 'Umhlanga, KwaZulu-Natal',
+      aliases: ['Durban', 'Umhlanga'],
     },
     {
       name: 'East London Campus',
@@ -109,14 +109,14 @@ export const EDUVOS_CONFIG: UniversityConfig = {
       aliases: ['Nelson Mandela Bay', 'Port Elizabeth', 'PE', 'NMB'],
     },
     {
-      name: 'Tyger Valley Campus',
+      name: 'Cape Town Tyger Valley Campus',
       location: 'Bellville, Western Cape',
       aliases: ['Tyger Valley', 'Tygervalley', 'Bellville'],
     },
     {
-      name: 'Claremont Campus',
-      location: 'Claremont, Cape Town, Western Cape',
-      aliases: ['Claremont', 'Mowbray', 'Cape Town'],
+      name: 'Cape Town Mowbray Campus',
+      location: 'Mowbray, Cape Town, Western Cape',
+      aliases: ['Mowbray', 'Claremont', 'Cape Town'],
     },
     {
       name: 'Bloemfontein Campus',
@@ -144,13 +144,45 @@ export const EDUVOS_CONFIG: UniversityConfig = {
   },
 
   scrapingConfig: {
-    maxPages: 40,
-    maxDepth: 3,
+    maxPages: 100,
+    maxDepth: 4,
+    timeoutMs: 90000, // Eduvos site can be slow
     priorityUrls: [
-      '/programmes',
-      '/faculties',
-      '/schools',
-      '/study-with-us',
+      // Main listing pages with type filters
+      '/programmes/',
+      '/programmes/?type=degree',
+      '/programmes/?type=honours',
+      '/programmes/?type=masters',
+      '/programmes/?type=higher-certificate',
+      '/programmes/?type=online',
+      '/programmes/?type=distance',
+      '/faculties/',
+      '/schools/',
+      '/campuses/',
+      // Faculty pages (5 faculties)
+      '/faculties/applied-science/',
+      '/faculties/commerce/',
+      '/faculties/law/',
+      '/faculties/technology/',
+      '/faculties/humanities-and-arts/',
+      // School pages (4 schools)
+      '/schools/school-of-future-technology/',
+      '/schools/school-of-arts-and-Design/',
+      '/schools/school-of-marketing/',
+      '/schools/graduate-school-of-accounting/',
+      // Campus pages (all 12)
+      '/campuses/midrand-campus/',
+      '/campuses/pretoria-campus/',
+      '/campuses/bedfordview-campus/',
+      '/campuses/durban/',
+      '/campuses/cape-town-tygervalley-campus/',
+      '/campuses/cape-town-mowbray-campus/',
+      '/campuses/bloemfontein-campus/',
+      '/campuses/east-london-campus/',
+      '/campuses/nelson-mandela-bay-port-elizabeth-campus/',
+      '/campuses/mbombela-nelspruit-campus/',
+      '/campuses/potchefstroom-campus/',
+      '/campuses/vanderbijlpark-campus/',
     ],
   },
 

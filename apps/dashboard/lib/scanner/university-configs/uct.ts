@@ -116,12 +116,18 @@ export const UCT_CONFIG: UniversityConfig = {
     maxPages: 120,
     maxDepth: 4,
     priorityUrls: [
-      '/study',
+      // Main faculty listing
       '/faculties',
-      '/programmes',
+      // Postgraduate programmes hub
+      '/postgraduate-hub/courses',
+      '/postgraduate-hub/courses/courses-faculty',
+      // Student portals
+      '/students/prospective-students/postgraduate-studies',
+      '/study',
       '/undergraduate',
       '/postgraduate',
     ],
+    timeoutMs: 90000, // UCT site can be slow
   },
 
   establishedYear: 1829,

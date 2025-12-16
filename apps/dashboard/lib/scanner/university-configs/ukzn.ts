@@ -108,12 +108,26 @@ export const UKZN_CONFIG: UniversityConfig = {
   scrapingConfig: {
     maxPages: 100,
     maxDepth: 4,
+    timeoutMs: 90000, // UKZN site can be slow
     priorityUrls: [
+      // Main programme listings
       '/programmes',
       '/qualifications',
+      // College pages (note: UKZN uses subdomain structure)
       '/colleges',
+      // Study portal
       '/study',
+      '/study/apply/',
+      // Campus information
+      '/ukzn-campuses/',
+      // Academic affairs
+      '/academic-affairs/',
+      // Prospective students
+      '/prospective-students/',
     ],
+    // Note: UKZN uses subdomain structure for colleges
+    // e.g., arts.ukzn.ac.za, engineering.ukzn.ac.za
+    // These may need separate scraping passes
   },
 
   establishedYear: 2004,

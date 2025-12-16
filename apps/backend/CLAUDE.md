@@ -11,6 +11,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - RAG-based university/course information retrieval with vector embeddings
 - Long-term memory for returning applicants
 
+## CRITICAL: Environment Variable Security Rules
+
+**MANDATORY RULES - NEVER VIOLATE THESE:**
+
+1. **ONLY USE ROOT `.env.local`**
+   - All environment variables MUST be loaded from `/home/mzansi_agentive/projects/portfolio/.env.local` (monorepo root)
+   - This backend loads env vars via `scanner_crew.py` using: `load_dotenv(dotenv_path=Path(__file__).resolve().parents[4] / '.env.local')`
+   - NEVER create `apps/backend/.env` or any other .env files
+   - NEVER read from or reference `apps/backend/.env`
+
+2. **NEVER EXPOSE API KEYS**
+   - NEVER read API key values from environment files
+   - NEVER print, log, or display API key values
+   - NEVER include API keys in code, comments, or documentation
+   - Only reference environment variable names (e.g., `DEEPSEEK_API_KEY`), never their values
+
+3. **NEVER CREATE NEW .env FILES**
+   - Do NOT create .env files in any subdirectory
+   - Do NOT suggest creating .env files
+   - If env vars are needed, update the ROOT `.env.local` only
+   - Reference `.env.example` files for documentation only
+
+4. **ENVIRONMENT VARIABLE LOADING**
+   - Backend Python: Uses root `.env.local` via scanner_crew.py (already configured)
+   - Dashboard Next.js: Uses root `.env.local` via next.config.js (already configured)
+   - Both systems are already configured - DO NOT modify dotenv loading
+
+**If you need to add environment variables:**
+- Update root `.env.local` (NOT tracked in git)
+- Update root `.env.example` with placeholder values
+- Update `apps/backend/.env.example` with documentation
+
 ## Development Setup
 
 ### Environment Requirements
@@ -19,12 +51,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Supabase account with PostgreSQL + pgvector extension
 
 ### Environment Variables
-Copy `.env.local` and configure the following services:
+
+**Location:** All environment variables are in the monorepo root `.env.local` file at `/home/mzansi_agentive/projects/portfolio/.env.local`
+
+**Required variables:**
+- `DEEPSEEK_API_KEY` - DeepSeek LLM for scanner crew agents
 - `SUPABASE_URL`, `SUPABASE_KEY` - Database and vector store
 - `SENDGRID_API_KEY` - Email OTP delivery
 - `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_NUMBER` - SMS OTP delivery
 - `BACKEND_URL` - Application submission backend API
-- `OPENAI_API_KEY` - LLM for agents and embeddings
+- `PHOENIX_AUTO_START` - Optional: Auto-start Phoenix observability UI
+
+**IMPORTANT:** See `.env.example` in the root directory for all available configuration options. Backend automatically loads from root `.env.local` - no local .env file needed.
 
 ### Running the Application
 

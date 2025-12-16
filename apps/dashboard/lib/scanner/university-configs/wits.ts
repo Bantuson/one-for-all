@@ -142,12 +142,17 @@ export const WITS_CONFIG: UniversityConfig = {
     maxPages: 250,
     maxDepth: 4,
     priorityUrls: [
-      '/academic-programmes',
-      '/faculties-and-schools',
-      '/study',
-      '/undergraduate',
-      '/postgraduate',
+      // Main entry points
+      '/faculties-and-schools/',
+      // Programme listings
+      '/undergraduate/academic-programmes/',
+      '/postgraduate/academic-programmes/',
+      // Study portal (searchable)
+      '/study-at-wits/',
+      // Campus info
+      '/campus-life/',
     ],
+    timeoutMs: 90000, // Wits site can timeout
   },
 
   establishedYear: 1922,

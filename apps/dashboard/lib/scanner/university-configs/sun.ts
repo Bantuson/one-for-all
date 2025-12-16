@@ -134,12 +134,25 @@ export const SUN_CONFIG: UniversityConfig = {
   scrapingConfig: {
     maxPages: 120,
     maxDepth: 4,
+    timeoutMs: 90000, // SUN site can be slow
     priorityUrls: [
+      // Main academic listings
       '/faculties',
+      '/faculty',
+      // Postgraduate programmes hub
+      '/pgstudies/Pages/Postgraduate-programmes.aspx',
+      // Prospective students portal
+      '/prospective-students/',
+      '/prospective-students/undergraduate-applicants/',
+      '/prospective-students/postgraduate-applicants/',
+      // Academic programmes
       '/programmes',
       '/study',
       '/undergraduate',
       '/postgraduate',
+      // Campus info
+      '/about/',
+      '/about/campuses/',
     ],
   },
 

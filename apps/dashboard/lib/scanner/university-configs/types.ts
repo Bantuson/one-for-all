@@ -59,6 +59,7 @@ export interface UniversityConfig {
     maxPages: number         // How many pages to crawl
     maxDepth: number         // Crawl depth (home=0, faculty=1, course=2, etc.)
     priorityUrls: string[]   // Known listing page URLs to prioritize
+    timeoutMs?: number       // Optional custom timeout for slow sites (default 60s)
   }
 
   // Additional metadata

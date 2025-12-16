@@ -116,12 +116,29 @@ export const UFS_CONFIG: UniversityConfig = {
   },
 
   scrapingConfig: {
-    maxPages: 80,
-    maxDepth: 3,
+    maxPages: 100,
+    maxDepth: 4,
+    timeoutMs: 90000, // UFS site can be slow
     priorityUrls: [
+      // Main programme portal
       '/programmes',
-      '/faculties',
+      // Faculty listing template
+      '/templates/faculty-list',
+      // Faculty shortcode pages (UFS uses shortcodes)
+      '/edu',       // Faculty of Education
+      '/humanities', // Faculty of the Humanities
+      '/health',    // Faculty of Health Sciences
+      '/nas',       // Faculty of Natural and Agricultural Sciences
+      '/law',       // Faculty of Law
+      '/ems',       // Faculty of Economic and Management Sciences
+      '/theology',  // Faculty of Theology and Religion
+      // Study portal
       '/study-at-the-ufs',
+      '/study-at-the-ufs/undergraduate-programmes/',
+      '/study-at-the-ufs/postgraduate-programmes/',
+      // Campus information
+      '/campuses/',
+      '/about/campuses/',
     ],
   },
 

@@ -123,14 +123,24 @@ export const UP_CONFIG: UniversityConfig = {
 
   targets: {
     minFaculties: 9,
-    minCourses: 1000,
+    minCourses: 800, // Realistic target given 20min scan window (was 1000)
     minCampuses: 7,
   },
 
   scrapingConfig: {
-    maxPages: 180,
+    maxPages: 200, // Increased to handle programme type pages
     maxDepth: 4,
     priorityUrls: [
+      // Main programmes hub (shows all programme types)
+      '/programmes',
+
+      // Programme types (131 undergrad + 725 postgrad + 3 online = 859 total)
+      '/programmes/undergraduate',
+      '/programmes/postgraduate',
+      '/programmes/uponline',
+      '/programmes/short-courses',
+
+      // Fallback to old URLs
       '/postgraduate-studies/article/3182123/faculties-and-programmes',
       '/schools-and-departments',
       '/undergraduate',

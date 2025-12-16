@@ -1,8 +1,13 @@
 node_modules
 .claude
 
-
+# Environment files
+.env
 .env.local
+.env*.local
+apps/*/.env
+apps/*/.env.local
+
 .venv
 claude.md
 docs
