@@ -63,17 +63,6 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
                   {step.name}
                 </span>
               </div>
-
-              {/* Connector Line - Dashed Style */}
-              {index !== steps.length - 1 && (
-                <div
-                  className={cn(
-                    'absolute left-[calc(50%+1.25rem)] right-[calc(-50%+1.25rem)] top-5 h-0.5 transition-colors duration-200',
-                    isCompleted ? 'bg-traffic-green' : 'border-t border-dashed border-border bg-transparent'
-                  )}
-                  aria-hidden="true"
-                />
-              )}
             </li>
           )
         })}
@@ -111,14 +100,6 @@ export function CompactStepper({ steps, currentStep, className }: CompactStepper
                   !isCompleted && !isCurrent && 'bg-border'
                 )}
               />
-              {index !== steps.length - 1 && (
-                <span
-                  className={cn(
-                    'flex-1 h-0.5 mx-1',
-                    isCompleted ? 'bg-traffic-green' : 'bg-border'
-                  )}
-                />
-              )}
             </React.Fragment>
           )
         })}

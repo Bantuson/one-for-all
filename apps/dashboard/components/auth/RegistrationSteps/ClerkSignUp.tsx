@@ -169,10 +169,6 @@ export function ClerkSignUp() {
               routing="virtual"
               afterSignUpUrl={undefined}
               redirectUrl={undefined}
-              signUpForceCaptureAttributes={{
-                firstName: 'required',
-                lastName: 'required',
-              }}
             />
           )}
         </Suspense>

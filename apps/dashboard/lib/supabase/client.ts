@@ -23,9 +23,13 @@ export function createClient(session: any) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       global: {
-        headers: async () => {
+        fetch: async (url, options = {}) => {
           const token = await session?.getToken()
-          return token ? { Authorization: `Bearer ${token}` } : {}
+          const headers = new Headers(options.headers)
+          if (token) {
+            headers.set('Authorization', `Bearer ${token}`)
+          }
+          return fetch(url, { ...options, headers })
         },
       },
     }

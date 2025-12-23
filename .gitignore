@@ -1,6 +1,7 @@
 node_modules
 .claude
-
+Claude.md
+CLAUDE.md
 # Environment files
 .env
 .env.local

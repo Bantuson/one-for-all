@@ -28,14 +28,21 @@ export function StatItem({
   valueColor = 'default',
   className
 }: StatItemProps) {
-  const IconComponent = icon as LucideIcon | undefined
-  const isLucideIcon = IconComponent && typeof IconComponent === 'function'
+  // Render icon content based on type
+  const renderIcon = (): React.ReactNode => {
+    if (!icon) return null
+    if (typeof icon === 'function') {
+      const IconComponent = icon as LucideIcon
+      return <IconComponent className="h-3.5 w-3.5" />
+    }
+    return icon
+  }
 
   return (
     <span className={cn('inline-flex items-center gap-1.5 text-sm', className)}>
       {icon && (
         <span className="text-muted-foreground shrink-0">
-          {isLucideIcon ? <IconComponent className="h-3.5 w-3.5" /> : icon}
+          {renderIcon()}
         </span>
       )}
       <span className="text-muted-foreground">{label}:</span>

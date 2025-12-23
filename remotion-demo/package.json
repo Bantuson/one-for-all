@@ -1,0 +1,34 @@
+{
+  "name": "one-for-all-pitch-deck",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npx remotion studio",
+    "build": "npx remotion bundle",
+    "render": "npx remotion render PitchDeck out/pitch-deck.mp4",
+    "render:hq": "npx remotion render PitchDeck out/pitch-deck.mp4 --crf 18"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.392",
+    "@remotion/cli": "4.0.392",
+    "@remotion/licensing": "4.0.392",
+    "@remotion/media-parser": "4.0.392",
+    "@remotion/media-utils": "4.0.392",
+    "@remotion/player": "4.0.392",
+    "@remotion/renderer": "4.0.392",
+    "@remotion/streaming": "4.0.392",
+    "@remotion/studio": "4.0.392",
+    "@remotion/studio-server": "4.0.392",
+    "@remotion/studio-shared": "4.0.392",
+    "@remotion/webcodecs": "4.0.392",
+    "@remotion/zod-types": "4.0.392",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.392"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.27",
+    "@types/react-dom": "18.3.7",
+    "typescript": "5.9.3"
+  }
+}

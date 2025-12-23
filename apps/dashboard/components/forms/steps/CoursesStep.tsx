@@ -22,7 +22,7 @@ const courseSchema = z.object({
   name: z.string().min(2, 'Course name must be at least 2 characters'),
   code: z.string().min(2, 'Course code must be at least 2 characters'),
   requirements: z.string().optional(),
-  status: z.enum(['draft', 'active', 'inactive']).default('active'),
+  status: z.enum(['draft', 'active', 'inactive']),
 })
 
 type CourseFormData = z.infer<typeof courseSchema>
@@ -75,6 +75,9 @@ export function CoursesStep({
   } = useForm<CourseFormData>({
     resolver: zodResolver(courseSchema),
     defaultValues: {
+      name: '',
+      code: '',
+      requirements: '',
       status: 'active',
     },
   })

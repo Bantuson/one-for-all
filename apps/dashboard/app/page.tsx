@@ -50,10 +50,17 @@ export default async function Home({
         .eq('user_id', user.id)
         .limit(1)
 
-      if (memberships && memberships.length > 0 && memberships[0].institutions) {
+      const firstMembership = memberships?.[0]
+      if (firstMembership?.institutions) {
         // User has institutions, redirect to first one
-        const institution = memberships[0].institutions as any
-        redirect(`/dashboard/${institution.slug}`)
+        // Handle both array and object forms from Supabase nested select
+        const institutionsData = firstMembership.institutions
+        const institution = Array.isArray(institutionsData)
+          ? institutionsData[0] as { slug: string } | undefined
+          : institutionsData as { slug: string }
+        if (institution?.slug) {
+          redirect(`/dashboard/${institution.slug}`)
+        }
       }
     }
   }
