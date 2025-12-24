@@ -89,8 +89,9 @@ export function InstitutionSelector({
   return (
     <div className={cn('flex flex-col gap-4', className)}>
       {/* Terminal-style header comment */}
-      <p className="font-mono text-sm text-traffic-green">
-        // Choose from 27 pre-configured South African institutions
+      <p className="font-mono text-sm">
+        <span className="text-traffic-green">//</span>
+        <span className="text-muted-foreground"> Choose from 27 pre-configured South African institutions</span>
       </p>
 
       {/* Search Input - Terminal Style */}
@@ -113,8 +114,9 @@ export function InstitutionSelector({
             {filteredResults.length === 0 ? (
               <div className="p-6 text-center font-mono">
                 <Building2 className="mx-auto mb-2 h-8 w-8 text-muted-foreground opacity-50" />
-                <p className="text-sm text-syntax-comment">
-                  // No institutions found for "{searchQuery}"
+                <p className="text-sm">
+                  <span className="text-traffic-green">//</span>
+                  <span className="text-muted-foreground"> No institutions found for "{searchQuery}"</span>
                 </p>
                 <button
                   onClick={handleManualMode}
@@ -156,7 +158,8 @@ export function InstitutionSelector({
               <div className="flex-1 font-mono">
                 <p className="font-medium text-foreground">
                   <span className="text-syntax-key">Other</span>
-                  <span className="text-syntax-comment"> // Not listed</span>
+                  <span className="text-traffic-green"> //</span>
+                  <span className="text-muted-foreground"> Not listed</span>
                 </p>
                 <p className="text-sm text-syntax-comment">
                   $ setup --manual --institution
@@ -164,6 +167,26 @@ export function InstitutionSelector({
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
+
+            {/* Manual Institution Name Input (shown when manual mode selected) */}
+            {mode === 'manual' && (
+              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4 mx-4 mb-2 font-mono">
+                <label className="text-sm text-syntax-key">
+                  "institutionName"
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Enter your institution's name"
+                  value={manualInstitutionName}
+                  onChange={(e) => setManualInstitutionName(e.target.value)}
+                  className="font-mono"
+                />
+                <p className="text-xs">
+                  <span className="text-traffic-green">//</span>
+                  <span className="text-muted-foreground"> You'll add campuses, faculties, and courses in the next step</span>
+                </p>
+              </div>
+            )}
 
             {/* Institution Groups */}
             {(Object.entries(groupedInstitutions) as [InstitutionType, InstitutionListItem[]][])
@@ -178,8 +201,9 @@ export function InstitutionSelector({
                       <span className="text-sm text-syntax-key">
                         {TYPE_LABELS[type]}
                       </span>
-                      <span className="text-xs text-syntax-comment">
-                        // {institutions.length} available
+                      <span className="text-xs">
+                        <span className="text-traffic-green">//</span>
+                        <span className="text-muted-foreground"> {institutions.length} available</span>
                       </span>
                     </div>
 
@@ -205,29 +229,6 @@ export function InstitutionSelector({
         )}
       </div>
 
-      {/* Manual Institution Name Input (shown when manual mode selected) */}
-      {mode === 'manual' && (
-        <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4 font-mono">
-          <label className="text-sm text-syntax-key">
-            "institutionName"
-          </label>
-          <Input
-            type="text"
-            placeholder="Enter your institution's name"
-            value={manualInstitutionName}
-            onChange={(e) => setManualInstitutionName(e.target.value)}
-            className="font-mono"
-          />
-          <p className="text-xs text-syntax-comment">
-            // You'll add campuses, faculties, and courses in the next step
-          </p>
-        </div>
-      )}
-
-      {/* Selected Institution Summary */}
-      {selectedInstitutionId && mode === 'preconfigured' && (
-        <SelectedSummary institutionId={selectedInstitutionId} />
-      )}
     </div>
   )
 }
@@ -324,70 +325,6 @@ function InstitutionItem({
         )}
       />
     </button>
-  )
-}
-
-interface SelectedSummaryProps {
-  institutionId: string
-}
-
-function SelectedSummary({ institutionId }: SelectedSummaryProps) {
-  const { institutionData } = useSetupStore()
-
-  if (!institutionData) return null
-
-  return (
-    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 font-mono">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-traffic-green mb-2">
-            // Selected institution:
-          </p>
-          <div className="space-y-1">
-            <div>
-              <span className="text-syntax-key">"name"</span>
-              <span className="text-foreground"> : </span>
-              <span className="text-syntax-string">"{institutionData.name}"</span>
-            </div>
-            <div>
-              <span className="text-syntax-key">"location"</span>
-              <span className="text-foreground"> : </span>
-              <span className="text-syntax-string">
-                "{institutionData.city}, {institutionData.province}"
-              </span>
-            </div>
-          </div>
-        </div>
-        <a
-          href={institutionData.website}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-primary hover:underline"
-        >
-          $ open --website
-        </a>
-      </div>
-      <div className="mt-4 grid grid-cols-3 gap-4 text-center border-t border-primary/20 pt-4">
-        <div>
-          <p className="text-2xl font-bold text-syntax-number">
-            {institutionData.stats.totalCampuses}
-          </p>
-          <p className="text-xs text-syntax-comment">campuses</p>
-        </div>
-        <div>
-          <p className="text-2xl font-bold text-syntax-number">
-            {institutionData.stats.totalFaculties}
-          </p>
-          <p className="text-xs text-syntax-comment">faculties</p>
-        </div>
-        <div>
-          <p className="text-2xl font-bold text-syntax-number">
-            {institutionData.stats.totalCourses}
-          </p>
-          <p className="text-xs text-syntax-comment">courses</p>
-        </div>
-      </div>
-    </div>
   )
 }
 

@@ -133,10 +133,12 @@ export function InstitutionSetupPage({
         <div className="max-w-5xl mx-auto">
           {/* Description - Comment Style */}
           <div className="mb-8">
-            <p className="font-mono text-sm text-traffic-green">
-              // Select your institution from 27 pre-configured South African universities,
+            <p className="font-mono text-sm">
+              <span className="text-traffic-green">//</span>
+              <span className="text-muted-foreground"> Select your institution from 27 pre-configured South African universities,</span>
               <br />
-              // or set up manually. Your progress is automatically saved.
+              <span className="text-traffic-green">//</span>
+              <span className="text-muted-foreground"> or set up manually. Your progress is automatically saved.</span>
             </p>
           </div>
 
@@ -190,7 +192,7 @@ export function InstitutionSetupPage({
           {/* Footer Navigation */}
           <div className="flex items-center justify-between mt-6 pt-6 border-t border-border">
             <div>
-              {currentStepIndex > 0 && currentStep !== 'confirm' && (
+              {currentStepIndex > 0 && (
                 <Button variant="ghost" onClick={prevStep} disabled={isSubmitting}>
                   <ChevronLeft className="h-4 w-4 mr-1" />
                   Back
@@ -305,8 +307,9 @@ function ConfirmStep({ institutionName, campusCount }: ConfirmStepProps) {
     <div className="space-y-6">
       {/* Summary - Terminal Style */}
       <div className="font-mono">
-        <p className="text-sm text-traffic-green mb-4">
-          // Ready to populate your dashboard with the following data:
+        <p className="text-sm mb-4">
+          <span className="text-traffic-green">//</span>
+          <span className="text-muted-foreground"> Ready to populate your dashboard with the following data:</span>
         </p>
 
         <div className="bg-muted/30 rounded-lg p-4 space-y-2">
@@ -335,8 +338,9 @@ function ConfirmStep({ institutionName, campusCount }: ConfirmStepProps) {
 
       {/* Team Summary Section */}
       <div className="font-mono">
-        <p className="text-sm text-traffic-green mb-4">
-          // Team invitations to send:
+        <p className="text-sm mb-4">
+          <span className="text-traffic-green">//</span>
+          <span className="text-muted-foreground"> Team invitations to send:</span>
         </p>
         <div className="bg-muted/30 rounded-lg p-4">
           {pendingInvites.length > 0 ? (
@@ -371,8 +375,9 @@ function ConfirmStep({ institutionName, campusCount }: ConfirmStepProps) {
 
       {/* What happens next - Terminal Style */}
       <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-        <p className="font-mono text-sm text-traffic-green mb-3">
-          // What happens next:
+        <p className="font-mono text-sm mb-3">
+          <span className="text-traffic-green">//</span>
+          <span className="text-muted-foreground"> What happens next:</span>
         </p>
         <ul className="space-y-2 font-mono text-sm">
           <li className="flex items-start gap-2">

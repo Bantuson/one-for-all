@@ -181,8 +181,9 @@ export function TeamInviteStep({
         />
         <div className="p-4 space-y-4 font-mono text-sm">
           {/* Section: Invite description */}
-          <p className="text-syntax-comment">
-            // Invite team members to collaborate
+          <p>
+            <span className="text-traffic-green">//</span>
+            <span className="text-muted-foreground"> Invite team members to collaborate</span>
           </p>
 
           {/* Email Input Row */}
@@ -231,16 +232,17 @@ export function TeamInviteStep({
             <p
               id="email-error"
               role="alert"
-              className="text-destructive"
             >
-              // Error: {emailError}
+              <span className="text-traffic-green">//</span>
+              <span className="text-destructive"> Error: {emailError}</span>
             </p>
           )}
 
           {/* Permissions Section */}
           <div className="pt-2">
-            <p className="text-syntax-comment mb-3">
-              // Select permissions:
+            <p className="mb-3">
+              <span className="text-traffic-green">//</span>
+              <span className="text-muted-foreground"> Select permissions:</span>
             </p>
             <fieldset>
               <legend className="sr-only">Select permissions for team member</legend>
@@ -294,8 +296,9 @@ export function TeamInviteStep({
           {/* Pending Invites Section */}
           {pendingInvites.length > 0 ? (
             <div className="space-y-2">
-              <p className="text-syntax-comment">
-                // Pending invites:
+              <p>
+                <span className="text-traffic-green">//</span>
+                <span className="text-muted-foreground"> Pending invites:</span>
               </p>
               <ul className="space-y-1" aria-label="Pending team invites">
                 {pendingInvites.map((invite) => {
@@ -335,15 +338,17 @@ export function TeamInviteStep({
           ) : (
             <div className="text-center py-4">
               <Users className="mx-auto h-8 w-8 text-muted-foreground opacity-50 mb-2" />
-              <p className="text-syntax-comment">
-                // No invites yet. Add team members above.
+              <p>
+                <span className="text-traffic-green">//</span>
+                <span className="text-muted-foreground"> No invites yet. Add team members above.</span>
               </p>
             </div>
           )}
 
           {/* Skip Option */}
-          <p className="text-syntax-comment text-center pt-2">
-            // You can skip and invite team members later from Settings
+          <p className="text-center pt-2">
+            <span className="text-traffic-green">//</span>
+            <span className="text-muted-foreground"> You can skip and invite team members later from Settings</span>
           </p>
         </div>
       </CodeCard>

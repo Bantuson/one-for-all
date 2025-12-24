@@ -17,10 +17,10 @@ import {
   Moon,
   Sun,
   Building2,
+  Clock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
-import { TrafficLightsFilename, ModuleBadge } from '@/components/ui/TrafficLights'
 import {
   useSetupStore,
   selectCampusCount,
@@ -32,7 +32,6 @@ import type {
   PreConfiguredFaculty,
   PreConfiguredCourse,
   CourseLevel,
-  ProgrammeTypeCategory,
 } from '@/lib/institutions/types'
 
 // ============================================================================
@@ -99,11 +98,11 @@ interface BreadcrumbProps {
 }
 
 function Breadcrumb({
-  institutionName,
+  institutionName: _institutionName,
   selectedCampus,
   selectedProgrammeType,
   selectedFaculty,
-  onNavigateToRoot,
+  onNavigateToRoot: _onNavigateToRoot,
   onNavigateToCampus,
   onNavigateToProgrammeType,
 }: BreadcrumbProps) {
@@ -186,7 +185,7 @@ interface TreeNodeProps {
 
 function TreeNode({
   label,
-  nodeId,
+  nodeId: _nodeId,
   icon,
   isExpanded,
   isSelected,
@@ -302,7 +301,7 @@ function NavigationTree({
   selectedCampusId,
   selectedProgrammeType,
   selectedFacultyCode,
-  editingItemId,
+  editingItemId: _editingItemId,
   onToggleNode,
   onSelectFaculty,
   onAddCampus,
@@ -328,13 +327,11 @@ function NavigationTree({
       {/* Header */}
       <div className="px-4 py-3 border-b border-border bg-card sticky top-0 z-10">
         <div className="flex items-center justify-between">
-          <TrafficLightsFilename
-            status="active"
-            filename="structure/"
-            rightContent={
-              <span className="text-xs font-mono text-syntax-number">{totalFaculties}</span>
-            }
-          />
+          <div className="flex items-center gap-2 font-mono text-sm">
+            <Folder className="h-4 w-4 text-syntax-key" />
+            <span className="text-foreground">structure/</span>
+            <span className="text-xs text-syntax-number">{totalFaculties}</span>
+          </div>
           <Button variant="ghost" size="sm" onClick={onAddCampus}>
             <Plus className="h-3 w-3" />
           </Button>
@@ -464,8 +461,11 @@ function NavigationTree({
 
         {campuses.filter((c) => !c._isDeleted).length === 0 && (
           <div className="p-4 text-center font-mono">
-            <p className="text-syntax-comment text-sm">// No campuses found</p>
-            <p className="text-syntax-comment text-xs mt-1">$ add --campus to get started</p>
+            <p className="text-sm">
+              <span className="text-traffic-green">//</span>
+              <span className="text-muted-foreground"> No campuses found</span>
+            </p>
+            <p className="text-xs mt-1 text-muted-foreground">$ add --campus to get started</p>
           </div>
         )}
       </div>
@@ -484,15 +484,25 @@ interface EditableCourseCardProps {
   facultyName: string
   isEditing: boolean
   onEdit: () => void
-  onSave: (name: string) => void
+  onSave: (updates: Partial<PreConfiguredCourse>) => void
   onCancel: () => void
   onDelete: () => void
 }
 
+interface CourseEditState {
+  name: string
+  description: string
+  level: CourseLevel
+  durationYears: number
+  minimumAps: number
+  requiredSubjects: string
+  status: 'open' | 'closed'
+}
+
 function EditableCourseCard({
   course,
-  campusId,
-  facultyCode,
+  campusId: _campusId,
+  facultyCode: _facultyCode,
   facultyName,
   isEditing,
   onEdit,
@@ -500,112 +510,197 @@ function EditableCourseCard({
   onCancel,
   onDelete,
 }: EditableCourseCardProps) {
-  const [editName, setEditName] = useState(course.name)
+  const [editState, setEditState] = useState<CourseEditState>({
+    name: course.name,
+    description: course.description || '',
+    level: course.level,
+    durationYears: course.durationYears || 3,
+    minimumAps: course.requirements?.minimumAps || 0,
+    requiredSubjects: course.requirements?.requiredSubjects?.join(', ') || '',
+    status: (course.status as 'open' | 'closed') || 'open',
+  })
+
+  // Reset edit state when course changes or editing starts
+  const resetEditState = useCallback(() => {
+    setEditState({
+      name: course.name,
+      description: course.description || '',
+      level: course.level,
+      durationYears: course.durationYears || 3,
+      minimumAps: course.requirements?.minimumAps || 0,
+      requiredSubjects: course.requirements?.requiredSubjects?.join(', ') || '',
+      status: (course.status as 'open' | 'closed') || 'open',
+    })
+  }, [course])
+
+  const handleSave = useCallback(() => {
+    const subjects = editState.requiredSubjects
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+
+    onSave({
+      name: editState.name,
+      description: editState.description || undefined,
+      level: editState.level,
+      durationYears: editState.durationYears,
+      requirements: {
+        minimumAps: editState.minimumAps || undefined,
+        requiredSubjects: subjects.length > 0 ? subjects : undefined,
+      },
+      status: editState.status,
+    })
+  }, [editState, onSave])
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden hover:border-primary/50 transition-all flex flex-col">
+    <div className="rounded-lg border border-border bg-card overflow-hidden hover:border-primary/50 transition-all flex flex-col h-[320px]">
       {/* Card Header */}
-      <div className="px-4 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
-        <TrafficLightsFilename
-          status="active"
-          filename={`${course.code.toLowerCase()}.course`}
-          rightContent={
-            <span
-              className={cn(
-                'text-[10px] px-1.5 py-0.5 rounded font-medium',
-                LEVEL_COLORS[course.level]
-              )}
-            >
-              {course.level}
-            </span>
-          }
-        />
+      <div className="px-4 py-3 border-b border-border bg-muted/30 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2 font-mono text-sm">
+          <GraduationCap className="h-4 w-4 text-syntax-export" />
+          <span className="text-foreground">{course.code.toLowerCase()}.course</span>
+        </div>
+        <span
+          className={cn(
+            'text-[10px] px-1.5 py-0.5 rounded font-medium',
+            LEVEL_COLORS[course.level]
+          )}
+        >
+          {course.level}
+        </span>
       </div>
 
       {/* Card Body */}
-      <div className="p-4 font-mono text-sm space-y-1 flex-1">
+      <div className="p-4 font-mono text-sm space-y-1 flex-1 overflow-y-auto">
         {isEditing ? (
-          <input
-            type="text"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            className="w-full px-2 py-1 border rounded bg-background text-sm font-mono"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') onSave(editName)
-              if (e.key === 'Escape') onCancel()
-            }}
-          />
+          <div className="space-y-3">
+            {/* Name */}
+            <div>
+              <label className="text-xs text-syntax-key block mb-1">'name':</label>
+              <input
+                type="text"
+                value={editState.name}
+                onChange={(e) => setEditState(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-2 py-1 border rounded bg-background text-sm font-mono"
+                autoFocus
+              />
+            </div>
+            {/* Level */}
+            <div>
+              <label className="text-xs text-syntax-key block mb-1">'level':</label>
+              <select
+                value={editState.level}
+                onChange={(e) => setEditState(prev => ({ ...prev, level: e.target.value as CourseLevel }))}
+                className="w-full px-2 py-1 border rounded bg-background text-sm font-mono"
+              >
+                {Object.keys(LEVEL_COLORS).map(level => (
+                  <option key={level} value={level}>{level}</option>
+                ))}
+              </select>
+            </div>
+            {/* Duration */}
+            <div>
+              <label className="text-xs text-syntax-key block mb-1">'duration':</label>
+              <input
+                type="number"
+                min="1"
+                max="8"
+                value={editState.durationYears}
+                onChange={(e) => setEditState(prev => ({ ...prev, durationYears: parseInt(e.target.value) || 3 }))}
+                className="w-full px-2 py-1 border rounded bg-background text-sm font-mono"
+              />
+            </div>
+            {/* Minimum APS */}
+            <div>
+              <label className="text-xs text-syntax-key block mb-1">'minimumAps':</label>
+              <input
+                type="number"
+                min="0"
+                max="60"
+                value={editState.minimumAps}
+                onChange={(e) => setEditState(prev => ({ ...prev, minimumAps: parseInt(e.target.value) || 0 }))}
+                className="w-full px-2 py-1 border rounded bg-background text-sm font-mono"
+              />
+            </div>
+            {/* Required Subjects */}
+            <div>
+              <label className="text-xs text-syntax-key block mb-1">'subjects':</label>
+              <input
+                type="text"
+                value={editState.requiredSubjects}
+                onChange={(e) => setEditState(prev => ({ ...prev, requiredSubjects: e.target.value }))}
+                placeholder="Math, English, Physics"
+                className="w-full px-2 py-1 border rounded bg-background text-sm font-mono"
+              />
+            </div>
+            {/* Status */}
+            <div>
+              <label className="text-xs text-syntax-key block mb-1">'status':</label>
+              <select
+                value={editState.status}
+                onChange={(e) => setEditState(prev => ({ ...prev, status: e.target.value as 'open' | 'closed' }))}
+                className="w-full px-2 py-1 border rounded bg-background text-sm font-mono"
+              >
+                <option value="open">open</option>
+                <option value="closed">closed</option>
+              </select>
+            </div>
+          </div>
         ) : (
           <>
-            {/* Course name with proper indentation */}
+            {/* Course name */}
             <div>
-              <div>
-                <span className="text-syntax-export">export</span>
-                <span className="text-syntax-string ml-1">"</span>
-                <span className="text-syntax-string">{course.name}</span>
-                <span className="text-syntax-string">"</span>
-              </div>
-              <div className="ml-6">
-                <span className="text-syntax-from">from</span>
-                <span className="text-syntax-string ml-1">"{facultyName}"</span>
-              </div>
+              <span className="text-syntax-export">export</span>
+              <span className="text-syntax-string"> "{course.name}"</span>
             </div>
-            {course.description && (
-              <>
-                <div className="text-syntax-comment">//</div>
-                <div className="text-syntax-comment">// {course.description}</div>
-              </>
+            {/* Faculty - indented to align under course name */}
+            <div className="pl-7">
+              <span className="text-syntax-from">from</span>
+              <span className="text-syntax-string"> "{facultyName}"</span>
+            </div>
+            {/* Requirements - directly in body, no separate footer */}
+            {course.requirements?.minimumAps && (
+              <div>
+                <span className="text-syntax-key">'minimumAps'</span>
+                <span className="text-foreground">: </span>
+                <span className="text-syntax-number">{course.requirements.minimumAps}</span>
+              </div>
             )}
-
-            {/* Course details */}
-            <div className="mt-2 space-y-1 text-xs font-mono">
-              {course.requirements?.minimumAps && (
-                <div>
-                  <span className="text-syntax-key">'minimumAps'</span>
-                  <span className="text-foreground">: {course.requirements.minimumAps}</span>
-                </div>
-              )}
-              {course.requirements?.requiredSubjects && course.requirements.requiredSubjects.length > 0 && (
-                <div className="flex flex-wrap gap-1 items-start">
-                  <span className="text-syntax-key">'subjects'</span>
-                  <span className="text-foreground">: </span>
-                  {course.requirements.requiredSubjects.map((subj, i) => (
-                    <span key={i} className="text-syntax-string">[{subj}]</span>
-                  ))}
-                </div>
-              )}
+            {course.requirements?.requiredSubjects && course.requirements.requiredSubjects.length > 0 && (
+              <div>
+                <span className="text-syntax-key">'subjects'</span>
+                <span className="text-foreground">: </span>
+                <span className="text-syntax-string">[{course.requirements.requiredSubjects.join(', ')}]</span>
+              </div>
+            )}
+            {course.durationYears && (
               <div>
                 <span className="text-syntax-key">'duration'</span>
-                <span className="text-foreground">: {course.durationYears} years</span>
-              </div>
-              {course.deadline && (
-                <div>
-                  <span className="text-syntax-key">'deadline'</span>
-                  <span className="text-foreground">: {course.deadline}</span>
-                </div>
-              )}
-              <div>
-                <span className="text-syntax-key">'status'</span>
                 <span className="text-foreground">: </span>
-                <span className={course.status === 'closed' ? 'text-red-500' : 'text-green-500'}>
-                  {course.status || 'open'}
-                </span>
+                <span className="text-syntax-number">{course.durationYears}</span>
+                <span className="text-foreground"> years</span>
               </div>
+            )}
+            <div>
+              <span className="text-syntax-key">'status'</span>
+              <span className="text-foreground">: </span>
+              <span className={course.status === 'closed' ? 'text-traffic-red' : 'text-traffic-green'}>
+                {course.status || 'open'}
+              </span>
             </div>
           </>
         )}
       </div>
 
       {/* Card Footer - Action Buttons */}
-      <div className="px-4 py-3 border-t border-border bg-muted/20">
+      <div className="px-4 py-2 border-t border-border bg-muted/30 flex-shrink-0">
         <div className="flex gap-1 justify-end">
           {isEditing ? (
             <>
-              <Button variant="ghost" size="sm" onClick={() => onSave(editName)}>
+              <Button variant="ghost" size="sm" onClick={handleSave}>
                 <Check className="h-3 w-3" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={onCancel}>
+              <Button variant="ghost" size="sm" onClick={() => { resetEditState(); onCancel(); }}>
                 <X className="h-3 w-3" />
               </Button>
             </>
@@ -615,7 +710,7 @@ function EditableCourseCard({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setEditName(course.name)
+                  resetEditState()
                   onEdit()
                 }}
               >
@@ -649,7 +744,7 @@ interface DetailPanelProps {
 
 function DetailPanel({
   selectedCampus,
-  selectedProgrammeType,
+  selectedProgrammeType: _selectedProgrammeType,
   selectedFaculty,
   editingItemId,
   onSetEditingItem,
@@ -664,8 +759,11 @@ function DetailPanel({
           <div className="mb-4">
             <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/50" aria-hidden="true" />
           </div>
-          <p className="text-syntax-comment text-sm">// No faculty selected</p>
-          <p className="text-syntax-comment text-xs mt-1">
+          <p className="text-sm">
+            <span className="text-traffic-green">//</span>
+            <span className="text-muted-foreground"> No faculty selected</span>
+          </p>
+          <p className="text-xs mt-1 text-muted-foreground">
             $ select a faculty from the tree to view and edit courses
           </p>
         </div>
@@ -678,16 +776,12 @@ function DetailPanel({
       {/* Panel Header */}
       <div className="px-4 py-3 border-b border-border sticky top-0 z-10 bg-card">
         <div className="flex items-center justify-between">
-          <TrafficLightsFilename
-            status="active"
-            filename={`${selectedFaculty.code.toLowerCase()}.courses`}
-            badge={<ModuleBadge label="faculty" />}
-            rightContent={
-              <span className="text-xs font-mono text-syntax-number">
-                {selectedFaculty.courses.length}
-              </span>
-            }
-          />
+          <div className="flex items-center gap-2 font-mono text-sm">
+            <BookOpen className="h-4 w-4 text-syntax-string" />
+            <span className="text-foreground">{selectedFaculty.code.toLowerCase()}.courses</span>
+            <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-syntax-export">faculty</span>
+            <span className="text-xs text-syntax-number">{selectedFaculty.courses.length}</span>
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -716,8 +810,8 @@ function DetailPanel({
               onEdit={() =>
                 onSetEditingItem(`${selectedCampus._id}-${selectedFaculty.code}-${course.code}`)
               }
-              onSave={(name) => {
-                onUpdateCourse(selectedCampus._id, selectedFaculty.code, course.code, { name })
+              onSave={(updates) => {
+                onUpdateCourse(selectedCampus._id, selectedFaculty.code, course.code, updates)
                 onSetEditingItem(null)
               }}
               onCancel={() => onSetEditingItem(null)}
@@ -735,10 +829,16 @@ function DetailPanel({
                 📁
               </span>
             </div>
-            <div className="font-mono text-sm space-y-2 text-syntax-comment">
-              <p>// No courses found in this faculty</p>
+            <div className="font-mono text-sm space-y-2">
+              <p>
+                <span className="text-traffic-green">//</span>
+                <span className="text-muted-foreground"> No courses found in this faculty</span>
+              </p>
               <p className="text-foreground">const courses = [];</p>
-              <p>// Add your first course to get started</p>
+              <p>
+                <span className="text-traffic-green">//</span>
+                <span className="text-muted-foreground"> Add your first course to get started</span>
+              </p>
             </div>
             <div className="mt-6">
               <Button
@@ -758,6 +858,158 @@ function DetailPanel({
 }
 
 // ============================================================================
+// Add Course Form Component
+// ============================================================================
+
+interface AddCourseFormProps {
+  onSubmit: (courseData: Omit<PreConfiguredCourse, 'code'>) => void
+  onCancel: () => void
+}
+
+function AddCourseForm({ onSubmit, onCancel }: AddCourseFormProps) {
+  const [formState, setFormState] = useState({
+    name: '',
+    description: '',
+    level: 'undergraduate' as CourseLevel,
+    durationYears: 3,
+    minimumAps: 0,
+    requiredSubjects: '',
+    status: 'open' as 'open' | 'closed',
+  })
+
+  const handleSubmit = useCallback(() => {
+    if (!formState.name.trim()) return
+
+    const subjects = formState.requiredSubjects
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+
+    onSubmit({
+      name: formState.name.trim(),
+      description: formState.description.trim() || undefined,
+      level: formState.level,
+      durationYears: formState.durationYears,
+      requirements: {
+        minimumAps: formState.minimumAps || undefined,
+        requiredSubjects: subjects.length > 0 ? subjects : undefined,
+      },
+      status: formState.status,
+    })
+  }, [formState, onSubmit])
+
+  return (
+    <div className="p-4 space-y-4 font-mono text-sm">
+      {/* Name (required) */}
+      <div>
+        <label className="text-xs text-syntax-key block mb-1">'name'<span className="text-destructive">*</span>:</label>
+        <input
+          type="text"
+          value={formState.name}
+          onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))}
+          placeholder="Bachelor of Science in Computer Science"
+          className="w-full px-2 py-1.5 border rounded bg-background text-sm font-mono"
+          autoFocus
+        />
+      </div>
+
+      {/* Level */}
+      <div>
+        <label className="text-xs text-syntax-key block mb-1">'level':</label>
+        <select
+          value={formState.level}
+          onChange={(e) => setFormState(prev => ({ ...prev, level: e.target.value as CourseLevel }))}
+          className="w-full px-2 py-1.5 border rounded bg-background text-sm font-mono"
+        >
+          {Object.keys(LEVEL_COLORS).map(level => (
+            <option key={level} value={level}>{level}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Duration */}
+      <div>
+        <label className="text-xs text-syntax-key block mb-1">'duration' (years):</label>
+        <input
+          type="number"
+          min="1"
+          max="8"
+          value={formState.durationYears}
+          onChange={(e) => setFormState(prev => ({ ...prev, durationYears: parseInt(e.target.value) || 3 }))}
+          className="w-full px-2 py-1.5 border rounded bg-background text-sm font-mono"
+        />
+      </div>
+
+      {/* Minimum APS */}
+      <div>
+        <label className="text-xs text-syntax-key block mb-1">'minimumAps':</label>
+        <input
+          type="number"
+          min="0"
+          max="60"
+          value={formState.minimumAps}
+          onChange={(e) => setFormState(prev => ({ ...prev, minimumAps: parseInt(e.target.value) || 0 }))}
+          className="w-full px-2 py-1.5 border rounded bg-background text-sm font-mono"
+        />
+      </div>
+
+      {/* Required Subjects */}
+      <div>
+        <label className="text-xs text-syntax-key block mb-1">'subjects' (comma-separated):</label>
+        <input
+          type="text"
+          value={formState.requiredSubjects}
+          onChange={(e) => setFormState(prev => ({ ...prev, requiredSubjects: e.target.value }))}
+          placeholder="Mathematics, Physical Sciences"
+          className="w-full px-2 py-1.5 border rounded bg-background text-sm font-mono"
+        />
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className="text-xs text-syntax-key block mb-1">'description':</label>
+        <textarea
+          value={formState.description}
+          onChange={(e) => setFormState(prev => ({ ...prev, description: e.target.value }))}
+          placeholder="Optional course description..."
+          rows={2}
+          className="w-full px-2 py-1.5 border rounded bg-background text-sm font-mono resize-none"
+        />
+      </div>
+
+      {/* Status */}
+      <div>
+        <label className="text-xs text-syntax-key block mb-1">'status':</label>
+        <select
+          value={formState.status}
+          onChange={(e) => setFormState(prev => ({ ...prev, status: e.target.value as 'open' | 'closed' }))}
+          className="w-full px-2 py-1.5 border rounded bg-background text-sm font-mono"
+        >
+          <option value="open">open</option>
+          <option value="closed">closed</option>
+        </select>
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-end gap-2 pt-2 border-t border-border">
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={handleSubmit}
+          disabled={!formState.name.trim()}
+        >
+          <Plus className="h-3 w-3 mr-1" />
+          Add Course
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -768,11 +1020,11 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
     editedCampuses,
     editingItemId,
     setEditingItem,
-    updateCampus,
+    updateCampus: _updateCampus,
     deleteCampus,
     restoreCampus,
     addCampus,
-    updateFaculty,
+    updateFaculty: _updateFaculty,
     deleteFaculty,
     addFaculty,
     updateCourse,
@@ -790,6 +1042,11 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
   const [selectedCampusId, setSelectedCampusId] = useState<string | null>(null)
   const [selectedProgrammeType, setSelectedProgrammeType] = useState<string | null>(null)
   const [selectedFacultyCode, setSelectedFacultyCode] = useState<string | null>(null)
+
+  // Add course dialog state
+  const [isAddCourseDialogOpen, setIsAddCourseDialogOpen] = useState(false)
+  const [addCourseTarget, setAddCourseTarget] = useState<{ campusId: string; facultyCode: string } | null>(null)
+
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
     const initial = new Set<string>()
     const firstCampus = editedCampuses.find((c) => !c._isDeleted)
@@ -872,7 +1129,7 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
   }, [addCampus])
 
   const handleAddFaculty = useCallback(
-    (campusId: string, programmeType: string) => {
+    (campusId: string, _programmeType: string) => {
       addFaculty(campusId, {
         name: 'New Faculty',
         code: `FAC${Date.now().toString().slice(-4)}`,
@@ -884,30 +1141,37 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
 
   const handleAddCourse = useCallback(
     (campusId: string, facultyCode: string) => {
-      addCourse(campusId, facultyCode, {
-        name: 'New Course',
-        code: `CRS${Date.now().toString().slice(-4)}`,
-        level: 'undergraduate',
-        durationYears: 3,
-      })
+      setAddCourseTarget({ campusId, facultyCode })
+      setIsAddCourseDialogOpen(true)
     },
-    [addCourse]
+    []
   )
+
+  const handleSubmitNewCourse = useCallback(
+    (courseData: Omit<PreConfiguredCourse, 'code'>) => {
+      if (!addCourseTarget) return
+      addCourse(addCourseTarget.campusId, addCourseTarget.facultyCode, {
+        ...courseData,
+        code: `CRS${Date.now().toString().slice(-4)}`,
+      })
+      setIsAddCourseDialogOpen(false)
+      setAddCourseTarget(null)
+    },
+    [addCourse, addCourseTarget]
+  )
+
+  const handleCancelAddCourse = useCallback(() => {
+    setIsAddCourseDialogOpen(false)
+    setAddCourseTarget(null)
+  }, [])
 
   return (
     <div className={cn('flex flex-col h-full', className)}>
       {/* Terminal-style title bar */}
       <div className="px-4 py-2 border-b border-border bg-card flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-traffic-red" aria-hidden="true" />
-            <span className="h-2.5 w-2.5 rounded-full bg-traffic-yellow" aria-hidden="true" />
-            <span className="h-2.5 w-2.5 rounded-full bg-traffic-green" aria-hidden="true" />
-          </div>
-          <div className="flex items-center gap-2 ml-2">
-            <Building2 className="h-4 w-4 text-primary" />
-            <span className="font-mono text-sm font-medium">{institutionName}</span>
-          </div>
+          <Building2 className="h-4 w-4 text-primary" />
+          <span className="font-mono text-sm font-medium">{institutionName}</span>
         </div>
 
         <div className="flex items-center gap-4">
@@ -990,6 +1254,24 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
           onAddCourse={handleAddCourse}
         />
       </div>
+
+      {/* Add Course Dialog */}
+      {isAddCourseDialogOpen && addCourseTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card rounded-lg border border-border shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="px-4 py-3 border-b border-border bg-muted/30">
+              <h3 className="font-mono text-sm">
+                <span className="text-syntax-export">new</span>
+                <span className="text-foreground"> Course</span>
+              </h3>
+            </div>
+            <AddCourseForm
+              onSubmit={handleSubmitNewCourse}
+              onCancel={handleCancelAddCourse}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

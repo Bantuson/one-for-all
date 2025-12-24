@@ -94,8 +94,9 @@ export function InstitutionPreview({ className }: InstitutionPreviewProps) {
   return (
     <div className={cn('flex flex-col gap-6', className)}>
       {/* Terminal-style header comment */}
-      <p className="font-mono text-sm text-traffic-green">
-        // Preview the data that will be added to your dashboard
+      <p className="font-mono text-sm">
+        <span className="text-traffic-green">//</span>
+        <span className="text-muted-foreground"> Preview the data that will be added to your dashboard</span>
       </p>
 
       {/* Institution Header - Terminal Style */}
@@ -192,17 +193,6 @@ export function InstitutionPreview({ className }: InstitutionPreviewProps) {
         </div>
       </CodeCard>
 
-      {/* Data Quality Note - Terminal Style */}
-      <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 font-mono">
-        <p className="text-sm text-traffic-green mb-2">
-          // Pre-configured data ready for import
-        </p>
-        <p className="text-xs text-syntax-comment">
-          // This data has been researched and verified. You can customize it
-          <br />
-          // in the next step by adding, removing, or editing items.
-        </p>
-      </div>
     </div>
   )
 }
@@ -289,8 +279,9 @@ function CampusNode({
       {/* Empty State */}
       {isExpanded && allFaculties.length === 0 && (
         <div className="border-t border-border/50 bg-muted/30 p-4 pl-12 font-mono">
-          <p className="text-sm text-syntax-comment">
-            // No faculties configured. Same programmes as main campus.
+          <p className="text-sm">
+            <span className="text-traffic-green">//</span>
+            <span className="text-muted-foreground"> No faculties configured. Same programmes as main campus.</span>
           </p>
         </div>
       )}
@@ -332,7 +323,10 @@ function FacultyNode({
             <span className="text-xs text-syntax-comment">({faculty.code})</span>
           </div>
           {faculty.description && (
-            <p className="text-xs text-syntax-comment">// {faculty.description}</p>
+            <p className="text-xs">
+              <span className="text-traffic-green">//</span>
+              <span className="text-muted-foreground"> {faculty.description}</span>
+            </p>
           )}
         </div>
         <span className="text-xs">

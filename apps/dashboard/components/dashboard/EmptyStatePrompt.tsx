@@ -92,7 +92,7 @@ export function EmptyStatePrompt({
 
         {/* Help Text */}
         <p className="font-mono text-xs text-muted-foreground">
-          <span className="text-traffic-green">$</span> {helpCommand}  <span className="text-traffic-green">//</span> <span className="text-syntax-key">{helpText}</span>
+          <span className="text-traffic-green">$</span> {helpCommand}  <span className="text-traffic-green">//</span> <span className="text-purple-500">{helpText}</span>
         </p>
       </div>
     </div>

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { PreConfiguredCampus } from '@/lib/institutions/types'
@@ -8,6 +9,8 @@ import type { PreConfiguredCampus } from '@/lib/institutions/types'
  *
  * Populates the database with institution structure from pre-configured
  * or manually entered data.
+ *
+ * Supports re-running setup by checking for existing data and skipping duplicates.
  */
 
 interface InviteData {
@@ -32,8 +35,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body: SetupRequestBody = await req.json()
+    let body: SetupRequestBody
+    try {
+      body = await req.json()
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError)
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      )
+    }
+
     const { institution_id, mode, campuses, invites = [] } = body
+
+    // Log the request for debugging
+    console.log('Setup request:', {
+      institution_id,
+      mode,
+      campusCount: campuses?.length,
+      inviteCount: invites?.length,
+    })
 
     if (!institution_id || !campuses || !Array.isArray(campuses)) {
       return NextResponse.json(
@@ -69,6 +90,36 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Phase 2: Check for existing data and clean up before insert
+    // This allows re-running setup without duplicate key errors
+    const { data: existingCampuses } = await supabase
+      .from('campuses')
+      .select('id, code')
+      .eq('institution_id', institution_id)
+
+    if (existingCampuses && existingCampuses.length > 0) {
+      console.log(`Found ${existingCampuses.length} existing campuses, cleaning up before re-setup...`)
+
+      // Delete existing courses, faculties, and campuses for this institution
+      // Cascading delete will handle related records
+      const { error: deleteError } = await supabase
+        .from('campuses')
+        .delete()
+        .eq('institution_id', institution_id)
+
+      if (deleteError) {
+        console.error('Failed to clean up existing data:', deleteError)
+        return NextResponse.json(
+          {
+            error: 'Failed to clean up existing data before setup',
+            details: deleteError.message,
+          },
+          { status: 500 }
+        )
+      }
+      console.log('Existing data cleaned up successfully')
+    }
+
     // Track counts for response
     let campusesCreated = 0
     let facultiesCreated = 0
@@ -76,24 +127,19 @@ export async function POST(req: NextRequest) {
 
     // Process each campus
     for (const campusData of campuses) {
-      // Create campus
+      // Create campus - use 'location' column (TEXT) instead of 'address' (JSONB)
+      // The schema has: location TEXT, address JSONB DEFAULT '{}'
+      const locationString = campusData.location ||
+        (campusData.address ? `${campusData.address.city}, ${campusData.address.province}` : '')
+
       const { data: campus, error: campusError } = await supabase
         .from('campuses')
         .insert({
           institution_id,
           name: campusData.name,
           code: campusData.code,
-          address: campusData.address
-            ? {
-                city: campusData.address.city,
-                province: campusData.address.province,
-              }
-            : campusData.location
-              ? {
-                  city: campusData.location.split(',')[0]?.trim() || '',
-                  province: campusData.location.split(',')[1]?.trim() || '',
-                }
-              : {},
+          location: locationString,
+          is_main: campusData.isMain || false,
         })
         .select()
         .single()
@@ -148,21 +194,18 @@ export async function POST(req: NextRequest) {
 
         // Process courses for this faculty
         for (const courseData of facultyData.courses || []) {
-          // Build requirements object
+          // Build requirements object with snake_case keys for database
           const requirements: Record<string, unknown> = {}
           if (courseData.requirements) {
             if (courseData.requirements.minimumAps) {
-              requirements.minimumAps = courseData.requirements.minimumAps
+              requirements.minimum_aps = courseData.requirements.minimumAps
             }
             if (courseData.requirements.requiredSubjects) {
-              requirements.requiredSubjects = courseData.requirements.requiredSubjects
+              requirements.required_subjects = courseData.requirements.requiredSubjects
             }
             if (courseData.requirements.additionalRequirements) {
-              requirements.additionalRequirements = courseData.requirements.additionalRequirements
+              requirements.additional_requirements = courseData.requirements.additionalRequirements
             }
-          }
-          if (courseData.durationYears) {
-            requirements.durationYears = courseData.durationYears
           }
 
           const { error: courseError } = await supabase.from('courses').insert({
@@ -173,6 +216,7 @@ export async function POST(req: NextRequest) {
             code: courseData.code,
             level: courseData.level,
             description: courseData.description,
+            duration_years: courseData.durationYears || 4,
             requirements: Object.keys(requirements).length > 0 ? requirements : null,
             status: 'active',
           })

@@ -533,16 +533,31 @@ export const useSetupStore = create<SetupState & SetupActions>()(
           })
 
           if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.error || 'Failed to complete setup')
+            const errorData = await response.json()
+            // Build a detailed error message
+            let errorMessage = errorData.error || 'Failed to complete setup'
+            if (errorData.details) {
+              errorMessage += `: ${errorData.details}`
+            }
+            if (errorData.campus) {
+              errorMessage += ` (Campus: ${errorData.campus})`
+            }
+            if (errorData.faculty) {
+              errorMessage += ` (Faculty: ${errorData.faculty})`
+            }
+            if (errorData.course) {
+              errorMessage += ` (Course: ${errorData.course})`
+            }
+            throw new Error(errorMessage)
           }
 
           set({ isSubmitting: false })
           return true
         } catch (error) {
+          console.error('Setup submission error:', error)
           set({
             isSubmitting: false,
-            error: error instanceof Error ? error.message : 'Setup failed',
+            error: error instanceof Error ? error.message : 'Setup failed. Please try again.',
           })
           return false
         }
