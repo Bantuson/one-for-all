@@ -65,6 +65,15 @@ const nextConfig = {
   // Optimize chunk loading and caching
   webpack: (config, { isServer }) => {
     if (!isServer) {
+      // Externalize server-only packages from client bundle
+      // These packages should never be bundled for the browser
+      config.externals = config.externals || []
+      config.externals.push({
+        playwright: 'commonjs playwright',
+        'playwright-core': 'commonjs playwright-core',
+        openai: 'commonjs openai',
+      })
+
       // Optimize client-side chunk loading
       config.optimization = {
         ...config.optimization,

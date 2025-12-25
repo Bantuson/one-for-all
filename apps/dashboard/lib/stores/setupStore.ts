@@ -76,7 +76,7 @@ interface SetupActions {
   prevStep: () => void
 
   // Institution selection
-  selectInstitution: (institutionId: string | null) => void
+  selectInstitution: (institutionId: string | null) => Promise<void>
   setMode: (mode: SetupMode) => void
 
   // Manual setup
@@ -231,7 +231,7 @@ export const useSetupStore = create<SetupState & SetupActions>()(
       // Institution Selection
       // -----------------------------------------------------------------------
 
-      selectInstitution: (institutionId) => {
+      selectInstitution: async (institutionId) => {
         if (!institutionId) {
           set({
             selectedInstitutionId: null,
@@ -242,14 +242,33 @@ export const useSetupStore = create<SetupState & SetupActions>()(
           return
         }
 
-        const institution = getInstitutionById(institutionId)
-        if (institution) {
+        // Set loading state
+        set({
+          selectedInstitutionId: institutionId,
+          institutionData: null,
+          editedCampuses: [],
+          mode: 'preconfigured',
+          error: null,
+        })
+
+        try {
+          const institution = await getInstitutionById(institutionId)
+          if (institution) {
+            set({
+              institutionData: institution,
+              editedCampuses: convertToEditableCampuses(institution.campuses),
+            })
+          } else {
+            set({
+              error: `Institution "${institutionId}" not found`,
+              selectedInstitutionId: null,
+            })
+          }
+        } catch (error) {
+          console.error('Failed to load institution:', error)
           set({
-            selectedInstitutionId: institutionId,
-            institutionData: institution,
-            editedCampuses: convertToEditableCampuses(institution.campuses),
-            mode: 'preconfigured',
-            error: null,
+            error: 'Failed to load institution data',
+            selectedInstitutionId: null,
           })
         }
       },

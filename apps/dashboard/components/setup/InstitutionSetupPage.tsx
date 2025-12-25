@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Check, Loader2, AlertCircle } from 'lucide-react'
@@ -22,12 +23,79 @@ import {
   useSetupStore,
   selectCanProceed,
   selectCampusCount,
-  type Permission,
 } from '@/lib/stores/setupStore'
-import { InstitutionSelector } from './InstitutionSelector'
-import { InstitutionPreview } from './InstitutionPreview'
-import { SetupEditorMasterDetail } from './SetupEditorMasterDetail'
-import { TeamInviteStep } from './TeamInviteStep'
+
+// ============================================================================
+// Loading Skeletons
+// ============================================================================
+
+function StepLoadingSkeleton() {
+  return (
+    <div className="animate-pulse space-y-4 p-4">
+      <div className="h-4 bg-muted rounded w-3/4"></div>
+      <div className="space-y-3">
+        <div className="h-10 bg-muted rounded"></div>
+        <div className="h-10 bg-muted rounded"></div>
+        <div className="h-10 bg-muted rounded"></div>
+      </div>
+      <div className="h-4 bg-muted rounded w-1/2"></div>
+    </div>
+  )
+}
+
+function EditorLoadingSkeleton() {
+  return (
+    <div className="animate-pulse flex h-[500px]">
+      <div className="w-1/3 border-r border-border p-4 space-y-3">
+        <div className="h-6 bg-muted rounded w-1/2"></div>
+        <div className="h-8 bg-muted rounded"></div>
+        <div className="h-8 bg-muted rounded"></div>
+        <div className="h-8 bg-muted rounded"></div>
+      </div>
+      <div className="flex-1 p-4 space-y-4">
+        <div className="h-6 bg-muted rounded w-1/4"></div>
+        <div className="h-32 bg-muted rounded"></div>
+        <div className="h-24 bg-muted rounded"></div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Dynamic Imports - Lazy-loaded components for code splitting
+// ============================================================================
+
+const InstitutionSelector = dynamic(
+  () => import('./InstitutionSelector').then((mod) => ({ default: mod.InstitutionSelector })),
+  {
+    loading: () => <StepLoadingSkeleton />,
+    ssr: false,
+  }
+)
+
+const InstitutionPreview = dynamic(
+  () => import('./InstitutionPreview').then((mod) => ({ default: mod.InstitutionPreview })),
+  {
+    loading: () => <StepLoadingSkeleton />,
+    ssr: false,
+  }
+)
+
+const SetupEditorMasterDetail = dynamic(
+  () => import('./SetupEditorMasterDetail').then((mod) => ({ default: mod.SetupEditorMasterDetail })),
+  {
+    loading: () => <EditorLoadingSkeleton />,
+    ssr: false,
+  }
+)
+
+const TeamInviteStep = dynamic(
+  () => import('./TeamInviteStep').then((mod) => ({ default: mod.TeamInviteStep })),
+  {
+    loading: () => <StepLoadingSkeleton />,
+    ssr: false,
+  }
+)
 
 // ============================================================================
 // Types
