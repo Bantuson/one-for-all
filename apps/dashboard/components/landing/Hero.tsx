@@ -4,17 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Logo } from '../branding/Logo'
 import { Button } from '../ui/Button'
-import { RegistrationModal } from '../modals/RegistrationModal'
 import { LoginModal } from '../modals/LoginModal'
 import { TrafficLights } from '../ui/TrafficLights'
 
-interface HeroProps {
-  showRegistrationModal?: boolean
-}
-
-export function Hero({ showRegistrationModal: initialShowRegistration }: HeroProps) {
+export function Hero() {
   const cardsRef = useRef<(HTMLDivElement | null)[]>([])
-  // Registration modal state removed - now using /register route
   const [showLoginModal, setShowLoginModal] = useState(false)
 
   useEffect(() => {
@@ -82,8 +76,7 @@ export function Hero({ showRegistrationModal: initialShowRegistration }: HeroPro
         </Button>
       </div>
 
-      {/* Modals */}
-      {/* RegistrationModal removed - now using /register route */}
+      {/* Login Modal */}
       <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
 
       {/* Feature Description */}
