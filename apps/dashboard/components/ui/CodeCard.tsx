@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   TrafficLights,
@@ -15,13 +16,17 @@ import {
 interface CodeCardProps {
   children: React.ReactNode
   className?: string
+  overflow?: 'hidden' | 'visible' | 'auto'
 }
 
-export function CodeCard({ children, className }: CodeCardProps) {
+export function CodeCard({ children, className, overflow = 'hidden' }: CodeCardProps) {
   return (
     <div
       className={cn(
-        'rounded-lg border border-border bg-card overflow-hidden',
+        'rounded-lg border border-border bg-card',
+        overflow === 'hidden' && 'overflow-hidden',
+        overflow === 'visible' && 'overflow-visible',
+        overflow === 'auto' && 'overflow-auto',
         'transition-all duration-200',
         'hover:border-border/80 hover:shadow-sm',
         className
@@ -148,7 +153,11 @@ interface CourseCardProps {
   status: 'active' | 'pending' | 'draft' | 'rejected'
   applications?: number
   deadline?: string
+  minimumAps?: number
+  durationYears?: number
+  requiredSubjects?: string[]
   onClick?: () => void
+  onEdit?: () => void
   onViewApplications?: () => void
   className?: string
 }
@@ -161,7 +170,11 @@ export function CourseCard({
   status,
   applications = 0,
   deadline,
+  minimumAps,
+  durationYears,
+  requiredSubjects,
   onClick,
+  onEdit,
   onViewApplications,
   className,
 }: CourseCardProps) {
@@ -182,6 +195,31 @@ export function CourseCard({
           <span className="text-syntax-from">from</span>
           <span className="text-syntax-string">"{faculty}"</span>
         </div>
+        {/* Key metrics row with badges */}
+        {(minimumAps || durationYears) && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {minimumAps && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">
+                APS: {minimumAps}
+              </span>
+            )}
+            {durationYears && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600">
+                {durationYears}yr
+              </span>
+            )}
+          </div>
+        )}
+        {/* Required subjects */}
+        {requiredSubjects && requiredSubjects.length > 0 && (
+          <div className="mt-2">
+            <span className="text-[10px] text-muted-foreground">Subjects: </span>
+            <span className="text-[10px] text-amber-500">
+              {requiredSubjects.slice(0, 3).join(', ')}
+              {requiredSubjects.length > 3 && ` +${requiredSubjects.length - 3}`}
+            </span>
+          </div>
+        )}
         {description && (
           <>
             <div className="text-syntax-comment">//</div>
@@ -207,17 +245,31 @@ export function CourseCard({
             </span>
           )}
         </div>
-        {onViewApplications && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onViewApplications()
-            }}
-            className="text-sm font-mono text-primary hover:underline inline-flex items-center gap-1"
-          >
-            <span className="opacity-70">$</span> view --applications &rarr;
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {onEdit && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit()
+              }}
+              className="p-1.5 rounded-md hover:bg-muted transition-colors"
+              aria-label="Edit course"
+            >
+              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          )}
+          {onViewApplications && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onViewApplications()
+              }}
+              className="text-sm font-mono text-primary hover:underline inline-flex items-center gap-1"
+            >
+              <span className="opacity-70">$</span> view --applications &rarr;
+            </button>
+          )}
+        </div>
       </CodeCardFooter>
     </CodeCard>
   )

@@ -27,10 +27,7 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
           return (
             <li
               key={step.id}
-              className={cn(
-                'relative flex items-center',
-                index !== steps.length - 1 && 'flex-1'
-              )}
+              className="relative flex-1 flex justify-center"
             >
               <div className="flex flex-col items-center">
                 {/* Step Circle - Terminal Style */}

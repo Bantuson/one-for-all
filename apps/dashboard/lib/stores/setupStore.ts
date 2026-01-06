@@ -5,6 +5,7 @@ import type {
   PreConfiguredCampus,
   PreConfiguredFaculty,
   PreConfiguredCourse,
+  ProgrammeTypeCategory,
 } from '@/lib/institutions/types'
 import { getInstitutionById } from '@/lib/institutions'
 
@@ -95,7 +96,7 @@ interface SetupActions {
     facultyCode: string,
     updates: Partial<PreConfiguredFaculty>
   ) => void
-  addFaculty: (campusId: string, faculty: PreConfiguredFaculty) => void
+  addFaculty: (campusId: string, faculty: PreConfiguredFaculty, programmeType: ProgrammeTypeCategory) => void
   deleteFaculty: (campusId: string, facultyCode: string) => void
 
   // Course editing
@@ -356,25 +357,47 @@ export const useSetupStore = create<SetupState & SetupActions>()(
         }))
       },
 
-      addFaculty: (campusId, faculty) => {
+      addFaculty: (campusId, faculty, programmeType) => {
         set((state) => ({
           editedCampuses: state.editedCampuses.map((campus) => {
             if (campus._id !== campusId) return campus
 
-            // Add to the first programme type, or create one if none exist
-            const programmeTypes = campus.programmeTypes.length > 0
-              ? campus.programmeTypes.map((pt, index) =>
-                  index === 0
-                    ? { ...pt, faculties: [...pt.faculties, faculty] }
-                    : pt
-                )
-              : [{
-                  type: 'undergraduate' as const,
-                  displayName: 'Undergraduate Programmes',
-                  faculties: [faculty],
-                }]
+            // Find existing programme type or create new one
+            const existingPtIndex = campus.programmeTypes.findIndex(
+              (pt) => pt.type === programmeType
+            )
 
-            return { ...campus, programmeTypes }
+            if (existingPtIndex >= 0) {
+              // Add to existing programme type
+              const programmeTypes = campus.programmeTypes.map((pt, index) =>
+                index === existingPtIndex
+                  ? { ...pt, faculties: [...pt.faculties, faculty] }
+                  : pt
+              )
+              return { ...campus, programmeTypes }
+            } else {
+              // Create new programme type with this faculty
+              const displayNameMap: Record<ProgrammeTypeCategory, string> = {
+                undergraduate: 'Undergraduate Programmes',
+                honours: 'Honours Programmes',
+                postgraduate: 'Postgraduate Programmes',
+                masters: 'Masters Programmes',
+                doctoral: 'Doctoral Programmes',
+                diploma: 'Diploma Programmes',
+                certificate: 'Certificate Programmes',
+                online: 'Online Programmes',
+                'short-course': 'Short Courses',
+              }
+              const newPt = {
+                type: programmeType,
+                displayName: displayNameMap[programmeType] || `${programmeType} Programmes`,
+                faculties: [faculty],
+              }
+              return {
+                ...campus,
+                programmeTypes: [...campus.programmeTypes, newPt],
+              }
+            }
           }),
         }))
       },
@@ -535,6 +558,7 @@ export const useSetupStore = create<SetupState & SetupActions>()(
           const response = await fetch('/api/setup/complete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
               institution_id: institutionId,
               mode: state.mode,

@@ -84,15 +84,17 @@ export async function POST(req: Request) {
     const serviceSupabase = createServiceClient()
 
     // Get current user from Supabase
-    let { data: user, error: userError } = await serviceSupabase
+    const { data: existingUser, error: userError } = await serviceSupabase
       .from('users')
       .select('id')
       .eq('clerk_user_id', userId)
       .single()
 
+    let user = existingUser
+
     // If user doesn't exist in Supabase yet, sync from Clerk
     // (This handles cases where webhook hasn't fired yet)
-    if (userError || !user) {
+    if (userError || !existingUser) {
       const client = await clerkClient()
       const clerkUser = await client.users.getUser(userId)
 
@@ -112,7 +114,7 @@ export async function POST(req: Request) {
       }
 
       // Sync user to Supabase using service client (bypasses RLS)
-      const { data: syncedUserId, error: syncError } = await serviceSupabase.rpc(
+      const { error: syncError } = await serviceSupabase.rpc(
         'sync_clerk_user',
         {
           p_clerk_user_id: userId,
@@ -150,6 +152,10 @@ export async function POST(req: Request) {
       user = newUser
     }
 
+    // At this point user is guaranteed to exist (either existing or newly synced)
+    // Use non-null assertion since we've validated or created the user above
+    const userId_db = user!.id
+
     // Generate slug from name
     const slug = name
       .toLowerCase()
@@ -166,7 +172,7 @@ export async function POST(req: Request) {
         contact_email,
         contact_phone: contact_phone || null,
         website: website || null,
-        created_by: user.id,
+        created_by: userId_db,
       })
       .select()
       .single()

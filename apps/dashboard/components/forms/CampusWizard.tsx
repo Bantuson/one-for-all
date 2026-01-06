@@ -4,15 +4,20 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Stepper } from '@/components/ui/Stepper'
 import { CodeCard, CodeCardHeader } from '@/components/ui/CodeCard'
-import { CampusInfoStep, CampusInfoFormData } from './steps/CampusInfoStep'
-import { FacultiesStep, Faculty } from './steps/FacultiesStep'
-import { CoursesStep, Course } from './steps/CoursesStep'
-import { TeamMembersStep, TeamMember } from './steps/TeamMembersStep'
+import type { CampusInfoFormData } from './steps/CampusInfoStep';
+import { CampusInfoStep } from './steps/CampusInfoStep'
+import type { Faculty } from './steps/FacultiesStep';
+import { FacultiesStep } from './steps/FacultiesStep'
+import type { Course } from './steps/CoursesStep';
+import { CoursesStep } from './steps/CoursesStep'
+import type { TeamMember } from './steps/TeamMembersStep';
+import { TeamMembersStep } from './steps/TeamMembersStep'
+import type {
+  CampusWizardData} from '@/lib/localStorage';
 import {
   saveCampusWizardData,
   loadCampusWizardData,
-  clearCampusWizardData,
-  CampusWizardData,
+  clearCampusWizardData
 } from '@/lib/localStorage'
 import { CommandButton } from '@/components/ui/CommandButton'
 import { AlertCircle, ArrowLeft } from 'lucide-react'
@@ -116,6 +121,7 @@ export function CampusWizard({ institutionId, institutionSlug }: CampusWizardPro
       const campusResponse = await fetch('/api/campuses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(campusData),
       })
 
@@ -139,6 +145,7 @@ export function CampusWizard({ institutionId, institutionSlug }: CampusWizardPro
         const facultyResponse = await fetch('/api/faculties', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify(facultyData),
         })
 
@@ -164,6 +171,7 @@ export function CampusWizard({ institutionId, institutionSlug }: CampusWizardPro
           const courseResponse = await fetch('/api/courses', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify(courseData),
           })
 
@@ -188,6 +196,7 @@ export function CampusWizard({ institutionId, institutionSlug }: CampusWizardPro
         const inviteResponse = await fetch('/api/team/invite', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify(inviteData),
         })
 

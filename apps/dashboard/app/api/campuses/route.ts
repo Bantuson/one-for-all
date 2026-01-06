@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest} from 'next/server';
+import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { institution_id, name, code, address } = body
+    const { institution_id, name, code, location, is_main } = body
 
     if (!institution_id || !name || !code) {
       return NextResponse.json(
@@ -27,7 +28,8 @@ export async function POST(req: NextRequest) {
         institution_id,
         name,
         code,
-        address: address || {},
+        location: location || null,
+        is_main: is_main || false,
       })
       .select()
       .single()

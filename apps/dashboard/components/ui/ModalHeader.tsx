@@ -2,7 +2,6 @@
 
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { DialogTitle } from './Dialog'
 import { TrafficLights } from './TrafficLights'
 
 interface ModalHeaderProps {
@@ -23,10 +22,10 @@ export function ModalHeader({ title, onClose, className }: ModalHeaderProps) {
     >
       <div className="flex items-center gap-3">
         <TrafficLights status="active" size="sm" />
-        <DialogTitle className="font-mono text-lg">
+        <h2 className="font-mono text-lg">
           <span className="text-syntax-export">export</span>
           <span className="text-syntax-key ml-2">{title}</span>
-        </DialogTitle>
+        </h2>
       </div>
       <button
         onClick={onClose}

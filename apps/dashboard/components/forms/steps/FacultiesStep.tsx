@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Input } from '@/components/ui/Input'
 import { CommandButton } from '@/components/ui/CommandButton'
-import { GraduationCap, Plus, Trash2 } from 'lucide-react'
+import { GraduationCap,  Trash2 } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,

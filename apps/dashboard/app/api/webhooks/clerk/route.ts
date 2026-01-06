@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { Webhook } from 'svix'
-import { WebhookEvent } from '@clerk/nextjs/server'
+import type { WebhookEvent } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(req: Request) {
@@ -87,6 +87,119 @@ export async function POST(req: Request) {
       }
 
       console.log('User deleted successfully')
+    } else if (eventType === 'organizationMembership.created') {
+      // Handle when a user accepts an organization invitation
+      const membership = evt.data
+      const orgId = membership.organization.id
+      const clerkUserId = membership.public_user_data.user_id
+
+      console.log(`Organization membership created: user ${clerkUserId} joined org ${orgId}`)
+
+      // Find institution by clerk_org_id
+      const { data: institution, error: institutionError } = await supabase
+        .from('institutions')
+        .select('id')
+        .eq('clerk_org_id', orgId)
+        .single()
+
+      if (institutionError || !institution) {
+        console.error('Institution not found for Clerk org:', orgId)
+        return new NextResponse('Institution not found', { status: 404 })
+      }
+
+      // Get or create user in our system
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_user_id', clerkUserId)
+        .single()
+
+      if (userError || !user) {
+        console.error('User not found:', clerkUserId)
+        return new NextResponse('User not found', { status: 404 })
+      }
+
+      // Map Clerk role to our role
+      const clerkRole = membership.role
+      let role: 'admin' | 'reviewer' | 'member' = 'member'
+      if (clerkRole === 'org:admin') role = 'admin'
+      else if (clerkRole === 'org:member') role = 'member'
+
+      // Get pending invitation email to update the correct record
+      const memberEmail = membership.public_user_data.identifier // Usually the email
+
+      // Try to update existing pending invitation first
+      const { data: existingMember } = await supabase
+        .from('institution_members')
+        .select('id')
+        .eq('institution_id', institution.id)
+        .eq('invited_email', memberEmail)
+        .eq('invitation_status', 'pending')
+        .single()
+
+      if (existingMember) {
+        // Update existing invitation to accepted
+        // IMPORTANT: Do NOT overwrite role or permissions - they were set during invitation creation
+        // Only update user_id, status, and accepted timestamp
+        await supabase
+          .from('institution_members')
+          .update({
+            user_id: user.id,
+            invitation_status: 'accepted',
+            invitation_accepted_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingMember.id)
+
+        console.log(`Updated pending invitation for ${memberEmail} to accepted (preserved original permissions)`)
+      } else {
+        // Create new membership (direct invite via Clerk dashboard)
+        await supabase
+          .from('institution_members')
+          .insert({
+            institution_id: institution.id,
+            user_id: user.id,
+            role: role,
+            invitation_status: 'accepted',
+            invited_email: memberEmail,
+          })
+
+        console.log(`Created new membership for ${memberEmail}`)
+      }
+    } else if (eventType === 'organizationMembership.deleted') {
+      // Handle when a user is removed from an organization
+      const membership = evt.data
+      const orgId = membership.organization.id
+      const clerkUserId = membership.public_user_data.user_id
+
+      console.log(`Organization membership deleted: user ${clerkUserId} left org ${orgId}`)
+
+      // Find institution by clerk_org_id
+      const { data: institution } = await supabase
+        .from('institutions')
+        .select('id')
+        .eq('clerk_org_id', orgId)
+        .single()
+
+      if (institution) {
+        // Get user
+        const { data: user } = await supabase
+          .from('users')
+          .select('id')
+          .eq('clerk_user_id', clerkUserId)
+          .single()
+
+        if (user) {
+          // Remove membership
+          await supabase
+            .from('institution_members')
+            .delete()
+            .eq('institution_id', institution.id)
+            .eq('user_id', user.id)
+
+          console.log(`Removed membership for user ${clerkUserId} from institution ${institution.id}`)
+        }
+      }
     }
 
     return new NextResponse('Webhook processed successfully', { status: 200 })

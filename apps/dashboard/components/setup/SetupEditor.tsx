@@ -250,11 +250,15 @@ export function SetupEditor({ className }: SetupEditorProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() =>
-                    addFaculty(selectedCampus._id, {
-                      name: 'New Faculty',
-                      code: `FAC${Date.now().toString().slice(-4)}`,
-                      courses: [],
-                    })
+                    addFaculty(
+                      selectedCampus._id,
+                      {
+                        name: 'New Faculty',
+                        code: `FAC${Date.now().toString().slice(-4)}`,
+                        courses: [],
+                      },
+                      'undergraduate'
+                    )
                   }
                 >
                   <Plus className="h-3 w-3" />

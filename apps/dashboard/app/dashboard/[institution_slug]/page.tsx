@@ -1,125 +1,41 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
-import { MasterDetailLayout } from '@/components/dashboard/MasterDetailLayout'
+import { DashboardEditor } from '@/components/dashboard/DashboardEditor'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 
 // ============================================================================
 // Type Definitions
 // ============================================================================
 
-interface Course {
+interface DatabaseCourse {
   id: string
   name: string
   code: string
-  status: string
-}
-
-interface FacultyWithCourses {
-  id: string
-  name: string
-  code: string
-  courses: Course[]
-}
-
-interface ProgrammeType {
-  type: string
-  displayName: string
-  faculties: FacultyWithCourses[]
-}
-
-interface CampusWithHierarchy {
-  id: string
-  name: string
-  code: string
-  programmeTypes: ProgrammeType[]
-}
-
-interface DatabaseCampus {
-  id: string
-  name: string
-  code: string
-  faculties: DatabaseFaculty[]
+  status: string | null
+  level: string | null
+  description: string | null
+  duration_years: number | null
+  requirements: string | Record<string, unknown> | null
+  campus_id: string | null
+  programme_type: string | null
 }
 
 interface DatabaseFaculty {
   id: string
   name: string
   code: string
-  courses: Course[]
+  description: string | null
+  courses: DatabaseCourse[]
 }
 
-// ============================================================================
-// Data Transformation
-// ============================================================================
-
-/**
- * Transforms flat database structure into nested programmeTypes hierarchy
- * by analyzing course levels within faculties.
- */
-function transformCampusData(campuses: DatabaseCampus[]): CampusWithHierarchy[] {
-  return campuses.map((campus) => {
-    // Group faculties by programme type based on course levels
-    const undergraduateFaculties: FacultyWithCourses[] = []
-    const postgraduateFaculties: FacultyWithCourses[] = []
-
-    campus.faculties.forEach((faculty) => {
-      // Check if faculty has any courses to determine its type
-      const hasUndergrad = faculty.courses.some((course) =>
-        course.code.toLowerCase().includes('undergrad') ||
-        course.name.toLowerCase().includes('bachelor') ||
-        course.name.toLowerCase().includes('bcom') ||
-        course.name.toLowerCase().includes('bsc') ||
-        course.name.toLowerCase().includes('ba ') ||
-        course.name.toLowerCase().includes('beng')
-      )
-
-      const hasPostgrad = faculty.courses.some((course) =>
-        course.code.toLowerCase().includes('postgrad') ||
-        course.name.toLowerCase().includes('honours') ||
-        course.name.toLowerCase().includes('master') ||
-        course.name.toLowerCase().includes('phd') ||
-        course.name.toLowerCase().includes('doctorate')
-      )
-
-      // If no clear distinction, default to undergraduate
-      if (hasPostgrad && !hasUndergrad) {
-        postgraduateFaculties.push(faculty)
-      } else {
-        // Default to undergraduate or include in both if mixed
-        undergraduateFaculties.push(faculty)
-        if (hasPostgrad && hasUndergrad) {
-          postgraduateFaculties.push(faculty)
-        }
-      }
-    })
-
-    // Build programmeTypes array
-    const programmeTypes: ProgrammeType[] = []
-
-    if (undergraduateFaculties.length > 0) {
-      programmeTypes.push({
-        type: 'undergraduate',
-        displayName: 'Undergraduate Programmes',
-        faculties: undergraduateFaculties,
-      })
-    }
-
-    if (postgraduateFaculties.length > 0) {
-      programmeTypes.push({
-        type: 'postgraduate',
-        displayName: 'Postgraduate Programmes',
-        faculties: postgraduateFaculties,
-      })
-    }
-
-    return {
-      id: campus.id,
-      name: campus.name,
-      code: campus.code,
-      programmeTypes,
-    }
-  })
+interface DatabaseCampus {
+  id: string
+  name: string
+  code: string
+  location: string | null
+  is_main: boolean | null
+  faculties: DatabaseFaculty[]
 }
 
 // ============================================================================
@@ -154,7 +70,7 @@ export default async function InstitutionDashboardPage({
     redirect('/dashboard')
   }
 
-  // Fetch full hierarchy: campuses -> faculties -> courses
+  // Fetch full hierarchy: campuses -> faculties -> courses with ALL fields
   const { data: campuses } = await supabase
     .from('campuses')
     .select(
@@ -162,15 +78,24 @@ export default async function InstitutionDashboardPage({
       id,
       name,
       code,
+      location,
+      is_main,
       faculties (
         id,
         name,
         code,
+        description,
         courses (
           id,
           name,
           code,
-          status
+          status,
+          level,
+          description,
+          duration_years,
+          requirements,
+          campus_id,
+          programme_type
         )
       )
     `
@@ -181,15 +106,14 @@ export default async function InstitutionDashboardPage({
   // Check if we have any data
   const hasCampuses = campuses && campuses.length > 0
 
-  // Transform data for MasterDetailLayout
-  const transformedCampuses = hasCampuses ? transformCampusData(campuses as DatabaseCampus[]) : []
-
   return (
     <>
       {hasCampuses ? (
-        <MasterDetailLayout
-          campuses={transformedCampuses}
+        <DashboardEditor
+          campuses={campuses as DatabaseCampus[]}
+          institutionName={institution.name}
           institutionSlug={institution_slug}
+          institutionId={institution.id}
         />
       ) : (
         <DashboardEmptyState

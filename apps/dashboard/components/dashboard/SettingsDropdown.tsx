@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +22,11 @@ export function SettingsDropdown({ children }: SettingsDropdownProps) {
   const { theme } = useTheme()
   const { signOut } = useClerk()
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleSignOut = () => {
     signOut({ redirectUrl: '/' })
@@ -52,10 +57,12 @@ export function SettingsDropdown({ children }: SettingsDropdownProps) {
             <div className="flex items-center gap-2 text-muted-foreground text-sm">
               <span className="text-traffic-green">$</span>
               <span>theme --toggle</span>
-              {theme === 'dark' ? (
-                <Moon className="h-3 w-3 ml-1" />
-              ) : (
-                <Sun className="h-3 w-3 ml-1" />
+              {mounted && (
+                theme === 'dark' ? (
+                  <Moon className="h-3 w-3 ml-1" />
+                ) : (
+                  <Sun className="h-3 w-3 ml-1" />
+                )
               )}
             </div>
             <ThemeToggle />

@@ -1,9 +1,8 @@
 export { InstitutionSelector } from './InstitutionSelector'
 export { InstitutionPreview } from './InstitutionPreview'
 export { SetupEditor } from './SetupEditor'
-export { InstitutionSetupPage } from './InstitutionSetupPage'
 export { TeamInviteStep } from './TeamInviteStep'
-// Legacy modal-based wizard (deprecated - use InstitutionSetupPage instead)
+// Legacy modal-based wizard (deprecated - use unified registration workflow instead)
 export {
   InstitutionSetupWizard,
   useInstitutionSetupWizard,

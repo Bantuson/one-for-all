@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest} from 'next/server';
+import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     })
 
     // TODO: Store pending invitations in database
-    const supabase = createServiceClient()
+    const _supabase = createServiceClient()
 
     // Placeholder: Create invitation records
     // const invitations = members.map(member => ({

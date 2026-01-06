@@ -30,7 +30,9 @@ export function RegistrationModal({ open, onOpenChange }: RegistrationModalProps
       if (open && isSignedIn && !checkingInstitutions) {
         setCheckingInstitutions(true)
         try {
-          const response = await fetch('/api/institutions')
+          const response = await fetch('/api/institutions', {
+            credentials: 'include',
+          })
 
           // Only proceed if request was successful
           if (!response.ok) {

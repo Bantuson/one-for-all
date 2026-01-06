@@ -9,16 +9,10 @@ import { createServiceClient } from '@/lib/supabase/server'
  *
  * Server-side authentication and onboarding checks:
  * 1. Unauthenticated users → Show landing page
- * 2. Authenticated users without onboarding → Show landing page with registration modal
+ * 2. Authenticated users without onboarding → Redirect to /register
  * 3. Authenticated users with completed onboarding → Redirect to dashboard
  */
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ register?: string }>
-}) {
-  // Await searchParams as required by Next.js 15
-  const params = await searchParams
+export default async function Home() {
   // Check authentication
   const { userId } = await auth()
 
@@ -62,16 +56,17 @@ export default async function Home({
           redirect(`/dashboard/${institution.slug}`)
         }
       }
+    } else {
+      // User is authenticated but hasn't completed onboarding
+      // Redirect to registration page
+      redirect('/register')
     }
   }
 
-  // Show landing page for:
-  // - Unauthenticated users
-  // - Authenticated users without completed onboarding
-  // - Authenticated users without institutions
+  // Show landing page for unauthenticated users only
   return (
     <LandingLayout>
-      <Hero showRegistrationModal={params.register === 'true'} />
+      <Hero />
     </LandingLayout>
   )
 }

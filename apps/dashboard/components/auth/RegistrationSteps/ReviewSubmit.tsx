@@ -31,6 +31,7 @@ export function ReviewSubmit() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           name: institutionData.name,
           type: institutionType,
@@ -49,6 +50,7 @@ export function ReviewSubmit() {
       // Mark onboarding as complete in database
       await fetch('/api/users/complete-onboarding', {
         method: 'POST',
+        credentials: 'include',
       })
 
       // Reset registration state

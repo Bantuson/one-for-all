@@ -1,7 +1,8 @@
 'use client'
 
-import { Search, Activity, Settings, User } from 'lucide-react'
+import { Search, Activity, Settings, Users } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { SettingsDropdown } from './SettingsDropdown'
 import { CommandPalette } from './CommandPalette'
@@ -35,13 +36,13 @@ export function DashboardHeader({ institution }: DashboardHeaderProps) {
     <header className="border-b border-border sticky top-0 z-50 bg-card">
       {/* Main header row */}
       <div className="h-14 px-6 flex items-center">
-        {/* Left: Logo with traffic lights - dual-tone */}
-        <div className="flex items-center gap-4 w-72">
+        {/* Left: Logo with traffic lights - dual-tone, single line */}
+        <div className="flex items-center gap-4">
           <div className="flex items-center gap-3 px-3 py-1.5 rounded-md bg-muted/50 border border-border/50">
-            <TrafficLights status="active" size="sm" />
-            <span className="font-mono text-sm">
+            <TrafficLights status="active" size="sm" className="flex-shrink-0" />
+            <span className="font-mono text-sm whitespace-nowrap">
               <span className="text-syntax-export">export</span>
-              <span className="text-syntax-key ml-1">oneforall</span>
+              <span className="text-syntax-key ml-1">{institution.name.toLowerCase()}</span>
             </span>
           </div>
         </div>
@@ -81,15 +82,17 @@ export function DashboardHeader({ institution }: DashboardHeaderProps) {
             <Activity className="h-5 w-5" />
           </Button>
 
-          {/* Profile - YELLOW */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-traffic-yellow hover:text-traffic-yellow hover:bg-traffic-yellow/10 transition-colors"
-            title="Profile"
-          >
-            <User className="h-5 w-5" />
-          </Button>
+          {/* Team - YELLOW */}
+          <Link href={`/dashboard/${institution.slug}/team`}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-traffic-yellow hover:text-traffic-yellow hover:bg-traffic-yellow/10 transition-colors"
+              title="Team"
+            >
+              <Users className="h-5 w-5" />
+            </Button>
+          </Link>
 
           {/* Settings Dropdown - GREEN */}
           <SettingsDropdown>

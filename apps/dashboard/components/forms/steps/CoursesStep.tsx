@@ -7,7 +7,7 @@ import * as z from 'zod'
 import { Input } from '@/components/ui/Input'
 import { CommandButton } from '@/components/ui/CommandButton'
 import { BookOpen, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
-import { Faculty } from './FacultiesStep'
+import type { Faculty } from './FacultiesStep'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,7 +71,7 @@ export function CoursesStep({
     handleSubmit,
     formState: { errors },
     reset,
-    setValue,
+    
   } = useForm<CourseFormData>({
     resolver: zodResolver(courseSchema),
     defaultValues: {

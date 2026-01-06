@@ -29,6 +29,7 @@ interface PendingInvite {
 interface TeamInviteStepProps {
   className?: string
   onInvitesChange?: (invites: PendingInvite[]) => void
+  showWrapper?: boolean
 }
 
 // ============================================================================
@@ -80,6 +81,7 @@ function formatPermissionsDisplay(permissions: Permission[]): string {
 export function TeamInviteStep({
   className,
   onInvitesChange,
+  showWrapper = true,
 }: TeamInviteStepProps) {
   const [emailInput, setEmailInput] = React.useState('')
   const [selectedPermissions, setSelectedPermissions] = React.useState<Permission[]>(DEFAULT_PERMISSIONS)
@@ -166,9 +168,187 @@ export function TeamInviteStep({
     [emailError]
   )
 
+  const content = (
+    <div className="p-4 space-y-4 font-mono text-sm">
+      {/* Section: Invite description */}
+      <p className="text-center">
+        <span className="text-traffic-green">//</span>
+        <span className="text-muted-foreground"> Invite team members to collaborate</span>
+      </p>
+
+      {/* Email Input Row */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Email Label and Input */}
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-syntax-key">Email:</span>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-syntax-export" />
+              <Input
+                ref={emailInputRef}
+                type="email"
+                placeholder="teammate@example.com"
+                value={emailInput}
+                onChange={handleEmailChange}
+                onKeyDown={handleKeyDown}
+                aria-label="Team member email address"
+                aria-describedby={emailError ? 'email-error' : 'email-hint'}
+                aria-invalid={emailError ? 'true' : 'false'}
+                className={cn(
+                  'pl-10 font-mono',
+                  emailError && 'border-destructive focus-visible:ring-destructive'
+                )}
+              />
+            </div>
+            {/* Add Button */}
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleAddInvite}
+              aria-label="Add team member invite"
+              className="shrink-0 gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add</span>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Email Error */}
+      {emailError && (
+        <p
+          id="email-error"
+          role="alert"
+        >
+          <span className="text-traffic-green">//</span>
+          <span className="text-destructive"> Error: {emailError}</span>
+        </p>
+      )}
+
+      {/* Permissions Section */}
+      <div className="pt-2">
+        <p className="mb-3 text-center">
+          <span className="text-traffic-green">//</span>
+          <span className="text-muted-foreground"> Select permissions:</span>
+        </p>
+        <fieldset>
+          <legend className="sr-only">Select permissions for team member</legend>
+          <div className="space-y-2">
+            {PERMISSIONS.map((permission) => {
+              const isChecked = selectedPermissions.includes(permission.id)
+              return (
+                <label
+                  key={permission.id}
+                  className={cn(
+                    'flex items-start gap-3 p-2 rounded cursor-pointer transition-colors',
+                    'hover:bg-muted/30',
+                    isChecked && 'bg-muted/20'
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => handlePermissionToggle(permission.id)}
+                    className={cn(
+                      'mt-0.5 h-4 w-4 rounded border-2 border-muted-foreground',
+                      'text-traffic-green focus:ring-traffic-green focus:ring-offset-0',
+                      'accent-traffic-green cursor-pointer'
+                    )}
+                    aria-describedby={`permission-desc-${permission.id}`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className={cn(
+                      'block',
+                      isChecked ? 'text-traffic-green' : 'text-foreground'
+                    )}>
+                      {permission.label}
+                    </span>
+                    <span
+                      id={`permission-desc-${permission.id}`}
+                      className="block text-xs text-syntax-comment"
+                    >
+                      {permission.description}
+                    </span>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-border" />
+
+      {/* Pending Invites Section */}
+      {pendingInvites.length > 0 ? (
+        <div className="space-y-2">
+          <p>
+            <span className="text-traffic-green">//</span>
+            <span className="text-muted-foreground"> Pending invites:</span>
+          </p>
+          <ul className="space-y-1" aria-label="Pending team invites">
+            {pendingInvites.map((invite) => {
+              const inviteWithPermissions = invite as PendingInvite
+              return (
+                <li
+                  key={invite.email}
+                  className="flex items-center justify-between gap-2 p-2 rounded bg-muted/30 group"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-traffic-yellow">*</span>
+                    <span className="text-syntax-string truncate">
+                      "{invite.email}"
+                    </span>
+                    <span className="text-foreground">:</span>
+                    <span className="text-syntax-key truncate" title={inviteWithPermissions.permissions?.join(', ')}>
+                      [{formatPermissionsDisplay(inviteWithPermissions.permissions || [])}]
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveInvite(invite.email)}
+                    aria-label={`Remove invite for ${invite.email}`}
+                    className={cn(
+                      'p-1 rounded transition-colors shrink-0',
+                      'text-muted-foreground hover:text-destructive hover:bg-destructive/10',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+                    )}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ) : (
+        <div className="text-center py-4">
+          <Users className="mx-auto h-8 w-8 text-muted-foreground opacity-50 mb-2" />
+          <p>
+            <span className="text-traffic-green">//</span>
+            <span className="text-muted-foreground"> No invites yet. Add team members above.</span>
+          </p>
+        </div>
+      )}
+
+      {/* Skip Option */}
+      <p className="text-center pt-2">
+        <span className="text-traffic-green">//</span>
+        <span className="text-muted-foreground"> You can skip and invite team members later from Settings</span>
+      </p>
+    </div>
+  )
+
+  if (!showWrapper) {
+    return <div className={cn('flex flex-col gap-6', className)}>{content}</div>
+  }
+
   return (
     <div className={cn('flex flex-col gap-6', className)}>
-      {/* Single CodeCard encompassing entire team workflow */}
       <CodeCard>
         <CodeCardHeader
           filename="team-members.config"
@@ -179,178 +359,7 @@ export function TeamInviteStep({
             </span>
           }
         />
-        <div className="p-4 space-y-4 font-mono text-sm">
-          {/* Section: Invite description */}
-          <p>
-            <span className="text-traffic-green">//</span>
-            <span className="text-muted-foreground"> Invite team members to collaborate</span>
-          </p>
-
-          {/* Email Input Row */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* Email Label and Input */}
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-syntax-key">Email:</span>
-              </div>
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-syntax-export" />
-                  <Input
-                    ref={emailInputRef}
-                    type="email"
-                    placeholder="teammate@example.com"
-                    value={emailInput}
-                    onChange={handleEmailChange}
-                    onKeyDown={handleKeyDown}
-                    aria-label="Team member email address"
-                    aria-describedby={emailError ? 'email-error' : 'email-hint'}
-                    aria-invalid={emailError ? 'true' : 'false'}
-                    className={cn(
-                      'pl-10 font-mono',
-                      emailError && 'border-destructive focus-visible:ring-destructive'
-                    )}
-                  />
-                </div>
-                {/* Add Button */}
-                <Button
-                  type="button"
-                  variant="primary"
-                  onClick={handleAddInvite}
-                  aria-label="Add team member invite"
-                  className="shrink-0 gap-1"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">Add</span>
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Email Error */}
-          {emailError && (
-            <p
-              id="email-error"
-              role="alert"
-            >
-              <span className="text-traffic-green">//</span>
-              <span className="text-destructive"> Error: {emailError}</span>
-            </p>
-          )}
-
-          {/* Permissions Section */}
-          <div className="pt-2">
-            <p className="mb-3">
-              <span className="text-traffic-green">//</span>
-              <span className="text-muted-foreground"> Select permissions:</span>
-            </p>
-            <fieldset>
-              <legend className="sr-only">Select permissions for team member</legend>
-              <div className="space-y-2">
-                {PERMISSIONS.map((permission) => {
-                  const isChecked = selectedPermissions.includes(permission.id)
-                  return (
-                    <label
-                      key={permission.id}
-                      className={cn(
-                        'flex items-start gap-3 p-2 rounded cursor-pointer transition-colors',
-                        'hover:bg-muted/30',
-                        isChecked && 'bg-muted/20'
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => handlePermissionToggle(permission.id)}
-                        className={cn(
-                          'mt-0.5 h-4 w-4 rounded border-2 border-muted-foreground',
-                          'text-traffic-green focus:ring-traffic-green focus:ring-offset-0',
-                          'accent-traffic-green cursor-pointer'
-                        )}
-                        aria-describedby={`permission-desc-${permission.id}`}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className={cn(
-                          'block',
-                          isChecked ? 'text-traffic-green' : 'text-foreground'
-                        )}>
-                          {permission.label}
-                        </span>
-                        <span
-                          id={`permission-desc-${permission.id}`}
-                          className="block text-xs text-syntax-comment"
-                        >
-                          {permission.description}
-                        </span>
-                      </div>
-                    </label>
-                  )
-                })}
-              </div>
-            </fieldset>
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-border" />
-
-          {/* Pending Invites Section */}
-          {pendingInvites.length > 0 ? (
-            <div className="space-y-2">
-              <p>
-                <span className="text-traffic-green">//</span>
-                <span className="text-muted-foreground"> Pending invites:</span>
-              </p>
-              <ul className="space-y-1" aria-label="Pending team invites">
-                {pendingInvites.map((invite) => {
-                  const inviteWithPermissions = invite as PendingInvite
-                  return (
-                    <li
-                      key={invite.email}
-                      className="flex items-center justify-between gap-2 p-2 rounded bg-muted/30 group"
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="text-traffic-yellow">*</span>
-                        <span className="text-syntax-string truncate">
-                          "{invite.email}"
-                        </span>
-                        <span className="text-foreground">:</span>
-                        <span className="text-syntax-key truncate" title={inviteWithPermissions.permissions?.join(', ')}>
-                          [{formatPermissionsDisplay(inviteWithPermissions.permissions || [])}]
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveInvite(invite.email)}
-                        aria-label={`Remove invite for ${invite.email}`}
-                        className={cn(
-                          'p-1 rounded transition-colors shrink-0',
-                          'text-muted-foreground hover:text-destructive hover:bg-destructive/10',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
-                        )}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          ) : (
-            <div className="text-center py-4">
-              <Users className="mx-auto h-8 w-8 text-muted-foreground opacity-50 mb-2" />
-              <p>
-                <span className="text-traffic-green">//</span>
-                <span className="text-muted-foreground"> No invites yet. Add team members above.</span>
-              </p>
-            </div>
-          )}
-
-          {/* Skip Option */}
-          <p className="text-center pt-2">
-            <span className="text-traffic-green">//</span>
-            <span className="text-muted-foreground"> You can skip and invite team members later from Settings</span>
-          </p>
-        </div>
+        {content}
       </CodeCard>
     </div>
   )

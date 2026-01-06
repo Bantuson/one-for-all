@@ -22,7 +22,9 @@ export function ClerkSignUp() {
       if (isSignedIn && !checkingInstitutions) {
         setCheckingInstitutions(true)
         try {
-          const response = await fetch('/api/institutions')
+          const response = await fetch('/api/institutions', {
+            credentials: 'include',
+          })
           const data = await response.json()
 
           if (data.institutions && data.institutions.length > 0) {
@@ -136,8 +138,6 @@ export function ClerkSignUp() {
                 },
               }}
               routing="virtual"
-              afterSignInUrl={undefined}
-              redirectUrl={undefined}
             />
           ) : (
             <SignUp
@@ -167,8 +167,6 @@ export function ClerkSignUp() {
                 },
               }}
               routing="virtual"
-              afterSignUpUrl={undefined}
-              redirectUrl={undefined}
             />
           )}
         </Suspense>

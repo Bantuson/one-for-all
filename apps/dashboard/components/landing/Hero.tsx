@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { Logo } from '../branding/Logo'
 import { Button } from '../ui/Button'
 import { RegistrationModal } from '../modals/RegistrationModal'
@@ -13,17 +14,8 @@ interface HeroProps {
 
 export function Hero({ showRegistrationModal: initialShowRegistration }: HeroProps) {
   const cardsRef = useRef<(HTMLDivElement | null)[]>([])
-  const [showRegistrationModal, setShowRegistrationModal] = useState(
-    initialShowRegistration || false
-  )
+  // Registration modal state removed - now using /register route
   const [showLoginModal, setShowLoginModal] = useState(false)
-
-  // Open registration modal if URL param is set
-  useEffect(() => {
-    if (initialShowRegistration) {
-      setShowRegistrationModal(true)
-    }
-  }, [initialShowRegistration])
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -72,13 +64,14 @@ export function Hero({ showRegistrationModal: initialShowRegistration }: HeroPro
 
       {/* CTA Buttons - Command style */}
       <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
-        <Button
-          size="lg"
-          className="min-w-[180px] font-mono"
-          onClick={() => setShowRegistrationModal(true)}
-        >
-          <span className="text-traffic-green mr-1">$</span> register
-        </Button>
+        <Link href="/register">
+          <Button
+            size="lg"
+            className="min-w-[180px] font-mono"
+          >
+            <span className="text-traffic-green mr-1">$</span> register
+          </Button>
+        </Link>
         <Button
           size="lg"
           variant="outline"
@@ -90,10 +83,7 @@ export function Hero({ showRegistrationModal: initialShowRegistration }: HeroPro
       </div>
 
       {/* Modals */}
-      <RegistrationModal
-        open={showRegistrationModal}
-        onOpenChange={setShowRegistrationModal}
-      />
+      {/* RegistrationModal removed - now using /register route */}
       <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
 
       {/* Feature Description */}

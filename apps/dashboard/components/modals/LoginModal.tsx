@@ -73,8 +73,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                   },
                 }}
                 routing="virtual"
-                afterSignInUrl="/dashboard"
-                redirectUrl="/dashboard"
+                fallbackRedirectUrl="/dashboard"
               />
             </Suspense>
           </ClerkErrorBoundary>

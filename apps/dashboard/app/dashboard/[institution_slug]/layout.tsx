@@ -33,9 +33,11 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen overflow-hidden">
       <DashboardHeader institution={institution} />
-      {children}
+      <main className="flex-1 overflow-y-auto" id="dashboard-main">
+        {children}
+      </main>
     </div>
   )
 }

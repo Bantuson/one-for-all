@@ -6,7 +6,7 @@ interface DashboardEmptyStateProps {
 }
 
 export function DashboardEmptyState({
-  institutionId,
+  institutionId: _institutionId,
   institutionSlug,
 }: DashboardEmptyStateProps) {
   return (

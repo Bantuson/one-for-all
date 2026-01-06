@@ -1,7 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
-import { InstitutionSetupPage } from '@/components/setup/InstitutionSetupPage'
 
 export default async function SetupPage({
   params,
@@ -17,7 +16,7 @@ export default async function SetupPage({
     redirect('/sign-in')
   }
 
-  // Use service client to fetch institution
+  // Use service client to fetch institution and campuses
   const supabase = createServiceClient()
 
   const { data: institution, error } = await supabase
@@ -30,10 +29,17 @@ export default async function SetupPage({
     redirect('/dashboard')
   }
 
-  return (
-    <InstitutionSetupPage
-      institutionId={institution.id}
-      institutionSlug={institution.slug}
-    />
-  )
+  // Check if institution already has campuses set up
+  const { data: campuses } = await supabase
+    .from('campuses')
+    .select('id')
+    .eq('institution_id', institution.id)
+
+  // If no campuses exist, redirect to unified registration flow
+  if (!campuses || campuses.length === 0) {
+    redirect('/register?complete_setup=true')
+  }
+
+  // If campuses exist, setup is already complete - redirect to dashboard
+  redirect(`/dashboard/${institution_slug}`)
 }

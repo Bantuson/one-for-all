@@ -55,7 +55,9 @@ export function IntegrationStatus() {
       // Check 2: Supabase User Sync
       if (isSignedIn) {
         try {
-          const response = await fetch('/api/users/me')
+          const response = await fetch('/api/users/me', {
+            credentials: 'include',
+          })
           if (response.ok) {
             const data = await response.json()
             newChecks.push({
@@ -92,7 +94,9 @@ export function IntegrationStatus() {
       // Check 3: Institutions API
       if (isSignedIn) {
         try {
-          const response = await fetch('/api/institutions')
+          const response = await fetch('/api/institutions', {
+            credentials: 'include',
+          })
           if (response.ok) {
             const data = await response.json()
             const count = data.institutions?.length || 0
