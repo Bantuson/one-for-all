@@ -882,12 +882,20 @@ export function DashboardEditor({
   // ============================================================================
 
   useEffect(() => {
-    // Only initialize if the store is empty or on mount
-    if (editedCampuses.length === 0 && transformedCampuses.length > 0) {
+    const currentStoreInstitutionId = useSetupStore.getState().institutionId
+
+    // Reinitialize if:
+    // 1. Institution has changed (tenant isolation fix)
+    // 2. Store is empty and we have data to initialize
+    const institutionChanged = institutionId !== currentStoreInstitutionId
+    const storeEmpty = editedCampuses.length === 0 && transformedCampuses.length > 0
+
+    if (institutionChanged || storeEmpty) {
       // We need to manually set the campuses in the store
       // The store's selectInstitution method expects an institution ID
       // Instead, we'll directly set the editedCampuses and mode
       useSetupStore.setState({
+        institutionId, // Track which institution this data belongs to
         mode: 'manual',
         manualInstitutionName: institutionName,
         editedCampuses: transformedCampuses.map((campus, index) => ({
@@ -898,7 +906,7 @@ export function DashboardEditor({
         })),
       })
     }
-  }, [transformedCampuses, editedCampuses.length, institutionName])
+  }, [transformedCampuses, editedCampuses.length, institutionName, institutionId])
 
   // Subscribe to specific store actions to trigger API calls
   useEffect(() => {

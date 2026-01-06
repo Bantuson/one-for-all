@@ -38,6 +38,9 @@ interface SetupState {
   currentStep: SetupStep
   mode: SetupMode
 
+  // Current institution context (for tenant isolation)
+  institutionId: string | null
+
   // Institution selection
   selectedInstitutionId: string | null
   institutionData: PreConfiguredInstitution | null
@@ -155,6 +158,7 @@ const initialState: SetupState = {
   isOpen: false,
   currentStep: 'select',
   mode: 'preconfigured',
+  institutionId: null,
   selectedInstitutionId: null,
   institutionData: null,
   editedCampuses: [],

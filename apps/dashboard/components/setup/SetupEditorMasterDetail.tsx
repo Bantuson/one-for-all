@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import {
   ChevronRight,
   ChevronDown,
+  ChevronLeft,
   Folder,
   BookOpen,
   GraduationCap,
@@ -20,6 +21,9 @@ import { Button } from '@/components/ui/Button'
 import { useSetupStore } from '@/lib/stores/setupStore'
 import { DottedModal, DottedModalContent } from '@/components/ui/DottedModal'
 import { EditCourseModal } from '@/components/modals/EditCourseModal'
+import { ApplicationDetailModal } from '@/components/modals/ApplicationDetailModal'
+import { ApplicationCard } from './ApplicationCard'
+import { NoApplicationsEmptyState } from './NoApplicationsEmptyState'
 import type {
   PreConfiguredCampus,
   PreConfiguredFaculty,
@@ -27,6 +31,10 @@ import type {
   CourseLevel,
   ProgrammeTypeCategory,
 } from '@/lib/institutions/types'
+import type {
+  Application,
+  SelectedCourseForApplications,
+} from '@/lib/types/applications'
 
 // ============================================================================
 // Types
@@ -98,9 +106,11 @@ interface BreadcrumbProps {
   selectedCampus: EditableCampus | null
   selectedProgrammeType: string | null
   selectedFaculty: PreConfiguredFaculty | null
+  selectedCourse?: { code: string; name: string } | null
   onNavigateToRoot: () => void
   onNavigateToCampus: () => void
   onNavigateToProgrammeType: () => void
+  onNavigateToFaculty?: () => void
   onAddCampus: () => void
   onAddCourse?: (campusId: string, facultyCode: string) => void
   selectedCampusId?: string
@@ -112,9 +122,11 @@ function Breadcrumb({
   selectedCampus,
   selectedProgrammeType,
   selectedFaculty,
+  selectedCourse,
   onNavigateToRoot: _onNavigateToRoot,
   onNavigateToCampus,
   onNavigateToProgrammeType,
+  onNavigateToFaculty,
   onAddCampus,
   onAddCourse,
   selectedCampusId,
@@ -141,6 +153,14 @@ function Breadcrumb({
   if (selectedFaculty) {
     segments.push({
       label: selectedFaculty.code.toLowerCase(),
+      onClick: selectedCourse ? onNavigateToFaculty : undefined,
+      isActive: !selectedCourse,
+    })
+  }
+
+  if (selectedCourse) {
+    segments.push({
+      label: selectedCourse.code.toLowerCase(),
       isActive: true,
     })
   }
@@ -749,6 +769,7 @@ interface ViewOnlyCourseCardProps {
   facultyName: string
   onEdit: () => void
   onDelete: () => void
+  onClick?: () => void
 }
 
 function ViewOnlyCourseCard({
@@ -756,9 +777,32 @@ function ViewOnlyCourseCard({
   facultyName,
   onEdit,
   onDelete,
+  onClick,
 }: ViewOnlyCourseCardProps) {
+  const handleCardClick = () => {
+    if (onClick) {
+      onClick()
+    }
+  }
+
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onEdit()
+  }
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onDelete()
+  }
+
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden hover:border-primary/50 transition-all flex flex-col h-[260px]">
+    <div
+      className={cn(
+        'rounded-lg border border-border bg-card overflow-hidden transition-all flex flex-col h-[260px]',
+        onClick && 'cursor-pointer hover:border-primary/50'
+      )}
+      onClick={handleCardClick}
+    >
       {/* Card Header */}
       <div className="px-3 py-2 border-b border-border bg-muted/30 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2 font-mono text-sm">
@@ -828,10 +872,10 @@ function ViewOnlyCourseCard({
       {/* Card Footer - Action Buttons */}
       <div className="px-3 py-1.5 border-t border-border bg-muted/30 flex-shrink-0">
         <div className="flex gap-1 justify-end">
-          <Button variant="ghost" size="sm" onClick={onEdit}>
+          <Button variant="ghost" size="sm" onClick={handleEditClick}>
             <Pencil className="h-3 w-3" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={onDelete}>
+          <Button variant="ghost" size="sm" onClick={handleDeleteClick}>
             <Trash2 className="h-3 w-3 text-destructive" />
           </Button>
         </div>
@@ -848,20 +892,34 @@ interface DetailPanelProps {
   selectedCampus: EditableCampus | null
   selectedProgrammeType: string | null
   selectedFaculty: PreConfiguredFaculty | null
+  selectedCourseForApps: SelectedCourseForApplications | null
+  applications: Application[]
+  isLoadingApplications: boolean
+  applicationsError: string | null
   onUpdateCourse: (campusId: string, facultyCode: string, courseCode: string, updates: Partial<PreConfiguredCourse>) => void
   onDeleteCourse: (campusId: string, facultyCode: string, courseCode: string) => void
   onAddCourse: (campusId: string, facultyCode: string) => void
   onOpenEditCourseModal: (campusId: string, facultyCode: string, course: PreConfiguredCourse) => void
+  onViewCourseApplications: (course: PreConfiguredCourse, courseDbId?: string) => void
+  onBackToCoursesFromApps: () => void
+  onViewApplicationDetail: (application: Application) => void
 }
 
 function DetailPanel({
   selectedCampus,
   selectedProgrammeType: _selectedProgrammeType,
   selectedFaculty,
+  selectedCourseForApps,
+  applications,
+  isLoadingApplications,
+  applicationsError,
   onUpdateCourse: _onUpdateCourse,
   onDeleteCourse,
   onAddCourse,
   onOpenEditCourseModal,
+  onViewCourseApplications,
+  onBackToCoursesFromApps,
+  onViewApplicationDetail,
 }: DetailPanelProps) {
   if (!selectedFaculty || !selectedCampus) {
     return (
@@ -870,11 +928,11 @@ function DetailPanel({
           <div className="mb-4">
             <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/50" aria-hidden="true" />
           </div>
-          <p className="text-sm">
+          <p className="text-sm -translate-y-1">
             <span className="text-traffic-green">//</span>
             <span className="text-muted-foreground"> No faculty selected</span>
           </p>
-          <p className="text-xs mt-1 text-muted-foreground">
+          <p className="text-xs mt-1 text-muted-foreground translate-y-1">
             $ select a faculty from the tree to view and edit courses
           </p>
         </div>
@@ -882,6 +940,59 @@ function DetailPanel({
     )
   }
 
+  // Applications view
+  if (selectedCourseForApps) {
+    if (isLoadingApplications) {
+      return (
+        <div className="h-full flex items-center justify-center">
+          <div className="font-mono text-sm text-muted-foreground">
+            <span className="text-traffic-green">$</span> fetching applications...
+          </div>
+        </div>
+      )
+    }
+
+    if (applicationsError) {
+      return (
+        <div className="h-full flex items-center justify-center p-8">
+          <div className="text-center font-mono text-sm">
+            <p className="text-traffic-red">// Error</p>
+            <p className="text-muted-foreground">{applicationsError}</p>
+            <Button variant="ghost" size="sm" onClick={onBackToCoursesFromApps} className="mt-4">
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Back to Courses
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
+    if (applications.length === 0) {
+      return (
+        <NoApplicationsEmptyState
+          courseName={selectedCourseForApps.courseName}
+          onBack={onBackToCoursesFromApps}
+        />
+      )
+    }
+
+    return (
+      <div className="h-full overflow-y-auto flex flex-col">
+        <div className="flex-1 p-4 grid grid-cols-3 gap-4">
+          {applications.map((application) => (
+            <ApplicationCard
+              key={application.id}
+              application={application}
+              onView={() => onViewApplicationDetail(application)}
+              onClick={() => onViewApplicationDetail(application)}
+            />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Courses view (default)
   return (
     <div className="h-full overflow-y-auto flex flex-col">
       {/* Courses List */}
@@ -898,6 +1009,7 @@ function DetailPanel({
               onDelete={() =>
                 onDeleteCourse(selectedCampus._id, selectedFaculty.code, course.code)
               }
+              onClick={() => onViewCourseApplications(course)}
             />
           ))}
         </div>
@@ -1574,6 +1686,16 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
     course: PreConfiguredCourse
   } | null>(null)
 
+  // Applications view state
+  const [selectedCourseForApps, setSelectedCourseForApps] = useState<SelectedCourseForApplications | null>(null)
+  const [applications, setApplications] = useState<Application[]>([])
+  const [isLoadingApplications, setIsLoadingApplications] = useState(false)
+  const [applicationsError, setApplicationsError] = useState<string | null>(null)
+
+  // Application detail modal state
+  const [isApplicationDetailModalOpen, setIsApplicationDetailModalOpen] = useState(false)
+  const [applicationDetailTarget, setApplicationDetailTarget] = useState<Application | null>(null)
+
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
     const initial = new Set<string>()
     editedCampuses.filter((c) => !c._isDeleted).forEach((campus) => {
@@ -1785,6 +1907,88 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
     [editCourseTarget, updateCourse, handleCloseEditCourseModal]
   )
 
+  // Applications view handlers
+  const handleViewCourseApplications = useCallback(
+    (course: PreConfiguredCourse, courseDbId: string | undefined) => {
+      if (!selectedCampus || !selectedFaculty) return
+
+      setSelectedCourseForApps({
+        courseCode: course.code,
+        courseName: course.name,
+        courseId: courseDbId || course.code, // Use DB ID if available, fallback to code
+        campusId: selectedCampus._id,
+        facultyCode: selectedFaculty.code,
+        facultyName: selectedFaculty.name,
+      })
+    },
+    [selectedCampus, selectedFaculty]
+  )
+
+  const handleBackToCoursesFromApps = useCallback(() => {
+    setSelectedCourseForApps(null)
+    setApplications([])
+    setApplicationsError(null)
+  }, [])
+
+  const handleViewApplicationDetail = useCallback((application: Application) => {
+    setApplicationDetailTarget(application)
+    setIsApplicationDetailModalOpen(true)
+  }, [])
+
+  const handleCloseApplicationDetailModal = useCallback(() => {
+    setIsApplicationDetailModalOpen(false)
+    setApplicationDetailTarget(null)
+  }, [])
+
+  // Fetch applications when a course is selected for viewing
+  useEffect(() => {
+    if (!selectedCourseForApps) {
+      return
+    }
+
+    const fetchApplications = async () => {
+      setIsLoadingApplications(true)
+      setApplicationsError(null)
+
+      try {
+        // Get institution ID from the store
+        const { institutionData } = useSetupStore.getState()
+        const institutionId = institutionData?.id
+
+        if (!institutionId) {
+          // If no institution ID, show empty state (no error)
+          setApplications([])
+          setIsLoadingApplications(false)
+          return
+        }
+
+        const response = await fetch(
+          `/api/institutions/${institutionId}/courses/${selectedCourseForApps.courseId}/applications`
+        )
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            // No applications found
+            setApplications([])
+          } else {
+            throw new Error('Failed to fetch applications')
+          }
+        } else {
+          const data = await response.json()
+          setApplications(data.applications || [])
+        }
+      } catch (error) {
+        console.error('Error fetching applications:', error)
+        setApplicationsError(error instanceof Error ? error.message : 'Failed to load applications')
+        setApplications([])
+      } finally {
+        setIsLoadingApplications(false)
+      }
+    }
+
+    fetchApplications()
+  }, [selectedCourseForApps])
+
   return (
     <div className={cn('flex flex-col h-[calc(100vh-76px)] max-h-[calc(100vh-76px)]', className)}>
       {/* Breadcrumb */}
@@ -1793,9 +1997,11 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
         selectedCampus={selectedCampus}
         selectedProgrammeType={selectedProgrammeType}
         selectedFaculty={selectedFaculty}
+        selectedCourse={selectedCourseForApps ? { code: selectedCourseForApps.courseCode, name: selectedCourseForApps.courseName } : null}
         onNavigateToRoot={handleNavigateToRoot}
         onNavigateToCampus={handleNavigateToCampus}
         onNavigateToProgrammeType={handleNavigateToProgrammeType}
+        onNavigateToFaculty={handleBackToCoursesFromApps}
         onAddCampus={handleAddCampus}
         onAddCourse={handleAddCourse}
         selectedCampusId={selectedCampus?._id}
@@ -1838,10 +2044,17 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
               selectedCampus={selectedCampus}
               selectedProgrammeType={selectedProgrammeType}
               selectedFaculty={selectedFaculty}
+              selectedCourseForApps={selectedCourseForApps}
+              applications={applications}
+              isLoadingApplications={isLoadingApplications}
+              applicationsError={applicationsError}
               onUpdateCourse={updateCourse}
               onDeleteCourse={deleteCourse}
               onAddCourse={handleAddCourse}
               onOpenEditCourseModal={handleOpenEditCourseModal}
+              onViewCourseApplications={handleViewCourseApplications}
+              onBackToCoursesFromApps={handleBackToCoursesFromApps}
+              onViewApplicationDetail={handleViewApplicationDetail}
             />
           )}
         </div>
@@ -1909,6 +2122,13 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
         } : null}
         onSave={handleSaveEditedCourse}
         useApi={false}
+      />
+
+      {/* Application Detail Modal */}
+      <ApplicationDetailModal
+        application={applicationDetailTarget}
+        isOpen={isApplicationDetailModalOpen}
+        onClose={handleCloseApplicationDetailModal}
       />
     </div>
   )

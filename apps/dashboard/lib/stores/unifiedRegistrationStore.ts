@@ -156,6 +156,9 @@ interface UnifiedRegistrationActions {
 
   // Reset
   reset: () => void
+
+  // Clear storage (for logout/auth change)
+  clearStorage: () => void
 }
 
 // ============================================================================
@@ -792,6 +795,15 @@ export const useUnifiedRegistrationStore = create<
         // -----------------------------------------------------------------------
 
         reset: () => set(initialState),
+
+        clearStorage: () => {
+          // Reset in-memory state
+          set(initialState)
+          // Clear localStorage
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('unified-registration-storage')
+          }
+        },
       }),
       {
         name: 'unified-registration-storage',

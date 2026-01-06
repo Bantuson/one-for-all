@@ -31,6 +31,7 @@ export function AuthStep() {
   const [isLoading, setIsLoading] = useState(false)
   const [hasAutoVerified, setHasAutoVerified] = useState(false)
   const [checkingInstitutions, setCheckingInstitutions] = useState(false)
+  const [isAutoProceeding, setIsAutoProceeding] = useState(false)
 
   // Store actions
   const { nextStep, setClerkUserId } = useUnifiedRegistrationStore()
@@ -353,10 +354,15 @@ export function AuthStep() {
   // Auto-proceed for already signed-in users (after brief UI display)
   useEffect(() => {
     if (isSignedIn && user?.id && isLoaded) {
+      // Show visual indicator that we're about to proceed
+      setIsAutoProceeding(true)
       const timer = setTimeout(() => {
         handleContinue()
       }, 1500)
-      return () => clearTimeout(timer)
+      return () => {
+        clearTimeout(timer)
+        setIsAutoProceeding(false)
+      }
     }
     return undefined
   }, [isSignedIn, user?.id, isLoaded])
@@ -391,9 +397,18 @@ export function AuthStep() {
           <p className="text-sm text-muted-foreground mb-1">
             <span className="text-traffic-green">//</span> Welcome back, {user.firstName || user.emailAddresses[0]?.emailAddress}
           </p>
-          <p className="text-sm text-muted-foreground">
-            <span className="text-traffic-green">//</span> Click continue to proceed
-          </p>
+          {isAutoProceeding ? (
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-traffic-green" />
+              <p className="text-sm text-traffic-green">
+                Redirecting to dashboard...
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              <span className="text-traffic-green">//</span> Click continue to proceed
+            </p>
+          )}
         </div>
       </div>
     )

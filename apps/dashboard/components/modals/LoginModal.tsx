@@ -1,6 +1,6 @@
 'use client'
 
-import { Dialog, DialogContent } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogTitle, DialogDescription, VisuallyHidden } from '@/components/ui/Dialog'
 import { ModalHeader } from '@/components/ui/ModalHeader'
 import { SignIn } from '@clerk/nextjs'
 import { Suspense } from 'react'
@@ -30,6 +30,10 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
         className="max-w-md p-0 bg-card bg-[radial-gradient(rgba(255,255,255,0.08)_1.4px,transparent_1.4px)] dark:bg-[radial-gradient(rgba(255,255,255,0.15)_1.4px,transparent_1.4px)] bg-[length:32px_32px]"
         hideCloseButton
       >
+        <VisuallyHidden>
+          <DialogTitle>Welcome Back</DialogTitle>
+          <DialogDescription>Sign in to your account</DialogDescription>
+        </VisuallyHidden>
         <ModalHeader title="Welcome Back" onClose={() => onOpenChange(false)} />
 
         <div className="px-6 py-6">
