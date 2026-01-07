@@ -1,12 +1,12 @@
 account_creation_task:
   description: >
-    Collect username, email, and cellphone number from the user.
-    Ask which verification method they prefer (email or SMS).
-    Your final answer MUST include:
-    1. username
-    2. email
-    3. cellphone
-    4. chosen_otp_method
+    Use provided profile data for account creation:
+    - Full Name: {full_name}
+    - Email: {email}
+    - Mobile: {mobile_number}
+    - WhatsApp: {whatsapp_number}
+    Verify information is correct. Select OTP method (WhatsApp preferred).
+    Your final answer MUST include: username, email, cellphone, chosen_otp_method.
   expected_output: >
     A structured JSON object with user credentials ready for OTP sending.
   agent: identity_auth_agent
@@ -24,36 +24,40 @@ otp_verification_task:
 
 collect_personal_info_task:
   description: >
-    Collect SA-compliant personal information:
-    - Full Name
-    - South African ID or Passport
-    - Date of Birth
-    - Gender
-    - Citizenship (SA/SADC/International)
-    - Home Address
-    - Email + Cellphone
-    Your final answer MUST return a structured JSON object.
+    Use provided profile data for personal information:
+    - Full Name: {full_name}
+    - SA ID Number: {id_number}
+    - Date of Birth: {date_of_birth}
+    - Gender: {gender}
+    - Citizenship: {citizenship}
+    - Home Address: {physical_address}
+    - Email: {email}
+    - Cellphone: {mobile_number}
+    - Province: {province}
+    - Home Language: {home_language}
+    Confirm all data is correct. Your final answer MUST be a structured JSON.
   expected_output: >
     SA-standardised applicant personal information.
   agent: application_intake_agent
 
 collect_academic_info_task:
   description: >
-    Collect academic background:
-    - Matric/NSC subjects & percentages
-    - Highest qualification (if applicable)
-    - Previous institution details
-    Your final answer MUST be a JSON object that matches SA university requirements.
+    Use provided academic data from profile:
+    - Matric Results: {matric_results}
+    - Total APS Score: {total_aps_score}
+    - Academic Highlights: {academic_highlights}
+    Confirm data is correct. Your final answer MUST be a JSON matching SA requirements.
   expected_output: >
-    Detailed SA academic history JSON.
+    Detailed SA academic history JSON with APS score.
   agent: application_intake_agent
 
 collect_documents_task:
   description: >
-    Request SA-required documents (ID, matric/NSC, transcript, residence, payment).
-    Accept "I'll provide later" for any document - mark as "pending" in status.
+    Use provided document status from profile:
+    - Available: {documents_available}
+    - Missing: {documents_missing}
+    Mark available documents as "uploaded", missing as "pending".
     Do NOT block workflow for missing documents.
-    Track each document status in documents_status JSONB field.
     Your final answer MUST include document metadata with status per document.
   expected_output: >
     Document metadata JSON with status field per document (uploaded/pending).
@@ -64,13 +68,11 @@ collect_documents_task:
 
 program_selection_task:
   description: >
-    Ask user to choose universities to apply to. For each university, collect:
-    - University name, Faculty, Qualification type (Undergrad/Postgrad)
-    - FIRST CHOICE course (required)
-    - SECOND CHOICE course (optional backup)
-    - Year of application
-    Query available courses to verify selections exist. Ensure course level
-    matches applicant level (undergrad/postgrad).
+    Use provided course selections from profile:
+    - Course Choices: {course_choices}
+    - Primary Institution: {primary_institution}
+    The course_choices array contains first and second choice with priority.
+    Verify selections align with APS score ({total_aps_score}).
     Your final answer MUST include first_choice and second_choice per university.
   expected_output: >
     JSON list of universities with first_choice and second_choice course details.
@@ -123,8 +125,11 @@ application_submission_task:
 
 ask_if_apply_for_nsfas_task:
   description: >
-    Check if applicant selected Postgrad - if so, skip NSFAS (return NO_NSFAS).
-    For Undergrad only: ask if they want NSFAS funding.
+    Check profile for NSFAS eligibility:
+    - NSFAS Eligible: {nsfas_eligible}
+    - Household Income: {household_income}
+    - SASSA Recipient: {sassa_recipient}
+    If eligible and undergrad, return YES_NSFAS. If postgrad, return NO_NSFAS.
     Your final answer MUST be: "YES_NSFAS" or "NO_NSFAS"
   expected_output: >
     YES_NSFAS or NO_NSFAS
@@ -134,12 +139,13 @@ ask_if_apply_for_nsfas_task:
 
 nsfas_collection_task:
   description: >
-    Reuse verified data from prior tasks: personal info, academic records,
-    ID documents, address. Only collect NSFAS-specific fields:
-    - Guardian details (names, ID, contact)
-    - Household composition and income proof
-    - NSFAS consent form, bank details, living situation
-    Store documents via supabase_nsfas_documents_store.
+    Use profile data for NSFAS application:
+    - Guardian Employment: {guardian_employment}
+    - Household Income: {household_income}
+    - SASSA Recipient: {sassa_recipient}
+    - Disability Grant: {disability_grant}
+    Reuse personal info, academic records from prior tasks.
+    Compile NSFAS-specific fields. Store via supabase_nsfas_documents_store.
     Your final answer MUST be complete NSFAS application JSON.
   expected_output: >
     NSFAS application JSON with reused and new data combined.
@@ -160,7 +166,7 @@ nsfas_submission_task:
   context:
     - nsfas_collection_task
 
-univeristy_status_check_task:
+university_status_check_task:
   description: >
     Retrieve status updates for university applications using
     application_status_tool.

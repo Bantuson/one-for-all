@@ -1,6 +1,64 @@
+import logging
 import yaml
 from pathlib import Path
 from crewai import Crew, Process, Agent, Task
+
+# Import all tools from the tools module
+from one_for_all.tools import (
+    # OTP & Messaging Tools
+    sendgrid_otp_sender,
+    sms_otp_sender,
+    send_whatsapp_message,
+    # Student Number Tools
+    generate_student_number,
+    # Deprecated Supabase Tools (still used in agents.yaml)
+    supabase_user_store,
+    supabase_user_lookup,
+    supabase_session_lookup,
+    supabase_session_create,
+    supabase_session_extend,
+    supabase_application_store,
+    supabase_rag_store,
+    supabase_rag_query,
+    supabase_nsfas_store,
+    supabase_nsfas_documents_store,
+    # External Submission Tools
+    website_search_tool,
+    application_submission_tool,
+    application_status_tool,
+    nsfas_application_submission_tool,
+    nsfas_status_tool,
+)
+
+logger = logging.getLogger(__name__)
+
+# Tool registry mapping tool names (strings) to actual tool instances
+TOOL_REGISTRY = {
+    # OTP & Messaging Tools
+    "sendgrid_otp_sender": sendgrid_otp_sender,
+    "sms_otp_sender": sms_otp_sender,
+    "send_whatsapp_message": send_whatsapp_message,
+    # Student Number Tools
+    "generate_student_number": generate_student_number,
+    # Deprecated Supabase Tools (still referenced in agents.yaml)
+    "supabase_user_store": supabase_user_store,
+    "supabase_user_lookup": supabase_user_lookup,
+    "supabase_session_lookup": supabase_session_lookup,
+    "supabase_session_create": supabase_session_create,
+    "supabase_session_extend": supabase_session_extend,
+    "supabase_application_store": supabase_application_store,
+    "supabase_rag_store": supabase_rag_store,
+    "supabase_rag_query": supabase_rag_query,
+    "supabase_nsfas_store": supabase_nsfas_store,
+    "supabase_nsfas_documents_store": supabase_nsfas_documents_store,
+    # External Submission & Search Tools
+    "website_search_tool": website_search_tool,
+    "application_submission_tool": application_submission_tool,
+    "application_status_tool": application_status_tool,
+    "nsfas_application_submission_tool": nsfas_application_submission_tool,
+    "nsfas_status_tool": nsfas_status_tool,
+}
+
 
 class OneForAllCrew:
     def __init__(self):
@@ -20,17 +78,46 @@ class OneForAllCrew:
         self.agents = self._load_agents(self.agent_configs)
         self.tasks = self._load_tasks(self.task_configs)
 
+    def _resolve_tools(self, tool_names: list) -> list:
+        """Resolve tool names (strings) to actual tool instances.
+
+        Args:
+            tool_names: List of tool name strings from YAML config
+
+        Returns:
+            List of actual tool instances (BaseTool objects)
+        """
+        resolved_tools = []
+        for tool_name in tool_names:
+            if tool_name in TOOL_REGISTRY:
+                resolved_tools.append(TOOL_REGISTRY[tool_name])
+            else:
+                logger.warning(
+                    f"Tool '{tool_name}' not found in TOOL_REGISTRY. "
+                    f"Available tools: {list(TOOL_REGISTRY.keys())}"
+                )
+        return resolved_tools
+
     def _load_agents(self, configs: dict):
         """Create Agent objects from YAML config."""
         agents = {}
         for name, cfg in configs.items():
+            # Resolve tool names to actual tool instances
+            tool_names = cfg.get("tools", [])
+            resolved_tools = self._resolve_tools(tool_names)
+
             agents[name] = Agent(
                 role=cfg.get("role"),
                 goal=cfg.get("goal"),
                 backstory=cfg.get("backstory"),
                 llm=cfg.get("llm", "gpt-3.5-turbo"),
                 memory=cfg.get("memory", False),
-                tools=cfg.get("tools", []),
+                tools=resolved_tools,
+            )
+
+            logger.debug(
+                f"Loaded agent '{name}' with {len(resolved_tools)} tools: "
+                f"{[t.name if hasattr(t, 'name') else str(t) for t in resolved_tools]}"
             )
         return agents
 

@@ -2,7 +2,7 @@
 One For All - CrewAI Tools
 
 This module exports all custom tools for CrewAI agents.
-Uses lazy imports to avoid loading all tools at module import time.
+Uses direct imports to ensure tool functions (not modules) are exported.
 
 IMPORTANT: New tools use API wrappers instead of direct Supabase access.
 Old supabase_* tools are deprecated and will be removed in a future version.
@@ -14,14 +14,57 @@ Prefer using the new API-based tools:
 - create_nsfas_application (replaces supabase_nsfas_*)
 """
 
-# Scanner Tools are imported eagerly as they're most commonly used
-from .html_parser_tool import html_parser_tool
-from .content_classifier_tool import content_classifier_tool, extract_academic_entities
-from .data_normalizer_tool import data_normalizer_tool
+# =============================================================================
+# OTP & MESSAGING TOOLS
+# =============================================================================
+from .sendgrid_otp_sender import sendgrid_otp_sender
+from .sms_otp_sender import sms_otp_sender
+
+# WhatsApp Tools
+from .whatsapp_handler import (
+    send_whatsapp_message,
+    send_whatsapp_otp,
+    log_whatsapp_interaction,
+    send_whatsapp_template,
+)
+
+# =============================================================================
+# STUDENT NUMBER TOOLS
+# =============================================================================
+from .student_number_tool import (
+    generate_student_number,
+    get_applicant_student_numbers,
+    validate_student_number,
+    assign_student_number_manually,
+)
+
+# =============================================================================
+# EXTERNAL SUBMISSION TOOLS (No database access)
+# =============================================================================
+from .application_submission_tool import application_submission_tool
+from .application_status_tool import application_status_tool
+from .nsfas_application_submission_tool import nsfas_application_submission_tool
+from .nsfas_status_tool import nsfas_status_tool
+from .website_search_tool import website_search_tool
+
+# =============================================================================
+# DEPRECATED: Direct Supabase Tools (kept for backwards compatibility)
+# These will be removed in a future version. Use API-based tools instead.
+# =============================================================================
+from .supabase_user_store import supabase_user_store
+from .supabase_user_lookup import supabase_user_lookup
+from .supabase_session_lookup import supabase_session_lookup
+from .supabase_session_create import supabase_session_create
+from .supabase_session_extend import supabase_session_extend
+from .supabase_application_store import supabase_application_store
+from .supabase_rag_store import supabase_rag_store
+from .supabase_rag_query import supabase_rag_query
+from .supabase_nsfas_store import supabase_nsfas_store
+from .supabase_nsfas_documents_store import supabase_nsfas_documents_store
 
 
 def __getattr__(name):
-    """Lazy import for other tools to avoid loading all tools at once."""
+    """Lazy import for API-based tools to avoid loading all tools at once."""
 
     # =========================================================================
     # NEW API-BASED TOOLS (Preferred - use these instead of direct Supabase)
@@ -97,160 +140,6 @@ def __getattr__(name):
         from .nsfas_tools import list_nsfas_documents
         return list_nsfas_documents
 
-    # =========================================================================
-    # OTP & MESSAGING TOOLS (Still direct - no database access)
-    # =========================================================================
-    if name == "sendgrid_otp_sender":
-        from .sendgrid_otp_sender import sendgrid_otp_sender
-        return sendgrid_otp_sender
-    if name == "sms_otp_sender":
-        from .sms_otp_sender import sms_otp_sender
-        return sms_otp_sender
-
-    # WhatsApp Tools
-    if name == "send_whatsapp_message":
-        from .whatsapp_handler import send_whatsapp_message
-        return send_whatsapp_message
-    if name == "send_whatsapp_otp":
-        from .whatsapp_handler import send_whatsapp_otp
-        return send_whatsapp_otp
-    if name == "log_whatsapp_interaction":
-        from .whatsapp_handler import log_whatsapp_interaction
-        return log_whatsapp_interaction
-    if name == "send_whatsapp_template":
-        from .whatsapp_handler import send_whatsapp_template
-        return send_whatsapp_template
-
-    # =========================================================================
-    # STUDENT NUMBER TOOLS
-    # =========================================================================
-    if name == "generate_student_number":
-        from .student_number_tool import generate_student_number
-        return generate_student_number
-    if name == "get_applicant_student_numbers":
-        from .student_number_tool import get_applicant_student_numbers
-        return get_applicant_student_numbers
-    if name == "validate_student_number":
-        from .student_number_tool import validate_student_number
-        return validate_student_number
-    if name == "assign_student_number_manually":
-        from .student_number_tool import assign_student_number_manually
-        return assign_student_number_manually
-
-    # =========================================================================
-    # EXTERNAL SUBMISSION TOOLS (Still direct - no database access)
-    # =========================================================================
-    if name == "application_submission_tool":
-        from .application_submission_tool import application_submission_tool
-        return application_submission_tool
-    if name == "application_status_tool":
-        from .application_status_tool import application_status_tool
-        return application_status_tool
-    if name == "nsfas_application_submission_tool":
-        from .nsfas_application_submission_tool import nsfas_application_submission_tool
-        return nsfas_application_submission_tool
-    if name == "nsfas_status_tool":
-        from .nsfas_status_tool import nsfas_status_tool
-        return nsfas_status_tool
-    if name == "website_search_tool":
-        from .website_search_tool import website_search_tool
-        return website_search_tool
-
-    # =========================================================================
-    # DEPRECATED: Direct Supabase Tools (kept for backwards compatibility)
-    # These will be removed in a future version. Use API-based tools instead.
-    # =========================================================================
-    if name == "supabase_user_store":
-        import warnings
-        warnings.warn(
-            "supabase_user_store is deprecated. Use store_applicant instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from .supabase_user_store import supabase_user_store
-        return supabase_user_store
-    if name == "supabase_user_lookup":
-        import warnings
-        warnings.warn(
-            "supabase_user_lookup is deprecated. Use lookup_applicant instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from .supabase_user_lookup import supabase_user_lookup
-        return supabase_user_lookup
-    if name == "supabase_session_lookup":
-        import warnings
-        warnings.warn(
-            "supabase_session_lookup is deprecated. Use validate_session instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from .supabase_session_lookup import supabase_session_lookup
-        return supabase_session_lookup
-    if name == "supabase_session_create":
-        import warnings
-        warnings.warn(
-            "supabase_session_create is deprecated. Use create_session instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from .supabase_session_create import supabase_session_create
-        return supabase_session_create
-    if name == "supabase_session_extend":
-        import warnings
-        warnings.warn(
-            "supabase_session_extend is deprecated. Use extend_session instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from .supabase_session_extend import supabase_session_extend
-        return supabase_session_extend
-    if name == "supabase_application_store":
-        import warnings
-        warnings.warn(
-            "supabase_application_store is deprecated. Use create_application instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from .supabase_application_store import supabase_application_store
-        return supabase_application_store
-    if name == "supabase_rag_store":
-        import warnings
-        warnings.warn(
-            "supabase_rag_store is deprecated. Use store_rag_embedding instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from .supabase_rag_store import supabase_rag_store
-        return supabase_rag_store
-    if name == "supabase_rag_query":
-        import warnings
-        warnings.warn(
-            "supabase_rag_query is deprecated. Use query_rag instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from .supabase_rag_query import supabase_rag_query
-        return supabase_rag_query
-    if name == "supabase_nsfas_store":
-        import warnings
-        warnings.warn(
-            "supabase_nsfas_store is deprecated. Use create_nsfas_application instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from .supabase_nsfas_store import supabase_nsfas_store
-        return supabase_nsfas_store
-    if name == "supabase_nsfas_documents_store":
-        import warnings
-        warnings.warn(
-            "supabase_nsfas_documents_store is deprecated. Use add_nsfas_document instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from .supabase_nsfas_documents_store import supabase_nsfas_documents_store
-        return supabase_nsfas_documents_store
-
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -308,13 +197,6 @@ __all__ = [
     "nsfas_application_submission_tool",
     "nsfas_status_tool",
     "website_search_tool",
-    # =========================================================================
-    # SCANNER TOOLS
-    # =========================================================================
-    "html_parser_tool",
-    "content_classifier_tool",
-    "extract_academic_entities",
-    "data_normalizer_tool",
     # =========================================================================
     # DEPRECATED (kept for backwards compatibility)
     # =========================================================================
