@@ -98,7 +98,7 @@ def __getattr__(name):
         return list_nsfas_documents
 
     # =========================================================================
-    # OTP TOOLS (Still direct - no database access)
+    # OTP & MESSAGING TOOLS (Still direct - no database access)
     # =========================================================================
     if name == "sendgrid_otp_sender":
         from .sendgrid_otp_sender import sendgrid_otp_sender
@@ -106,6 +106,36 @@ def __getattr__(name):
     if name == "sms_otp_sender":
         from .sms_otp_sender import sms_otp_sender
         return sms_otp_sender
+
+    # WhatsApp Tools
+    if name == "send_whatsapp_message":
+        from .whatsapp_handler import send_whatsapp_message
+        return send_whatsapp_message
+    if name == "send_whatsapp_otp":
+        from .whatsapp_handler import send_whatsapp_otp
+        return send_whatsapp_otp
+    if name == "log_whatsapp_interaction":
+        from .whatsapp_handler import log_whatsapp_interaction
+        return log_whatsapp_interaction
+    if name == "send_whatsapp_template":
+        from .whatsapp_handler import send_whatsapp_template
+        return send_whatsapp_template
+
+    # =========================================================================
+    # STUDENT NUMBER TOOLS
+    # =========================================================================
+    if name == "generate_student_number":
+        from .student_number_tool import generate_student_number
+        return generate_student_number
+    if name == "get_applicant_student_numbers":
+        from .student_number_tool import get_applicant_student_numbers
+        return get_applicant_student_numbers
+    if name == "validate_student_number":
+        from .student_number_tool import validate_student_number
+        return validate_student_number
+    if name == "assign_student_number_manually":
+        from .student_number_tool import assign_student_number_manually
+        return assign_student_number_manually
 
     # =========================================================================
     # EXTERNAL SUBMISSION TOOLS (Still direct - no database access)
@@ -254,10 +284,25 @@ __all__ = [
     "add_nsfas_document",
     "list_nsfas_documents",
     # =========================================================================
-    # OTP & EXTERNAL TOOLS (No database access)
+    # OTP & MESSAGING TOOLS (No database access)
     # =========================================================================
     "sendgrid_otp_sender",
     "sms_otp_sender",
+    # WhatsApp
+    "send_whatsapp_message",
+    "send_whatsapp_otp",
+    "log_whatsapp_interaction",
+    "send_whatsapp_template",
+    # =========================================================================
+    # STUDENT NUMBER TOOLS
+    # =========================================================================
+    "generate_student_number",
+    "get_applicant_student_numbers",
+    "validate_student_number",
+    "assign_student_number_manually",
+    # =========================================================================
+    # EXTERNAL SUBMISSION TOOLS (No database access)
+    # =========================================================================
     "application_submission_tool",
     "application_status_tool",
     "nsfas_application_submission_tool",

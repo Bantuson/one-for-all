@@ -50,118 +50,115 @@ collect_academic_info_task:
 
 collect_documents_task:
   description: >
-    Request all SA-required application documents:
-    - ID document
-    - Matric certificate / NSC results
-    - Academic transcript (if applicable)
-    - Proof of residence
-    - Proof of payment (application fee)
-    Store upload metadata using Supabase tools.
-    Your final answer MUST confirm all documents collected.
+    Request SA-required documents (ID, matric/NSC, transcript, residence, payment).
+    Accept "I'll provide later" for any document - mark as "pending" in status.
+    Do NOT block workflow for missing documents.
+    Track each document status in documents_status JSONB field.
+    Your final answer MUST include document metadata with status per document.
   expected_output: >
-    Document metadata JSON for all uploaded files.
+    Document metadata JSON with status field per document (uploaded/pending).
   agent: application_intake_agent
+  context:
+    - collect_personal_info_task
+    - collect_academic_info_task
 
 program_selection_task:
   description: >
-    Ask the user to choose one or more universities they want to apply to.
-    For each selected university, collect:
-    - University name
-    - Faculty
-    - Qualification type (Undergrad/Postgrad)
-    - Program
+    Ask user to choose universities to apply to. For each university, collect:
+    - University name, Faculty, Qualification type (Undergrad/Postgrad)
+    - FIRST CHOICE course (required)
+    - SECOND CHOICE course (optional backup)
     - Year of application
-    Your final answer MUST return a list of universities, each with its own
-    program selection details.
+    Query available courses to verify selections exist. Ensure course level
+    matches applicant level (undergrad/postgrad).
+    Your final answer MUST include first_choice and second_choice per university.
   expected_output: >
-    JSON list of selected universities with program metadata.
+    JSON list of universities with first_choice and second_choice course details.
   agent: application_intake_agent
+  context:
+    - collect_academic_info_task
 
 rag_research_task:
   description: >
-    For each university in the user's selection:
-      1. Query the Supabase vector store using supabase_rag_query.
-      2. If information exists, use it immediately.
-      3. If not, use WebsiteSearchTool to fetch missing data.
-      4. Embed and store newly gathered information using supabase_rag_store.
-    Your final answer MUST provide a combined summary for ALL universities.
+    For each university and course choice:
+      1. Query vector store for course requirements (APS, subjects).
+      2. If missing, scrape and store via supabase_rag_store.
+      3. Compare applicant APS to first-choice requirements.
+      4. If APS below threshold, suggest second-choice as alternative.
+    Your final answer MUST include requirements and APS assessment per choice.
   expected_output: >
-    Multi-university course information summary with citations.
+    Course requirements with APS eligibility assessment per first/second choice.
   agent: rag_specialist_agent
+  context:
+    - collect_academic_info_task
+    - program_selection_task
 
 application_compilation_task:
   description: >
-    Compile:
-    - personal info
-    - academic info
-    - documents
-    - program selection
-    - university selection
-    - RAG-enhanced requirements
-    Validate everything and prepare final submission JSON.
-    Your final answer MUST be a single validated application payload.
+    Compile per university: personal info, academic info, documents (with status),
+    first_choice course, second_choice course, RAG requirements.
+    Validate all fields and prepare submission payload with choices prioritised.
+    Your final answer MUST be a validated payload per university.
   expected_output: >
-    Full validated SA university application JSON.
+    Validated application JSON per university with first/second choice courses.
   agent: submission_agent
+  context:
+    - collect_personal_info_task
+    - collect_academic_info_task
+    - collect_documents_task
+    - program_selection_task
+    - rag_research_task
 
 application_submission_task:
   description: >
-    Submit the compiled student application to ALL selected universities.
-    For each university:
-      - generate a validated application payload
-      - submit it using application_submission_tool
-    Your final answer MUST include:
-      - list of universities submitted to
-      - their application_ids
-      - statuses
+    Submit to ALL selected universities using application_submission_tool.
+    Per university: submit first_choice as primary, second_choice as backup.
+    Your final answer MUST include: university, application_id, status,
+    first_choice_status, second_choice_status.
   expected_output: >
-    JSON list of submissions for all universities.
+    JSON list with submission status per university and course choice.
   agent: submission_agent
+  context:
+    - application_compilation_task
 
 ask_if_apply_for_nsfas_task:
   description: >
-    Ask the user whether they would like to apply for NSFAS funding in addition
-    to their university applications. If yes, proceed with the NSFAS workflow.
-    Your final answer MUST be:
-      - "YES_NSFAS"
-      - "NO_NSFAS"
+    Check if applicant selected Postgrad - if so, skip NSFAS (return NO_NSFAS).
+    For Undergrad only: ask if they want NSFAS funding.
+    Your final answer MUST be: "YES_NSFAS" or "NO_NSFAS"
   expected_output: >
     YES_NSFAS or NO_NSFAS
   agent: application_intake_agent
+  context:
+    - program_selection_task
 
 nsfas_collection_task:
   description: >
-    Collect all NSFAS-required information while reusing the applicant’s
-    verified personal details, academic records, household address,
-    identification documents, and any overlapping university application info.
-    
-    Additional NSFAS-specific information that must be collected:
-      - Parent/guardian full names, ID numbers, contact details
-      - Household composition (members, relationship, age)
-      - Income per household member with proof document metadata
-      - NSFAS consent form upload
-      - Bank account details (for allowances)
-      - Living situation (home, university residence, private)
-    
-    For each NSFAS document uploaded, store metadata using
-    supabase_nsfas_documents_store.
-    
-    Your final answer MUST be a complete and valid NSFAS funding application
-    JSON suitable for backend submission.
+    Reuse verified data from prior tasks: personal info, academic records,
+    ID documents, address. Only collect NSFAS-specific fields:
+    - Guardian details (names, ID, contact)
+    - Household composition and income proof
+    - NSFAS consent form, bank details, living situation
+    Store documents via supabase_nsfas_documents_store.
+    Your final answer MUST be complete NSFAS application JSON.
   expected_output: >
-    Fully structured NSFAS application JSON.
+    NSFAS application JSON with reused and new data combined.
   agent: nsfas_agent
+  context:
+    - collect_personal_info_task
+    - collect_academic_info_task
+    - collect_documents_task
 
 nsfas_submission_task:
   description: >
-    Submit the completed NSFAS application payload to the backend API using
-    nsfas_application_submission_tool. Capture and return:
-      - nsfas_application_id
-      - submission status or confirmation message
-    Store the resulting application metadata in Supabase where applicable.
+    Submit NSFAS application via nsfas_application_submission_tool.
+    Return: nsfas_application_id and submission status.
+    Store application metadata in Supabase.
   expected_output: >
-    NSFAS submission confirmation including nsfas_application_id.
+    NSFAS submission confirmation with nsfas_application_id.
   agent: nsfas_agent
+  context:
+    - nsfas_collection_task
 
 univeristy_status_check_task:
   description: >
