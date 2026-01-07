@@ -173,8 +173,15 @@ ask_if_apply_for_nsfas_task:
     - NSFAS Eligible: {nsfas_eligible}
     - Household Income: {household_income}
     - SASSA Recipient: {sassa_recipient}
-    If eligible and undergrad, return YES_NSFAS. If postgrad, return NO_NSFAS.
-    Your final answer MUST be: "YES_NSFAS" or "NO_NSFAS"
+
+    DECISION LOGIC (check in order):
+    1. If nsfas_eligible is FALSE or "No" → return NO_NSFAS (income too high)
+    2. If postgrad programme → return NO_NSFAS (NSFAS is for undergrad only)
+    3. If nsfas_eligible is TRUE and undergrad → return YES_NSFAS
+
+    CRITICAL: High-income applicants (nsfas_eligible=false) must NOT apply for NSFAS.
+
+    Your final answer MUST be exactly: "YES_NSFAS" or "NO_NSFAS"
   expected_output: >
     YES_NSFAS or NO_NSFAS
   agent: application_intake_agent
@@ -183,29 +190,48 @@ ask_if_apply_for_nsfas_task:
 
 nsfas_collection_task:
   description: >
-    Use profile data for NSFAS application:
-    - Guardian Employment: {guardian_employment}
-    - Household Income: {household_income}
-    - SASSA Recipient: {sassa_recipient}
-    - Disability Grant: {disability_grant}
-    Reuse personal info, academic records from prior tasks.
-    Compile NSFAS-specific fields. Store via supabase_nsfas_documents_store.
-    Your final answer MUST be complete NSFAS application JSON.
+    FIRST: Check the ask_if_apply_for_nsfas_task result in your context.
+
+    IF the result was "NO_NSFAS":
+      - Do NOT collect any NSFAS data
+      - Do NOT call any tools
+      - Return exactly: {"nsfas_skipped": true, "reason": "Applicant not eligible for NSFAS"}
+
+    IF the result was "YES_NSFAS":
+      Use profile data for NSFAS application:
+      - Guardian Employment: {guardian_employment}
+      - Household Income: {household_income}
+      - SASSA Recipient: {sassa_recipient}
+      - Disability Grant: {disability_grant}
+      Reuse personal info, academic records from prior tasks.
+      Compile NSFAS-specific fields. Store via supabase_nsfas_documents_store.
+      Your final answer MUST be complete NSFAS application JSON.
   expected_output: >
-    NSFAS application JSON with reused and new data combined.
+    NSFAS application JSON with reused and new data combined, OR
+    {"nsfas_skipped": true, "reason": "..."} if applicant not eligible.
   agent: nsfas_agent
   context:
+    - ask_if_apply_for_nsfas_task
     - collect_personal_info_task
     - collect_academic_info_task
     - collect_documents_task
 
 nsfas_submission_task:
   description: >
-    Submit NSFAS application via nsfas_application_submission_tool.
-    Return: nsfas_application_id and submission status.
-    Store application metadata in Supabase.
+    FIRST: Check the nsfas_collection_task result in your context.
+
+    IF the result contains "nsfas_skipped": true:
+      - Do NOT submit any NSFAS application
+      - Do NOT call any tools
+      - Return exactly: {"nsfas_skipped": true, "reason": "Applicant not eligible for NSFAS - no submission required"}
+
+    IF valid NSFAS application data exists:
+      Submit NSFAS application via nsfas_application_submission_tool.
+      Return: nsfas_application_id and submission status.
+      Store application metadata in Supabase.
   expected_output: >
-    NSFAS submission confirmation with nsfas_application_id.
+    NSFAS submission confirmation with nsfas_application_id, OR
+    {"nsfas_skipped": true, "reason": "..."} if applicant not eligible.
   agent: nsfas_agent
   context:
     - nsfas_collection_task
@@ -221,11 +247,20 @@ university_status_check_task:
 
 nsfas_status_check_task:
   description: >
-    Retrieve the latest NSFAS application status using nsfas_status_tool.
-    Your final answer MUST summarise:
-      - current NSFAS status
-      - any outstanding requirements
-      - next steps for the student
+    FIRST: Check the nsfas_submission_task result in your context.
+
+    IF the result contains "nsfas_skipped": true:
+      - Do NOT check any NSFAS status
+      - Return exactly: "NSFAS application was not submitted - applicant not eligible for NSFAS funding due to household income exceeding threshold."
+
+    IF NSFAS application was submitted:
+      Retrieve the latest NSFAS application status using nsfas_status_tool.
+      Your final answer MUST summarise:
+        - current NSFAS status
+        - any outstanding requirements
+        - next steps for the student
   expected_output: >
-    Latest NSFAS status summary.
+    Latest NSFAS status summary, OR skip message if applicant not eligible.
   agent: nsfas_agent
+  context:
+    - nsfas_submission_task
