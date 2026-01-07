@@ -58,7 +58,7 @@
 | **Institution** | University of the Witwatersrand |
 | **Faculty** | Health Sciences |
 | **Programme** | MBBCh (Medicine) |
-| **Minimum APS** | 42 (or equivalent) |
+| **Minimum APS** | 42 |
 | **Specific Requirements** | Maths, Physical Sciences, Life Sciences 70%+ |
 
 ### Second Choice
