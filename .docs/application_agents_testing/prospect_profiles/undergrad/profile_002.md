@@ -68,6 +68,15 @@
 | **Minimum APS** | 28 |
 | **Specific Requirements** | English 50%+ |
 
+### Third Choice (Fallback when first choice rejected)
+| Field | Value |
+|-------|-------|
+| **Institution** | University of KwaZulu-Natal |
+| **Faculty** | Management Studies |
+| **Programme** | BCom (Economics) |
+| **Minimum APS** | 28 |
+| **Specific Requirements** | English 50%+ |
+
 ---
 
 ## Financial Information

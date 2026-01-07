@@ -65,6 +65,7 @@ class ProspectProfile:
     # Application Preferences
     first_choice: Optional[CourseChoice] = None
     second_choice: Optional[CourseChoice] = None
+    third_choice: Optional[CourseChoice] = None  # Fallback when first rejected
 
     # Financial Information
     nsfas_eligible: bool = False
@@ -208,6 +209,11 @@ class ProfileParser:
             sections.get("Application Preferences", ""),
             "Second Choice"
         )
+        # Parse Third Choice (fallback when first choice rejected)
+        third_choice = self._parse_course_choice(
+            sections.get("Application Preferences", ""),
+            "Third Choice"
+        )
 
         # Parse Financial Information
         financial = self._parse_table_to_dict(
@@ -249,6 +255,7 @@ class ProfileParser:
             academic_highlights=highlights,
             first_choice=first_choice,
             second_choice=second_choice,
+            third_choice=third_choice,
             nsfas_eligible=self._parse_bool(financial.get("NSFAS Eligible", "No")),
             household_income=financial.get("Household Income"),
             sassa_grant_recipient=self._parse_bool(
@@ -337,7 +344,8 @@ class ProfileParser:
         """Parse a course choice section."""
 
         # Find the specific choice section
-        pattern = rf"### {choice_type}\s*\n(.*?)(?=###|\Z)"
+        # Pattern handles headers with optional parenthetical text like "### Third Choice (Fallback...)"
+        pattern = rf"### {choice_type}[^\n]*\n(.*?)(?=###|\Z)"
         match = re.search(pattern, content, re.DOTALL)
 
         if not match:
@@ -477,6 +485,16 @@ class ProfileParser:
                 "programme": profile.second_choice.programme,
                 "minimum_aps": profile.second_choice.minimum_aps,
                 "requirements": profile.second_choice.specific_requirements,
+            })
+        if profile.third_choice:
+            course_choices.append({
+                "priority": 3,
+                "institution": profile.third_choice.institution,
+                "faculty": profile.third_choice.faculty,
+                "programme": profile.third_choice.programme,
+                "minimum_aps": profile.third_choice.minimum_aps,
+                "requirements": profile.third_choice.specific_requirements,
+                "fallback": True,  # Mark as fallback for when first choice rejected
             })
 
         return {

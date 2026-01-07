@@ -82,14 +82,41 @@ program_selection_task:
 
 rag_research_task:
   description: >
-    For each university and course choice:
-      1. Query vector store for course requirements (APS, subjects).
-      2. If missing, scrape and store via supabase_rag_store.
-      3. Compare applicant APS to first-choice requirements.
-      4. If APS below threshold, suggest second-choice as alternative.
-    Your final answer MUST include requirements and APS assessment per choice.
+    Evaluate eligibility for each course choice using profile data:
+    - APS Score: {total_aps_score}
+    - Matric Results: {matric_results}
+    - Course Choices: {course_choices}
+
+    The course_choices array may contain up to 3 choices:
+    - Priority 1: First choice (original)
+    - Priority 2: Second choice (original)
+    - Priority 3: Fallback choice (use when first rejected)
+
+    For EACH course choice:
+    1. Check APS score against minimum requirement
+    2. Check SUBJECT requirements (CRITICAL: Maths Literacy is NOT accepted for
+       programmes requiring "Maths" - only pure Mathematics qualifies)
+    3. Check language/other specific requirements
+
+    ELIGIBILITY SCENARIOS:
+    A) If FIRST-CHOICE ELIGIBLE: Use first + second as final choices
+    B) If FIRST-CHOICE INELIGIBLE:
+       - Mark as REJECTED with clear reason
+       - Promote SECOND-CHOICE to NEW first-choice
+       - Use FALLBACK (priority 3) as NEW second-choice if available
+       - If no fallback provided, list eligible alternatives for prospect
+
+    CRITICAL: Applications MUST have exactly TWO eligible choices.
+
+    Your final answer MUST include:
+    - original_first_choice_eligible (true/false) with reason
+    - final_first_choice (programme name)
+    - final_second_choice (programme name)
+    - rejection_reasons (if any)
+    - both_choices_verified (must be true)
   expected_output: >
-    Course requirements with APS eligibility assessment per first/second choice.
+    JSON with final_first_choice, final_second_choice, rejection_reasons,
+    original_eligibility, and both_choices_verified=true.
   agent: rag_specialist_agent
   context:
     - collect_academic_info_task
@@ -98,11 +125,18 @@ rag_research_task:
 application_compilation_task:
   description: >
     Compile per university: personal info, academic info, documents (with status),
-    first_choice course, second_choice course, RAG requirements.
-    Validate all fields and prepare submission payload with choices prioritised.
-    Your final answer MUST be a validated payload per university.
+    BOTH course choices from RAG task (final_first_choice, final_second_choice).
+
+    CRITICAL: Every application MUST have exactly TWO course choices:
+    - first_choice: Primary programme (verified eligible)
+    - second_choice: Backup programme (verified eligible)
+
+    Use the RAG task output which has already verified eligibility and
+    handled any promotions/replacements if original first choice was rejected.
+
+    Validate all fields and prepare submission payload.
   expected_output: >
-    Validated application JSON per university with first/second choice courses.
+    Validated application JSON with BOTH first_choice and second_choice courses.
   agent: submission_agent
   context:
     - collect_personal_info_task
@@ -114,11 +148,21 @@ application_compilation_task:
 application_submission_task:
   description: >
     Submit to ALL selected universities using application_submission_tool.
-    Per university: submit first_choice as primary, second_choice as backup.
-    Your final answer MUST include: university, application_id, status,
-    first_choice_status, second_choice_status.
+
+    CRITICAL: Each submission MUST include BOTH choices:
+    - first_choice: Primary programme
+    - second_choice: Backup programme
+
+    Do NOT submit applications with only one choice.
+
+    Your final answer MUST include per university:
+    - university name
+    - application_id
+    - first_choice_programme and status
+    - second_choice_programme and status
+    - overall submission status
   expected_output: >
-    JSON list with submission status per university and course choice.
+    JSON with university, application_id, first_choice, second_choice, status.
   agent: submission_agent
   context:
     - application_compilation_task
