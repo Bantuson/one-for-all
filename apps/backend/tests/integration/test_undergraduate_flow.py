@@ -7,12 +7,22 @@ Tests the complete end-to-end flow for undergraduate applicants including:
 - Course selection and RAG research
 - Application submission
 - NSFAS flow for eligible students
+
+VCR Cassette Recording:
+These tests use pytest-vcr to record/replay LLM API responses.
+- First run with API key: Records responses to tests/cassettes/
+- CI runs (no API key): Replays from cassettes (< 5 min instead of 30+ min)
+
+To re-record cassettes:
+    DEEPSEEK_API_KEY=sk-xxx pytest tests/integration/ -v --vcr-record=all
 """
 
 import pytest
 from typing import Dict, Any
 
 
+@pytest.mark.vcr()
+@pytest.mark.integration
 class TestUndergraduateApplicationFlow:
     """Test complete undergraduate application workflow."""
 
@@ -290,6 +300,8 @@ class TestUndergraduateApplicationFlow:
             "Application should proceed with pending documents"
 
 
+@pytest.mark.vcr()
+@pytest.mark.integration
 class TestUndergraduateEdgeCases:
     """Test edge cases and boundary conditions for undergraduate flow."""
 

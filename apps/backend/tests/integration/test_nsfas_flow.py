@@ -6,12 +6,18 @@ Tests NSFAS eligibility rules, data collection, and submission logic:
 - Education level restrictions (undergrad only)
 - SASSA grant recipients
 - Data reuse from university application
+
+VCR Cassette Recording:
+These tests use pytest-vcr to record/replay LLM API responses.
+To re-record: DEEPSEEK_API_KEY=sk-xxx pytest tests/integration/ -v --vcr-record=all
 """
 
 import pytest
 from typing import Dict, Any
 
 
+@pytest.mark.vcr()
+@pytest.mark.integration
 class TestNsfasFlow:
     """Test NSFAS-specific logic and workflows."""
 
@@ -230,6 +236,8 @@ class TestNsfasFlow:
             "NSFAS application should proceed with pending documents"
 
 
+@pytest.mark.vcr()
+@pytest.mark.integration
 class TestNsfasDataReuse:
     """Test that NSFAS reuses data from university application."""
 
@@ -302,6 +310,8 @@ class TestNsfasDataReuse:
             "NSFAS application should collect specific fields"
 
 
+@pytest.mark.vcr()
+@pytest.mark.integration
 class TestNsfasSubmissionFlow:
     """Test NSFAS submission and status tracking."""
 

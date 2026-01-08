@@ -6,12 +6,18 @@ Tests the complete flow for postgraduate applicants including:
 - Masters applications
 - NSFAS eligibility (should be skipped for postgrad)
 - Prerequisite validation
+
+VCR Cassette Recording:
+These tests use pytest-vcr to record/replay LLM API responses.
+To re-record: DEEPSEEK_API_KEY=sk-xxx pytest tests/integration/ -v --vcr-record=all
 """
 
 import pytest
 from typing import Dict, Any
 
 
+@pytest.mark.vcr()
+@pytest.mark.integration
 class TestPostgraduateFlow:
     """Test postgraduate application workflows."""
 
@@ -215,6 +221,8 @@ class TestPostgraduateFlow:
         assert result is not None
 
 
+@pytest.mark.vcr()
+@pytest.mark.integration
 class TestPostgraduateEdgeCases:
     """Test edge cases for postgraduate applications."""
 

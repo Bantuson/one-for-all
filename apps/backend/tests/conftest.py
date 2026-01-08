@@ -3,6 +3,7 @@ Shared pytest fixtures for integration and unit tests.
 
 This module provides common test fixtures including:
 - Test mode configuration
+- VCR cassette configuration for LLM response recording
 - CrewAI crew instances
 - Sample undergraduate and postgraduate profiles
 - Database cleanup utilities
@@ -12,6 +13,65 @@ import pytest
 import os
 from pathlib import Path
 from typing import Dict, Any
+
+
+# =============================================================================
+# VCR Configuration for Integration Tests
+# =============================================================================
+# VCR records HTTP responses from LLM APIs (DeepSeek) on first run,
+# then replays them in CI - eliminating 30+ minute timeouts.
+
+@pytest.fixture(scope="module")
+def vcr_config():
+    """
+    Configure VCR.py for recording/replaying LLM API responses.
+
+    This configuration:
+    - Filters out API keys from recordings (security)
+    - Records once, replays forever (deterministic CI)
+    - Matches on method, scheme, host, port, path (ignores body for LLM calls)
+
+    Usage:
+        @pytest.mark.vcr()
+        def test_my_llm_function():
+            # First run: records to tests/cassettes/test_my_llm_function.yaml
+            # All subsequent runs: replays from cassette (< 1 second)
+            ...
+    """
+    return {
+        # Filter sensitive headers from recordings
+        "filter_headers": [
+            "authorization",
+            "x-api-key",
+            "api-key",
+            "bearer",
+        ],
+        # Filter sensitive query params
+        "filter_query_parameters": [
+            "api_key",
+            "access_token",
+        ],
+        # Record mode: "once" = record if cassette missing, replay if exists
+        "record_mode": "once",
+        # Store cassettes in tests/cassettes/ directory
+        "cassette_library_dir": str(Path(__file__).parent / "cassettes"),
+        # Match requests on these attributes (ignore body for LLM variability)
+        "match_on": ["method", "scheme", "host", "port", "path"],
+        # Decode compressed responses for readable cassettes
+        "decode_compressed_response": True,
+        # Allow recording if no cassette exists
+        "record_on_exception": False,
+    }
+
+
+@pytest.fixture(scope="module")
+def vcr_cassette_dir(request):
+    """
+    Override cassette directory per test module.
+
+    Organizes cassettes by test module for easier navigation.
+    """
+    return str(Path(__file__).parent / "cassettes")
 
 # Add src to path for imports
 import sys

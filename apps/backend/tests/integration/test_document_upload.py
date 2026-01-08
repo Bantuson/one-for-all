@@ -6,12 +6,18 @@ Tests document upload, validation, and tracking:
 - Missing documents don't block workflow
 - Document requirements per application type
 - NSFAS document handling
+
+VCR Cassette Recording:
+These tests use pytest-vcr to record/replay LLM API responses.
+To re-record: DEEPSEEK_API_KEY=sk-xxx pytest tests/integration/ -v --vcr-record=all
 """
 
 import pytest
 from typing import Dict, Any
 
 
+@pytest.mark.vcr()
+@pytest.mark.integration
 class TestDocumentHandling:
     """Test document upload and tracking workflows."""
 
@@ -163,6 +169,8 @@ class TestDocumentHandling:
         assert result is not None
 
 
+@pytest.mark.vcr()
+@pytest.mark.integration
 class TestDocumentRequirements:
     """Test document requirements per application type."""
 
@@ -239,6 +247,8 @@ class TestDocumentRequirements:
         assert result is not None
 
 
+@pytest.mark.vcr()
+@pytest.mark.integration
 class TestNsfasDocumentHandling:
     """Test NSFAS-specific document handling."""
 
@@ -296,6 +306,8 @@ class TestNsfasDocumentHandling:
             "NSFAS should complete with pending documents"
 
 
+@pytest.mark.vcr()
+@pytest.mark.integration
 class TestDocumentValidation:
     """Test document validation and error handling."""
 
