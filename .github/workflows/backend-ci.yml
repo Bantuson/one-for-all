@@ -11,13 +11,12 @@
 #   6. E2E + Performance Tests (needs staging-deploy)
 #   7. Production Gate (main only, needs all stages)
 #
-# Required Secrets:
-#   - DEEPSEEK_API_KEY: DeepSeek LLM for scanner crew agents
-#   - SUPABASE_URL: Production Supabase URL
-#   - SUPABASE_KEY: Production Supabase service role key
-#   - STAGING_API_KEY: API key for staging environment access
-#   - RENDER_DEPLOY_HOOK: Webhook URL for Render staging deployment
-#   - CODECOV_TOKEN: Token for uploading coverage reports
+# Required Secrets (3 core + 2 optional):
+#   - NEXT_PUBLIC_SUPABASE_URL: Supabase project URL
+#   - SUPABASE_SERVICE_ROLE_KEY: Supabase service role key
+#   - DEEPSEEK_API_KEY: DeepSeek LLM for integration tests
+#   - RENDER_DEPLOY_HOOK: (optional) Webhook URL for Render staging deployment
+#   - CODECOV_TOKEN: (optional) Token for uploading coverage reports
 #
 # Environment Variables:
 #   All tests use production Supabase with TEST- prefix for cleanup
@@ -81,9 +80,9 @@ jobs:
       - name: Create .env.local at monorepo root
         working-directory: .
         run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" >> .env.local
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env.local
           echo "DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}" >> .env.local
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env.local
-          echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> .env.local
           echo "ONEFORALL_TEST_MODE=true" >> .env.local
 
       - name: Run unit tests with coverage
@@ -134,9 +133,9 @@ jobs:
       - name: Create .env.local at monorepo root
         working-directory: .
         run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" >> .env.local
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env.local
           echo "DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}" >> .env.local
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env.local
-          echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> .env.local
           echo "ONEFORALL_TEST_MODE=true" >> .env.local
           echo "TEST_PREFIX=TEST-${{ github.run_id }}-" >> .env.local
 
@@ -186,9 +185,9 @@ jobs:
       - name: Create .env.local at monorepo root
         working-directory: .
         run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" >> .env.local
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env.local
           echo "DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}" >> .env.local
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env.local
-          echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> .env.local
           echo "ONEFORALL_TEST_MODE=true" >> .env.local
           echo "TEST_PREFIX=TEST-API-${{ github.run_id }}-" >> .env.local
 
@@ -355,11 +354,10 @@ jobs:
       - name: Create .env.local at monorepo root
         working-directory: .
         run: |
-          echo "STAGING_API_URL=${{ needs.staging-deploy.outputs.staging_url }}" >> .env.local
-          echo "STAGING_API_KEY=${{ secrets.STAGING_API_KEY }}" >> .env.local
+          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" >> .env.local
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env.local
           echo "DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}" >> .env.local
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env.local
-          echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> .env.local
+          echo "STAGING_API_URL=${{ needs.staging-deploy.outputs.staging_url }}" >> .env.local
           echo "ONEFORALL_TEST_MODE=true" >> .env.local
 
       - name: Run E2E tests

@@ -61,6 +61,56 @@ def test_session_token() -> str:
 
 
 @pytest.fixture
+def db_test_applicant():
+    """
+    Create a test applicant in the database for FK constraint satisfaction.
+
+    This fixture creates an actual database record that allows tests to
+    insert applications and NSFAS records without FK violations.
+
+    Yields the applicant_id for use in tests.
+    Cleans up after the test completes.
+    """
+    from one_for_all.tools.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+    if not supabase:
+        pytest.skip("Supabase not configured for database tests")
+
+    # Generate unique test applicant ID
+    applicant_id = str(uuid4())
+    student_number = f"TEST-{datetime.now().strftime('%Y%m%d')}-{uuid4().hex[:6].upper()}"
+
+    # Create test applicant record (matching actual applicant_accounts schema)
+    applicant_data = {
+        "id": applicant_id,
+        "primary_student_number": student_number,
+        "username": f"test_api_user_{uuid4().hex[:8]}",
+        "email": f"test-{uuid4().hex[:8]}@example.com",
+        "cellphone": "+27821234567",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    try:
+        supabase.table("applicant_accounts").insert(applicant_data).execute()
+    except Exception as e:
+        pytest.skip(f"Could not create test applicant: {e}")
+
+    yield applicant_id, student_number
+
+    # Cleanup after test
+    try:
+        # Delete any applications created
+        supabase.table("applications").delete().eq("applicant_id", applicant_id).execute()
+        # Delete any NSFAS applications created
+        supabase.table("nsfas_applications").delete().eq("applicant_id", applicant_id).execute()
+        # Delete the test applicant
+        supabase.table("applicant_accounts").delete().eq("id", applicant_id).execute()
+    except Exception:
+        pass  # Cleanup failures are non-critical
+
+
+@pytest.fixture
 def mock_session_data(test_applicant_id: str, test_session_token: str, monkeypatch):
     """
     Mock session validation to avoid database dependencies.
@@ -304,25 +354,57 @@ def test_application_submit_missing_required_fields(
 
 
 @pytest.mark.api
+@pytest.mark.integration
 def test_application_submit_sanitizes_dangerous_keys(
     api_client: TestClient,
     auth_headers: dict,
-    sample_application_payload: dict,
-    mock_session_data
+    db_test_applicant,
+    test_session_token: str,
+    monkeypatch
 ):
     """Test that application submission sanitizes dangerous JSON keys."""
-    # Add dangerous prototype pollution keys
-    sample_application_payload["personal_info"]["__proto__"] = {"polluted": True}
-    sample_application_payload["academic_info"]["constructor"] = "malicious"
+    from one_for_all.api.routers import applications
+
+    applicant_id, _ = db_test_applicant
+
+    # Mock session validation for this test
+    async def mock_validate_session(supabase, session_token: str, app_id: str) -> bool:
+        return session_token.startswith("test-session-")
+
+    monkeypatch.setattr(applications, "validate_session", mock_validate_session)
+
+    # Create payload with dangerous keys
+    payload = {
+        "applicant_id": applicant_id,
+        "session_token": test_session_token,
+        "university_name": "University of Pretoria",
+        "faculty": "Engineering",
+        "qualification_type": "Undergraduate",
+        "program": "BSc Computer Science",
+        "year": 2025,
+        "personal_info": {
+            "full_name": "Test Student",
+            "id_number": "0001010000000",
+            "email": "test@example.com",
+            "mobile": "+27821234567",
+            "__proto__": {"polluted": True}  # Dangerous key
+        },
+        "academic_info": {
+            "matric_year": 2024,
+            "total_aps": 40,
+            "constructor": "malicious"  # Dangerous key
+        },
+        "submission_payload": {"submitted_to": "https://test.edu", "timestamp": datetime.now(timezone.utc).isoformat()}
+    }
 
     response = api_client.post(
         "/api/applications/submit",
-        json=sample_application_payload,
+        json=payload,
         headers=auth_headers
     )
 
     # Should either succeed (keys removed) or fail validation
-    # But should not cause server error
+    # But should not cause server error from prototype pollution
     assert response.status_code in [201, 401, 422, 500]
 
 
@@ -336,18 +418,50 @@ def test_application_submit_sanitizes_dangerous_keys(
 def test_application_submit_valid_payload_creates_application(
     api_client: TestClient,
     auth_headers: dict,
-    sample_application_payload: dict,
-    mock_session_data
+    db_test_applicant,
+    test_session_token: str,
+    monkeypatch
 ):
     """Test that valid application submission creates record."""
+    from one_for_all.api.routers import applications
+
+    applicant_id, _ = db_test_applicant
+
+    # Mock session validation for this test
+    async def mock_validate_session(supabase, session_token: str, app_id: str) -> bool:
+        return session_token.startswith("test-session-")
+
+    monkeypatch.setattr(applications, "validate_session", mock_validate_session)
+
+    payload = {
+        "applicant_id": applicant_id,
+        "session_token": test_session_token,
+        "university_name": "University of Pretoria",
+        "faculty": "Engineering, Built Environment and IT",
+        "qualification_type": "Undergraduate",
+        "program": "BSc Computer Science",
+        "year": 2025,
+        "personal_info": {
+            "full_name": "Test Student",
+            "id_number": "0001010000000",
+            "email": "test.student@example.com",
+            "mobile": "+27821234567"
+        },
+        "academic_info": {
+            "matric_year": 2024,
+            "total_aps": 40,
+            "subjects": {"Mathematics": {"level": "HL", "mark": 80}}
+        },
+        "submission_payload": {"submitted_to": "https://www.up.ac.za/admissions", "timestamp": datetime.now(timezone.utc).isoformat()}
+    }
+
     response = api_client.post(
         "/api/applications/submit",
-        json=sample_application_payload,
+        json=payload,
         headers=auth_headers
     )
 
-    # Note: This will fail without actual database, but tests the endpoint
-    # In CI/CD with test database, this should return 201
+    # With real DB applicant, this should return 201
     assert response.status_code in [201, 401, 500]
 
     if response.status_code == 201:
@@ -545,23 +659,59 @@ def test_nsfas_submit_missing_bank_details(
 
 
 @pytest.mark.api
+@pytest.mark.integration
 def test_nsfas_submit_sanitizes_dangerous_keys(
     api_client: TestClient,
     auth_headers: dict,
-    sample_nsfas_payload: dict,
-    mock_session_data
+    db_test_applicant,
+    test_session_token: str,
+    monkeypatch
 ):
     """Test that NSFAS submission sanitizes dangerous JSON keys."""
-    sample_nsfas_payload["personal_info"]["__proto__"] = {"polluted": True}
-    sample_nsfas_payload["guardian_info"]["constructor"] = "malicious"
+    from one_for_all.api.routers import nsfas
+
+    applicant_id, _ = db_test_applicant
+
+    # Mock session validation for this test
+    async def mock_validate_session(supabase, session_token: str, app_id: str) -> bool:
+        return session_token.startswith("test-session-")
+
+    monkeypatch.setattr(nsfas, "validate_session", mock_validate_session)
+
+    payload = {
+        "applicant_id": applicant_id,
+        "session_token": test_session_token,
+        "personal_info": {
+            "full_name": "Test Student",
+            "id_number": "0001010000000",
+            "email": "test@example.com",
+            "mobile": "+27821234567",
+            "__proto__": {"polluted": True}  # Dangerous key
+        },
+        "academic_info": {"matric_year": 2024, "total_aps": 35},
+        "guardian_info": {
+            "name": "Test Guardian",
+            "relationship": "Mother",
+            "contact": "+27821234568",
+            "constructor": "malicious"  # Dangerous key
+        },
+        "household_info": {"size": 5, "dependents": 3},
+        "income_info": {"total_annual_income": "R0-R50000", "source": "SASSA grant"},
+        "bank_details": {
+            "bank_name": "Test Bank",
+            "account_number": "1234567890",
+            "account_type": "Savings",
+            "branch_code": "123456"
+        }
+    }
 
     response = api_client.post(
         "/api/nsfas/submit",
-        json=sample_nsfas_payload,
+        json=payload,
         headers=auth_headers
     )
 
-    # Should not cause server error
+    # Should not cause server error from prototype pollution
     assert response.status_code in [201, 401, 422, 500]
 
 
@@ -575,17 +725,49 @@ def test_nsfas_submit_sanitizes_dangerous_keys(
 def test_nsfas_submit_valid_payload_creates_application(
     api_client: TestClient,
     auth_headers: dict,
-    sample_nsfas_payload: dict,
-    mock_session_data
+    db_test_applicant,
+    test_session_token: str,
+    monkeypatch
 ):
     """Test that valid NSFAS submission creates record."""
+    from one_for_all.api.routers import nsfas
+
+    applicant_id, _ = db_test_applicant
+
+    # Mock session validation for this test
+    async def mock_validate_session(supabase, session_token: str, app_id: str) -> bool:
+        return session_token.startswith("test-session-")
+
+    monkeypatch.setattr(nsfas, "validate_session", mock_validate_session)
+
+    payload = {
+        "applicant_id": applicant_id,
+        "session_token": test_session_token,
+        "personal_info": {
+            "full_name": "Test Student",
+            "id_number": "0001010000000",
+            "email": "test.student@example.com",
+            "mobile": "+27821234567"
+        },
+        "academic_info": {"matric_year": 2024, "total_aps": 35},
+        "guardian_info": {"name": "Test Guardian", "relationship": "Mother", "contact": "+27821234568"},
+        "household_info": {"size": 5, "dependents": 3},
+        "income_info": {"total_annual_income": "R0-R50000", "source": "SASSA grant"},
+        "bank_details": {
+            "bank_name": "Test Bank",
+            "account_number": "1234567890",
+            "account_type": "Savings",
+            "branch_code": "123456"
+        }
+    }
+
     response = api_client.post(
         "/api/nsfas/submit",
-        json=sample_nsfas_payload,
+        json=payload,
         headers=auth_headers
     )
 
-    # Without database, will likely fail, but tests endpoint
+    # With real DB applicant, this should return 201
     assert response.status_code in [201, 401, 500]
 
     if response.status_code == 201:
