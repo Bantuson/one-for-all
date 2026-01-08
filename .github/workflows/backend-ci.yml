@@ -141,7 +141,7 @@ jobs:
 
       - name: Run integration tests
         run: |
-          pytest tests/integration/ -v --timeout=300 -m integration
+          pytest tests/integration/ -v --timeout=300
 
       - name: Cleanup test data
         if: always()
