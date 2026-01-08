@@ -20,10 +20,6 @@ services:
       - key: ONEFORALL_TEST_MODE
         value: "false"  # Set to true to use mocks
 
-      # Python configuration
-      - key: PYTHON_VERSION
-        value: "3.12.0"
-
       # Supabase (sync from secrets)
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
