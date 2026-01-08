@@ -12,8 +12,16 @@ from typing import Any, Optional
 import httpx
 from dotenv import load_dotenv
 
-# Load env from monorepo root
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[5] / ".env.local")
+# Load env from monorepo root (local dev) or use Render env vars (production)
+_env_paths = [
+    Path(__file__).resolve().parents[5] / ".env.local",
+    Path(__file__).resolve().parents[4] / ".env.local",
+    Path.cwd() / ".env.local",
+]
+for _env_path in _env_paths:
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path)
+        break
 
 # API configuration
 BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000")

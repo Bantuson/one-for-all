@@ -13,8 +13,16 @@ import aiohttp
 from crewai.tools import tool
 from dotenv import load_dotenv
 
-# Load environment from monorepo root
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[5] / '.env.local')
+# Load env from monorepo root (local dev) or use Render env vars (production)
+_env_paths = [
+    Path(__file__).resolve().parents[5] / '.env.local',
+    Path(__file__).resolve().parents[4] / '.env.local',
+    Path.cwd() / '.env.local',
+]
+for _env_path in _env_paths:
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path)
+        break
 
 TWILIO_SID = os.getenv("TWILIO_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")

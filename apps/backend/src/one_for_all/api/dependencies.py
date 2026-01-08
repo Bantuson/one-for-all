@@ -16,8 +16,18 @@ from dotenv import load_dotenv
 from fastapi import Depends, Header, HTTPException, status
 from supabase import Client, create_client
 
-# Load env from monorepo root
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[5] / ".env.local")
+# Load env from monorepo root (local dev) or use Render env vars (production)
+_env_paths = [
+    Path(__file__).resolve().parents[5] / ".env.local",  # Monorepo root (local)
+    Path(__file__).resolve().parents[4] / ".env.local",  # Alternative structure
+    Path.cwd() / ".env.local",  # Current working directory
+]
+
+for _env_path in _env_paths:
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path)
+        break
+# If no .env.local found, rely on environment variables (Render sets these directly)
 
 
 @lru_cache()

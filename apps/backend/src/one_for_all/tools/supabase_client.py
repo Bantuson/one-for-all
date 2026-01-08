@@ -5,8 +5,19 @@ from typing import Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-# Load environment from monorepo root
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[5] / '.env.local')
+# Load environment from monorepo root (local dev) or use Render env vars (production)
+# Try multiple paths for different environments
+_env_paths = [
+    Path(__file__).resolve().parents[5] / '.env.local',  # Monorepo root (local)
+    Path(__file__).resolve().parents[4] / '.env.local',  # Alternative structure
+    Path.cwd() / '.env.local',  # Current working directory
+]
+
+for _env_path in _env_paths:
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path)
+        break
+# If no .env.local found, rely on environment variables (Render sets these directly)
 
 # Use correct environment variable names matching .env.local
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL", "")
