@@ -1,2 +1,3 @@
-# Install package with all dependencies from pyproject.toml
--e .
+# Minimal API-only dependencies for Render staging
+# Full package install: pip install -e .
+-r requirements-api.txt
