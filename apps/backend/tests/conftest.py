@@ -397,7 +397,8 @@ def cleanup_test_data():
     try:
         # 1. Delete test sessions (CRITICAL for isolation)
         # Sessions accumulate if not cleaned - each test creates a new session
-        supabase.table("user_sessions").delete().like("user_id", "TEST-%").execute()
+        # Note: Table is 'applicant_sessions' (not 'user_sessions')
+        supabase.table("applicant_sessions").delete().like("applicant_id", "TEST-%").execute()
         supabase.table("applicant_sessions").delete().like("session_token", "TEST-%").execute()
 
         # 2. Delete test applications and their documents
