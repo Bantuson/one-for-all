@@ -2,6 +2,8 @@
 Student Number Generator Tool
 
 CrewAI tool for generating institution-specific student numbers via Supabase RPC.
+
+In TEST_MODE, student numbers are prefixed with "TEST-" for easy cleanup.
 """
 
 import asyncio
@@ -10,6 +12,7 @@ from datetime import datetime
 from crewai.tools import tool
 
 from .supabase_client import supabase
+from one_for_all.config.test_config import TEST_MODE
 
 
 @tool
@@ -43,6 +46,19 @@ def generate_student_number(institution_id: str, applicant_id: str) -> str:
                 return "ERROR: Failed to generate student number - no data returned"
 
             student_number = result.data
+
+            # In test mode, prefix with TEST- for cleanup identification
+            if TEST_MODE and not student_number.startswith("TEST-"):
+                student_number = f"TEST-{student_number}"
+
+                # Update the applicant record with the test prefix
+                try:
+                    supabase.table("applicant_accounts").update(
+                        {"primary_student_number": student_number}
+                    ).eq("id", applicant_id).execute()
+                except Exception as update_error:
+                    # Log but don't fail if update fails
+                    pass
 
             # The RPC function handles updating the applicant record
             # Return the generated student number

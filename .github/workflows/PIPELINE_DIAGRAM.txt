@@ -1,0 +1,74 @@
+One For All Backend CI/CD Pipeline
+===================================
+
+Trigger Events:
+  - Push to main/develop (apps/backend/**)
+  - Pull request to main/develop (apps/backend/**)
+
+Pipeline Flow:
+==============
+
+Stage 1: UNIT TESTS (10 minutes)
+  - Checkout code
+  - Setup Python 3.12 with pip cache
+  - Install dependencies
+  - Run pytest tests/unit/ -m unit --cov
+  - Upload coverage to Codecov
+  
+Stage 2: INTEGRATION TESTS (30 minutes)
+  - Setup Python & dependencies
+  - Run pytest tests/integration/ -m integration
+  - Cleanup TEST- prefixed data
+  
+Stage 3: API TESTS (15 minutes, parallel with Stage 2)
+  - Setup Python & dependencies
+  - Run pytest tests/api/ -m api
+  - Run test_endpoints.py
+  - Cleanup TEST- prefixed data
+  
+Stage 4: CODE QUALITY (10 minutes, parallel, non-blocking)
+  - Run ruff linter
+  - Run black formatter check
+  - Run isort import check
+  - Run mypy type checker
+  
+Stage 5: STAGING DEPLOY (10 minutes, main/develop only)
+  - Trigger Render deploy hook
+  - Wait for deployment
+  - Health check (10 attempts)
+  - Output staging URL
+  
+Stage 6: E2E + PERFORMANCE (30 minutes)
+  - Run E2E tests against staging
+  - Run Locust load tests (50 users, 5/sec, 5 min)
+  - Check P95 < 2000ms
+  - Upload performance reports
+  
+Stage 7: PRODUCTION GATE (5 minutes, main only)
+  - Check coverage >= 80%
+  - Generate production readiness summary
+  - Upload summary artifact
+
+Artifacts:
+- coverage-unit (7 days)
+- integration-test-results (7 days)
+- api-test-results (7 days)
+- performance-reports (30 days)
+- production-readiness-summary (90 days)
+
+Required Secrets:
+1. DEEPSEEK_API_KEY
+2. SUPABASE_URL
+3. SUPABASE_KEY
+4. STAGING_API_KEY
+5. RENDER_DEPLOY_HOOK
+6. CODECOV_TOKEN
+
+Performance Thresholds:
+- P95: < 2000ms (enforced)
+- Coverage: >= 80% (enforced)
+
+Total Time:
+- Pull Request: 15-20 minutes
+- Push to develop: 80-90 minutes
+- Push to main: 85-95 minutes

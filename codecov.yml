@@ -1,0 +1,104 @@
+# Codecov Configuration
+# https://docs.codecov.com/docs/codecov-yaml
+#
+# This configuration sets coverage thresholds and reporting options
+# for the One For All monorepo.
+
+coverage:
+  precision: 2
+  round: down
+  range: "60...100"
+
+  status:
+    # Overall project coverage
+    project:
+      default:
+        target: 80%
+        threshold: 2%
+        if_ci_failed: error
+        informational: false
+        only_pulls: false
+
+    # Coverage for changed code in PR
+    patch:
+      default:
+        target: 70%
+        threshold: 5%
+        if_ci_failed: error
+
+# Separate coverage flags for different test types
+flags:
+  unit:
+    paths:
+      - apps/backend/src/
+    carryforward: true
+    after_n_builds: 1
+
+  integration:
+    paths:
+      - apps/backend/src/
+    carryforward: true
+    after_n_builds: 1
+
+  api:
+    paths:
+      - apps/backend/src/one_for_all/api/
+    carryforward: true
+    after_n_builds: 1
+
+# Components for grouping coverage by area
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: auto
+      - type: patch
+        target: auto
+
+  individual_components:
+    - component_id: backend-api
+      name: Backend API
+      paths:
+        - apps/backend/src/one_for_all/api/**
+
+    - component_id: backend-tools
+      name: Backend Tools
+      paths:
+        - apps/backend/src/one_for_all/tools/**
+
+    - component_id: backend-crew
+      name: Backend Crew
+      paths:
+        - apps/backend/src/one_for_all/crew.py
+        - apps/backend/src/one_for_all/config/**
+
+# Ignore paths from coverage
+ignore:
+  - "**/__pycache__/**"
+  - "**/tests/**"
+  - "**/.venv/**"
+  - "**/node_modules/**"
+  - "**/*.md"
+  - "**/migrations/**"
+
+# PR comment configuration
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: true
+  require_base: false
+  require_head: true
+  hide_project_coverage: false
+
+# Parsers
+parsers:
+  gcov:
+    branch_detection:
+      conditional: true
+      loop: true
+      macro: false
+      method: false
+
+# GitHub checks
+github_checks:
+  annotations: true

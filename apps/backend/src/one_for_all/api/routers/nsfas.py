@@ -23,6 +23,12 @@ router = APIRouter(
     tags=["nsfas"],
 )
 
+# Legacy router for CrewAI tools (without /v1 prefix)
+legacy_router = APIRouter(
+    prefix="/api/nsfas",
+    tags=["nsfas-legacy"],
+)
+
 
 async def validate_session(supabase, session_token: str, applicant_id: str) -> bool:
     """Validate that session is valid and belongs to the applicant."""
@@ -237,3 +243,102 @@ async def list_nsfas_documents(
     )
 
     return result.data or []
+
+
+# ============================================================================
+# Legacy Endpoints for CrewAI Tools (without /v1 prefix)
+# ============================================================================
+
+
+@legacy_router.post("/submit", status_code=status.HTTP_201_CREATED)
+async def submit_nsfas_application(
+    application: NsfasApplicationCreate,
+    supabase: SupabaseClient,
+    _: ApiKeyVerified,
+):
+    """
+    Submit an NSFAS application (legacy endpoint for CrewAI tools).
+
+    This is an alias for POST /api/v1/nsfas/ to support existing
+    CrewAI tool integrations that expect /api/nsfas/submit.
+
+    Returns a simplified response with application ID and confirmation.
+    """
+    # Validate session
+    if not await validate_session(
+        supabase, application.session_token, str(application.applicant_id)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session",
+        )
+
+    # Build NSFAS application data
+    nsfas_data = {
+        "applicant_id": str(application.applicant_id),
+        "personal_info": application.personal_info,
+        "academic_info": application.academic_info,
+        "guardian_info": application.guardian_info,
+        "household_info": application.household_info,
+        "income_info": application.income_info,
+        "bank_details": application.bank_details,
+        "living_situation": application.living_situation,
+        "status": "submitted",
+    }
+
+    # Create application
+    result = supabase.table("nsfas_applications").insert(nsfas_data).execute()
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create NSFAS application",
+        )
+
+    nsfas_record = result.data[0]
+
+    # Generate confirmation message for CrewAI agents
+    return {
+        "success": True,
+        "nsfas_application_id": nsfas_record["id"],
+        "reference_number": f"NSFAS-{nsfas_record['id'][:8].upper()}",
+        "status": nsfas_record["status"],
+        "message": "NSFAS application submitted successfully",
+        "created_at": nsfas_record["created_at"],
+    }
+
+
+@legacy_router.get("/status/{nsfas_id}")
+async def get_nsfas_status(
+    nsfas_id: str,
+    supabase: SupabaseClient,
+    _: ApiKeyVerified,
+):
+    """
+    Get NSFAS application status (legacy endpoint for CrewAI tools).
+
+    Returns a simplified status response.
+    """
+    result = (
+        supabase.table("nsfas_applications")
+        .select("id, status, created_at, updated_at, status_history")
+        .eq("id", nsfas_id)
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"NSFAS application {nsfas_id} not found",
+        )
+
+    nsfas = result.data[0]
+
+    return {
+        "nsfas_application_id": nsfas["id"],
+        "reference_number": f"NSFAS-{nsfas['id'][:8].upper()}",
+        "status": nsfas["status"],
+        "submitted_at": nsfas["created_at"],
+        "last_updated": nsfas.get("updated_at", nsfas["created_at"]),
+        "status_history": nsfas.get("status_history", []),
+    }

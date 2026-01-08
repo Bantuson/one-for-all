@@ -24,6 +24,12 @@ router = APIRouter(
     tags=["applications"],
 )
 
+# Legacy router for CrewAI tools (without /v1 prefix)
+legacy_router = APIRouter(
+    prefix="/api/applications",
+    tags=["applications-legacy"],
+)
+
 
 async def validate_session(supabase, session_token: str, applicant_id: str) -> bool:
     """Validate that session is valid and belongs to the applicant."""
@@ -279,3 +285,115 @@ async def list_documents(
     )
 
     return result.data or []
+
+
+# ============================================================================
+# Legacy Endpoints for CrewAI Tools (without /v1 prefix)
+# ============================================================================
+
+
+@legacy_router.post("/submit", status_code=status.HTTP_201_CREATED)
+async def submit_application(
+    application: ApplicationCreate,
+    supabase: SupabaseClient,
+    _: ApiKeyVerified,
+):
+    """
+    Submit a university application (legacy endpoint for CrewAI tools).
+
+    This is an alias for POST /api/v1/applications/ to support existing
+    CrewAI tool integrations that expect /api/applications/submit.
+
+    Returns a simplified response with application ID and confirmation.
+    """
+    # Validate session
+    if not await validate_session(
+        supabase, application.session_token, str(application.applicant_id)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session",
+        )
+
+    # Build application data
+    app_data = {
+        "applicant_id": str(application.applicant_id),
+        "university_name": application.university_name,
+        "faculty": application.faculty,
+        "qualification_type": application.qualification_type,
+        "program": application.program,
+        "year": application.year,
+        "personal_info": application.personal_info,
+        "academic_info": application.academic_info,
+        "submission_payload": application.submission_payload,
+        "status": "submitted",
+    }
+
+    # Add multi-tenant fields if provided
+    if application.institution_id:
+        app_data["institution_id"] = str(application.institution_id)
+    if application.course_id:
+        app_data["course_id"] = str(application.course_id)
+
+    # Create application
+    result = supabase.table("applications").insert(app_data).execute()
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create application",
+        )
+
+    app_record = result.data[0]
+
+    # Generate confirmation message for CrewAI agents
+    return {
+        "success": True,
+        "application_id": app_record["id"],
+        "reference_number": f"APP-{app_record['id'][:8].upper()}",
+        "status": app_record["status"],
+        "university": app_record["university_name"],
+        "message": f"Application submitted successfully to {app_record['university_name']}",
+        "created_at": app_record["created_at"],
+    }
+
+
+@legacy_router.get("/status/{application_id}")
+async def get_application_status(
+    application_id: str,
+    supabase: SupabaseClient,
+    _: ApiKeyVerified,
+):
+    """
+    Get application status (legacy endpoint for CrewAI tools).
+
+    This is an alias for GET /api/v1/applications/{application_id} to support
+    existing CrewAI tool integrations that expect /api/applications/status/{id}.
+
+    Returns a simplified status response.
+    """
+    result = (
+        supabase.table("applications")
+        .select("id, status, university_name, program, created_at, updated_at, status_history")
+        .eq("id", application_id)
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Application {application_id} not found",
+        )
+
+    app = result.data[0]
+
+    return {
+        "application_id": app["id"],
+        "reference_number": f"APP-{app['id'][:8].upper()}",
+        "status": app["status"],
+        "university": app["university_name"],
+        "program": app.get("program"),
+        "submitted_at": app["created_at"],
+        "last_updated": app.get("updated_at", app["created_at"]),
+        "status_history": app.get("status_history", []),
+    }

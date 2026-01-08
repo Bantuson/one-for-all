@@ -3,12 +3,20 @@ import yaml
 from pathlib import Path
 from crewai import Crew, Process, Agent, Task
 
+# Import test configuration
+from one_for_all.config.test_config import TEST_MODE, log_test_mode_warning
+
 # Import all tools from the tools module
 from one_for_all.tools import (
     # OTP & Messaging Tools
     sendgrid_otp_sender,
     sms_otp_sender,
     send_whatsapp_message,
+    send_whatsapp_otp,
+    # OTP Verification Tools
+    verify_otp,
+    check_otp_status,
+    resend_otp_check,
     # Student Number Tools
     generate_student_number,
     # Deprecated Supabase Tools (still used in agents.yaml)
@@ -30,34 +38,85 @@ from one_for_all.tools import (
     nsfas_status_tool,
 )
 
+# Import mock tools if in test mode
+if TEST_MODE:
+    from one_for_all.tools.mocks import (
+        mock_otp_sender,
+        mock_sms_sender,
+        mock_whatsapp_sender,
+        mock_submission_tool,
+        mock_nsfas_submission_tool,
+        mock_status_tool,
+        mock_nsfas_status_tool,
+    )
+
 logger = logging.getLogger(__name__)
 
 # Tool registry mapping tool names (strings) to actual tool instances
-TOOL_REGISTRY = {
-    # OTP & Messaging Tools
-    "sendgrid_otp_sender": sendgrid_otp_sender,
-    "sms_otp_sender": sms_otp_sender,
-    "send_whatsapp_message": send_whatsapp_message,
-    # Student Number Tools
-    "generate_student_number": generate_student_number,
-    # Deprecated Supabase Tools (still referenced in agents.yaml)
-    "supabase_user_store": supabase_user_store,
-    "supabase_user_lookup": supabase_user_lookup,
-    "supabase_session_lookup": supabase_session_lookup,
-    "supabase_session_create": supabase_session_create,
-    "supabase_session_extend": supabase_session_extend,
-    "supabase_application_store": supabase_application_store,
-    "supabase_rag_store": supabase_rag_store,
-    "supabase_rag_query": supabase_rag_query,
-    "supabase_nsfas_store": supabase_nsfas_store,
-    "supabase_nsfas_documents_store": supabase_nsfas_documents_store,
-    # External Submission & Search Tools
-    "website_search_tool": website_search_tool,
-    "application_submission_tool": application_submission_tool,
-    "application_status_tool": application_status_tool,
-    "nsfas_application_submission_tool": nsfas_application_submission_tool,
-    "nsfas_status_tool": nsfas_status_tool,
-}
+# In test mode, mock tools replace real external API tools
+if TEST_MODE:
+    TOOL_REGISTRY = {
+        # OTP & Messaging Tools (MOCKED)
+        "sendgrid_otp_sender": mock_otp_sender,
+        "sms_otp_sender": mock_sms_sender,
+        "send_whatsapp_message": mock_whatsapp_sender,
+        "send_whatsapp_otp": mock_whatsapp_sender,
+        # OTP Verification Tools (REAL - uses database)
+        "verify_otp": verify_otp,
+        "check_otp_status": check_otp_status,
+        "resend_otp_check": resend_otp_check,
+        # Student Number Tools (REAL - uses database)
+        "generate_student_number": generate_student_number,
+        # Supabase Tools (REAL - uses database)
+        "supabase_user_store": supabase_user_store,
+        "supabase_user_lookup": supabase_user_lookup,
+        "supabase_session_lookup": supabase_session_lookup,
+        "supabase_session_create": supabase_session_create,
+        "supabase_session_extend": supabase_session_extend,
+        "supabase_application_store": supabase_application_store,
+        "supabase_rag_store": supabase_rag_store,
+        "supabase_rag_query": supabase_rag_query,
+        "supabase_nsfas_store": supabase_nsfas_store,
+        "supabase_nsfas_documents_store": supabase_nsfas_documents_store,
+        # External Submission & Search Tools (MOCKED)
+        "website_search_tool": website_search_tool,  # Keep real for RAG
+        "application_submission_tool": mock_submission_tool,
+        "application_status_tool": mock_status_tool,
+        "nsfas_application_submission_tool": mock_nsfas_submission_tool,
+        "nsfas_status_tool": mock_nsfas_status_tool,
+    }
+    log_test_mode_warning()
+else:
+    TOOL_REGISTRY = {
+        # OTP & Messaging Tools
+        "sendgrid_otp_sender": sendgrid_otp_sender,
+        "sms_otp_sender": sms_otp_sender,
+        "send_whatsapp_message": send_whatsapp_message,
+        "send_whatsapp_otp": send_whatsapp_otp,
+        # OTP Verification Tools
+        "verify_otp": verify_otp,
+        "check_otp_status": check_otp_status,
+        "resend_otp_check": resend_otp_check,
+        # Student Number Tools
+        "generate_student_number": generate_student_number,
+        # Deprecated Supabase Tools (still referenced in agents.yaml)
+        "supabase_user_store": supabase_user_store,
+        "supabase_user_lookup": supabase_user_lookup,
+        "supabase_session_lookup": supabase_session_lookup,
+        "supabase_session_create": supabase_session_create,
+        "supabase_session_extend": supabase_session_extend,
+        "supabase_application_store": supabase_application_store,
+        "supabase_rag_store": supabase_rag_store,
+        "supabase_rag_query": supabase_rag_query,
+        "supabase_nsfas_store": supabase_nsfas_store,
+        "supabase_nsfas_documents_store": supabase_nsfas_documents_store,
+        # External Submission & Search Tools
+        "website_search_tool": website_search_tool,
+        "application_submission_tool": application_submission_tool,
+        "application_status_tool": application_status_tool,
+        "nsfas_application_submission_tool": nsfas_application_submission_tool,
+        "nsfas_status_tool": nsfas_status_tool,
+    }
 
 
 class OneForAllCrew:

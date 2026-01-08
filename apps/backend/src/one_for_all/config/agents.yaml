@@ -12,6 +12,10 @@ identity_auth_agent:
   tools:
     - sendgrid_otp_sender
     - sms_otp_sender
+    - send_whatsapp_otp
+    - verify_otp
+    - check_otp_status
+    - resend_otp_check
     - send_whatsapp_message
     - generate_student_number
     - supabase_user_store

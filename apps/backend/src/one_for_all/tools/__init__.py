@@ -15,10 +15,27 @@ Prefer using the new API-based tools:
 """
 
 # =============================================================================
+# DOCUMENT UPLOAD & VALIDATION TOOLS
+# =============================================================================
+from .document_upload_tool import upload_document, get_document_url
+from .document_validator import (
+    validate_document,
+    get_document_type_requirements,
+    validate_batch_documents,
+)
+
+# =============================================================================
 # OTP & MESSAGING TOOLS
 # =============================================================================
 from .sendgrid_otp_sender import sendgrid_otp_sender
 from .sms_otp_sender import sms_otp_sender
+
+# OTP Verification Tools
+from .otp_verification import (
+    verify_otp,
+    check_otp_status,
+    resend_otp_check,
+)
 
 # WhatsApp Tools
 from .whatsapp_handler import (
@@ -145,6 +162,14 @@ def __getattr__(name):
 
 __all__ = [
     # =========================================================================
+    # DOCUMENT UPLOAD & VALIDATION TOOLS
+    # =========================================================================
+    "upload_document",
+    "get_document_url",
+    "validate_document",
+    "get_document_type_requirements",
+    "validate_batch_documents",
+    # =========================================================================
     # NEW API-BASED TOOLS (Preferred)
     # =========================================================================
     # Applicant
@@ -173,10 +198,14 @@ __all__ = [
     "add_nsfas_document",
     "list_nsfas_documents",
     # =========================================================================
-    # OTP & MESSAGING TOOLS (No database access)
+    # OTP & MESSAGING TOOLS
     # =========================================================================
     "sendgrid_otp_sender",
     "sms_otp_sender",
+    # OTP Verification
+    "verify_otp",
+    "check_otp_status",
+    "resend_otp_check",
     # WhatsApp
     "send_whatsapp_message",
     "send_whatsapp_otp",

@@ -10,14 +10,16 @@ Run with:
 
 import os
 import logging
-from typing import List, Dict, Any
-from fastapi import FastAPI, HTTPException
+from typing import List, Dict, Any, Literal
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
 from .scanner_crew import analyze_scraped_pages
 from .observability import setup_observability, get_phoenix_url
+from .tools.document_upload_tool import upload_document
+from .tools.document_validator import validate_document
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -71,6 +73,22 @@ class HealthResponse(BaseModel):
     status: str
     phoenix_url: str | None
     deepseek_configured: bool
+
+
+class DocumentUploadResponse(BaseModel):
+    """Document upload response."""
+    success: bool
+    message: str
+    document_id: str | None = None
+    file_url: str | None = None
+    storage_path: str | None = None
+    file_size: int | None = None
+
+
+class ValidationResponse(BaseModel):
+    """Document validation response."""
+    valid: bool
+    message: str
 
 
 # ============================================================================
@@ -142,6 +160,131 @@ async def root():
         "docs": "/docs",
         "health": "/health",
     }
+
+
+@app.post("/api/v1/documents/upload", response_model=DocumentUploadResponse)
+async def upload_document_endpoint(
+    file: UploadFile = File(...),
+    document_type: str = Form(...),
+    application_id: str = Form(...),
+    bucket: Literal["application-documents", "nsfas-documents"] = Form("application-documents"),
+):
+    """
+    Upload a document to Supabase Storage.
+
+    This endpoint handles document uploads for both university applications
+    and NSFAS applications. It validates the document, uploads it to the
+    appropriate storage bucket, and records metadata in the database.
+
+    Args:
+        file: The file to upload (multipart/form-data)
+        document_type: Type of document (e.g., "id_document", "matric_certificate")
+        application_id: UUID of the application or NSFAS application
+        bucket: Storage bucket - "application-documents" or "nsfas-documents"
+
+    Returns:
+        DocumentUploadResponse with upload results
+
+    Example:
+        curl -X POST "http://localhost:8000/api/v1/documents/upload" \\
+             -F "file=@matric.pdf" \\
+             -F "document_type=matric_certificate" \\
+             -F "application_id=123e4567-e89b-12d3-a456-426614174000" \\
+             -F "bucket=application-documents"
+    """
+    logger.info(f"Received document upload: {file.filename} (type: {document_type})")
+
+    try:
+        # Read file content
+        file_content = await file.read()
+        file_name = file.filename or "unknown"
+
+        # Validate document first
+        validation_result = validate_document(file_content, file_name)
+
+        if validation_result != "VALID":
+            logger.warning(f"Document validation failed: {validation_result}")
+            return DocumentUploadResponse(
+                success=False,
+                message=validation_result,
+            )
+
+        # Upload document
+        upload_result = upload_document(
+            file_content=file_content,
+            file_name=file_name,
+            document_type=document_type,
+            application_id=application_id,
+            bucket=bucket,
+        )
+
+        # Parse upload result
+        if upload_result.startswith("UPLOAD_ERROR:"):
+            logger.error(f"Upload failed: {upload_result}")
+            return DocumentUploadResponse(
+                success=False,
+                message=upload_result,
+            )
+
+        # Parse success response (convert string dict to actual dict)
+        import ast
+
+        result_dict = ast.literal_eval(upload_result)
+
+        logger.info(f"Document uploaded successfully: {result_dict.get('document_id')}")
+
+        return DocumentUploadResponse(
+            success=True,
+            message="Document uploaded successfully",
+            document_id=result_dict.get("document_id"),
+            file_url=result_dict.get("file_url"),
+            storage_path=result_dict.get("storage_path"),
+            file_size=result_dict.get("file_size"),
+        )
+
+    except Exception as e:
+        logger.error(f"Document upload error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/documents/validate", response_model=ValidationResponse)
+async def validate_document_endpoint(
+    file: UploadFile = File(...),
+):
+    """
+    Validate a document without uploading it.
+
+    This endpoint allows clients to validate documents before uploading
+    to provide immediate feedback to users.
+
+    Args:
+        file: The file to validate (multipart/form-data)
+
+    Returns:
+        ValidationResponse with validation results
+
+    Example:
+        curl -X POST "http://localhost:8000/api/v1/documents/validate" \\
+             -F "file=@document.pdf"
+    """
+    try:
+        # Read file content
+        file_content = await file.read()
+        file_name = file.filename or "unknown"
+
+        # Validate document
+        validation_result = validate_document(file_content, file_name)
+
+        is_valid = validation_result == "VALID"
+
+        return ValidationResponse(
+            valid=is_valid,
+            message=validation_result,
+        )
+
+    except Exception as e:
+        logger.error(f"Document validation error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================

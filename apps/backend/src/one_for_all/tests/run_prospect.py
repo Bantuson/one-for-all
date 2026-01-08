@@ -35,14 +35,31 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def setup_environment():
-    """Load environment variables from root .env.local."""
+def setup_environment(use_production: bool = False):
+    """
+    Load environment variables from root .env.local or .env.test.
+
+    Args:
+        use_production: If True, uses production tools; if False, uses test mode
+    """
     try:
         from dotenv import load_dotenv
+        import os
 
         # Load from monorepo root (5 levels up from this file)
         project_root = Path(__file__).resolve().parents[5]
-        env_path = project_root / ".env.local"
+
+        if use_production:
+            # Production mode - use .env.local and disable test mode
+            env_path = project_root / ".env.local"
+            os.environ["ONEFORALL_TEST_MODE"] = "false"
+            logger.info("Running in PRODUCTION mode with real tools")
+        else:
+            # Test mode - try .env.test first, fallback to .env.local
+            env_test_path = project_root / "apps" / "backend" / ".env.test"
+            env_path = env_test_path if env_test_path.exists() else project_root / ".env.local"
+            os.environ["ONEFORALL_TEST_MODE"] = "true"
+            logger.info("Running in TEST mode with mock tools")
 
         if env_path.exists():
             load_dotenv(dotenv_path=env_path)
@@ -393,14 +410,26 @@ Examples:
         help="Verify Phoenix telemetry setup and exit"
     )
 
+    parser.add_argument(
+        "--production",
+        action="store_true",
+        help="Run with production tools (real API calls). Default is test mode with mocks."
+    )
+
+    parser.add_argument(
+        "--cleanup",
+        action="store_true",
+        help="Clean up test data after run (deletes TEST- prefixed records)"
+    )
+
     args = parser.parse_args()
 
     # Set logging level
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    # Load environment
-    setup_environment()
+    # Load environment (test mode by default, production if --production flag)
+    setup_environment(use_production=args.production)
 
     # Handle Phoenix verification
     if args.verify_phoenix:
@@ -496,6 +525,16 @@ Examples:
             print(f"\nReport saved: {saved_path}")
 
         print("=" * 60 + "\n")
+
+        # Clean up test data if requested
+        if args.cleanup and not args.production:
+            print("\nCleaning up test data...")
+            try:
+                from one_for_all.tests.cleanup import cleanup_test_data
+                cleanup_result = cleanup_test_data()
+                print(f"Cleanup completed: {cleanup_result}")
+            except Exception as cleanup_error:
+                logger.error(f"Cleanup failed: {cleanup_error}")
 
         # Exit with appropriate code
         sys.exit(0 if crew_output else 1)

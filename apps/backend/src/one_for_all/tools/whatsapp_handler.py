@@ -92,17 +92,28 @@ def send_whatsapp_message(phone_number: str, message: str) -> str:
 
 
 @tool
-def send_whatsapp_otp(phone_number: str, otp: str) -> str:
+def send_whatsapp_otp(phone_number: str) -> str:
     """
-    Send OTP verification code via WhatsApp.
+    Generates a 6-digit OTP, stores it in the database, and sends it via WhatsApp.
+    The OTP is generated internally for security.
 
     Args:
         phone_number: Recipient phone number (SA format: 0821234567 or +27821234567)
-        otp: The 6-digit OTP code to send
 
     Returns:
-        Success message or error details
+        Success message with OTP sent confirmation, or error details
     """
+    from .otp_store import generate_otp, store_otp
+
+    # Generate OTP
+    otp = generate_otp()
+
+    # Store OTP in database (use normalized phone format for identifier)
+    normalized_phone = format_whatsapp_number(phone_number).replace("whatsapp:", "")
+    if not store_otp(identifier=normalized_phone, channel="whatsapp", code=otp):
+        return f"Failed to store OTP for {phone_number}. WhatsApp message not sent."
+
+    # Send OTP via WhatsApp
     message = f"Your One For All verification code is: {otp}\n\nThis code expires in 10 minutes. Do not share this code with anyone."
     return send_whatsapp_message.func(phone_number, message)
 

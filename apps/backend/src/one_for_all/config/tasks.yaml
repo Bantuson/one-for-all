@@ -13,13 +13,27 @@ account_creation_task:
 
 otp_verification_task:
   description: >
-    Send the OTP based on the user's selected method (email or SMS).
-    Prompt the user to provide the OTP they received.
-    Verify the OTP using Supabase.
-    After verification, create a user account and 24hr session record.
-    Your final answer MUST confirm successful account creation.
+    Send the OTP based on the user's selected method (email, SMS, or WhatsApp).
+    The OTP sending tools (sendgrid_otp_sender, sms_otp_sender, send_whatsapp_otp)
+    will AUTOMATICALLY generate and store the OTP in the database - do NOT
+    fabricate OTP codes.
+
+    After sending, prompt the user to provide the OTP they received.
+
+    Use the verify_otp tool to validate the code against the database:
+    - verify_otp(identifier, code) returns "OTP_VALID" or "OTP_INVALID: reason"
+    - identifier must match exactly what was used when sending (email or phone)
+
+    ONLY after receiving "OTP_VALID" response:
+    - Create user account via supabase_user_store
+    - Create 24hr session via supabase_session_create
+
+    If verification fails, inform the user of the specific reason and offer
+    to resend using resend_otp_check tool first.
+
+    Your final answer MUST confirm successful account creation with session token.
   expected_output: >
-    Confirmation message + session token.
+    Confirmation message with session token (only after OTP_VALID verification).
   agent: identity_auth_agent
 
 collect_personal_info_task:

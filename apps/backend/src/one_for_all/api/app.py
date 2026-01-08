@@ -45,6 +45,10 @@ def create_app() -> FastAPI:
     app.include_router(nsfas.router)
     app.include_router(rag.router)
 
+    # Include legacy routers for CrewAI tool compatibility
+    app.include_router(applications.legacy_router)
+    app.include_router(nsfas.legacy_router)
+
     return app
 
 
