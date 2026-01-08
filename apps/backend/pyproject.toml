@@ -15,6 +15,12 @@ dependencies = [
     "arize-phoenix>=4.0.0",
     "openinference-instrumentation-crewai>=0.1.0",
     "openinference-instrumentation-litellm>=0.1.0",
+    # API server dependencies
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.0.0",
+    "aiohttp>=3.9.0",
 ]
 
 [project.optional-dependencies]
