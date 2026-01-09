@@ -1,0 +1,54 @@
+# Render Blueprint Configuration
+# https://render.com/docs/blueprint-spec
+#
+# This configuration deploys the One For All backend API to Render.
+# Use for staging environment to run E2E and performance tests.
+
+services:
+  - type: web
+    name: oneforall-backend-staging
+    runtime: python
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: apps/backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements-api.txt
+    startCommand: python -m uvicorn one_for_all.api.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # Test mode for staging (uses mock external APIs)
+      - key: ONEFORALL_TEST_MODE
+        value: "false"  # Set to true to use mocks
+
+      # Supabase (sync from secrets)
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # DeepSeek LLM
+      - key: DEEPSEEK_API_KEY
+        sync: false
+
+      # Backend API key for authentication
+      - key: BACKEND_API_KEY
+        sync: false
+
+      # Optional: Phoenix observability
+      - key: PHOENIX_AUTO_START
+        value: "false"
+
+# Alternative: Production service configuration
+# Uncomment and modify for production deployment
+#
+#   - type: web
+#     name: oneforall-backend-production
+#     runtime: python
+#     region: oregon
+#     plan: starter  # Paid plan for production
+#     branch: main
+#     rootDir: apps/backend
+#     buildCommand: pip install -e .
+#     startCommand: python -m uvicorn one_for_all.api.app:app --host 0.0.0.0 --port $PORT --workers 4
+#     healthCheckPath: /health
+#     autoDeploy: false  # Manual deploys for production
