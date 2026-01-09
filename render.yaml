@@ -13,7 +13,7 @@ services:
     branch: main
     rootDir: apps/backend
     buildCommand: pip install --upgrade pip && pip install -r requirements-api.txt
-    startCommand: uvicorn one_for_all.api.app:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn one_for_all.api.app:app --host 0.0.0.0 --port $PORT --app-dir src
     healthCheckPath: /health
     envVars:
       # CRITICAL: PYTHONPATH for src layout (uvicorn workers inherit this)
