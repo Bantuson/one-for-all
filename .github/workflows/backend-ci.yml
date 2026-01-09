@@ -380,6 +380,9 @@ jobs:
           echo "ONEFORALL_TEST_MODE=true" >> .env.local
 
       - name: Run E2E tests
+        env:
+          STAGING_API_URL: ${{ needs.staging-deploy.outputs.staging_url }}
+          STAGING_API_KEY: ${{ secrets.BACKEND_API_KEY }}
         run: |
           if [ -d "tests/e2e" ]; then
             pytest tests/e2e/ -v --timeout=300
