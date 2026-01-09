@@ -13,7 +13,7 @@ services:
     branch: main
     rootDir: apps/backend
     buildCommand: pip install --upgrade pip && pip install -r requirements-api.txt
-    startCommand: python -m uvicorn one_for_all.api:app --host 0.0.0.0 --port $PORT
+    startCommand: python -m uvicorn one_for_all.api.app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       # Test mode for staging (uses mock external APIs)
@@ -49,6 +49,6 @@ services:
 #     branch: main
 #     rootDir: apps/backend
 #     buildCommand: pip install -e .
-#     startCommand: python -m uvicorn one_for_all.api:app --host 0.0.0.0 --port $PORT --workers 4
+#     startCommand: python -m uvicorn one_for_all.api.app:app --host 0.0.0.0 --port $PORT --workers 4
 #     healthCheckPath: /health
 #     autoDeploy: false  # Manual deploys for production
