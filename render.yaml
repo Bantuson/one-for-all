@@ -13,9 +13,13 @@ services:
     branch: main
     rootDir: apps/backend
     buildCommand: pip install --upgrade pip && pip install -r requirements-api.txt
-    startCommand: python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn one_for_all.api.app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
+      # CRITICAL: PYTHONPATH for src layout (uvicorn workers inherit this)
+      - key: PYTHONPATH
+        value: /opt/render/project/src/apps/backend/src
+
       # Test mode for staging (uses mock external APIs)
       - key: ONEFORALL_TEST_MODE
         value: "false"  # Set to true to use mocks
