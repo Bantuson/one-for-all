@@ -407,6 +407,7 @@ jobs:
           fi
 
       - name: Check performance thresholds
+        continue-on-error: true  # Performance thresholds are advisory on free-tier staging
         run: |
           if [ -f "tests/performance/results_stats.csv" ]; then
             # Extract 95th percentile response time
