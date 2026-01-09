@@ -376,6 +376,7 @@ jobs:
           echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env.local
           echo "DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}" >> .env.local
           echo "STAGING_API_URL=${{ needs.staging-deploy.outputs.staging_url }}" >> .env.local
+          echo "STAGING_API_KEY=${{ secrets.BACKEND_API_KEY }}" >> .env.local
           echo "ONEFORALL_TEST_MODE=true" >> .env.local
 
       - name: Run E2E tests
