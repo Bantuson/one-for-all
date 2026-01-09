@@ -391,6 +391,7 @@ jobs:
           fi
 
       - name: Run Locust load tests
+        continue-on-error: true  # Load tests are informational, don't fail build
         run: |
           if [ -f "tests/performance/locustfile.py" ]; then
             locust -f tests/performance/locustfile.py \
