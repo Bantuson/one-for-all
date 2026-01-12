@@ -8,6 +8,7 @@ import type {
   ProgrammeTypeCategory,
 } from '@/lib/institutions/types'
 import { getInstitutionById } from '@/lib/institutions'
+import type { Permission } from '@/lib/constants/permissions'
 
 // ============================================================================
 // Types
@@ -26,15 +27,6 @@ export type UserType = 'institution' | 'applicant' | null
 export type InstitutionType = 'university' | 'college' | 'nsfas' | 'bursary_provider' | null
 
 export type SetupMode = 'preconfigured' | 'manual'
-
-export type Permission =
-  | 'view_dashboard'
-  | 'view_applications'
-  | 'edit_courses'
-  | 'process_applications'
-  | 'export_data'
-  | 'manage_team'
-  | 'admin_access'
 
 export interface InstitutionData {
   name: string
@@ -88,6 +80,8 @@ interface UnifiedRegistrationState {
   // Team invite state
   pendingInvites: Array<{
     email: string
+    roleId?: string
+    roleName?: string
     permissions: Permission[]
   }>
 
@@ -146,7 +140,7 @@ interface UnifiedRegistrationActions {
   setEditingItem: (itemId: string | null) => void
 
   // Team invite actions
-  addInvite: (email: string, permissions: Permission[]) => void
+  addInvite: (email: string, permissions: Permission[], roleId?: string, roleName?: string) => void
   removeInvite: (email: string) => void
   clearInvites: () => void
 
@@ -635,9 +629,9 @@ export const useUnifiedRegistrationStore = create<
         // Team Invite Actions
         // -----------------------------------------------------------------------
 
-        addInvite: (email, permissions) =>
+        addInvite: (email, permissions, roleId, roleName) =>
           set((state) => ({
-            pendingInvites: [...state.pendingInvites, { email, permissions }],
+            pendingInvites: [...state.pendingInvites, { email, roleId, roleName, permissions }],
           })),
 
         removeInvite: (email) =>

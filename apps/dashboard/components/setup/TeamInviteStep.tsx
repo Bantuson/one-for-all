@@ -1,18 +1,23 @@
 'use client'
 
 import * as React from 'react'
-import { Plus, X, Mail, Users } from 'lucide-react'
+import { Plus, X, Mail, Users, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { CodeCard, CodeCardHeader } from '@/components/ui/CodeCard'
 import { useSetupStore } from '@/lib/stores/setupStore'
+import { RoleSelector } from '@/components/roles/RoleSelector'
+import { RolePermissionGrid } from '@/components/roles/RolePermissionGrid'
+import type { Role } from '@/components/roles'
+import type { Permission } from '@/lib/constants/permissions'
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type Permission =
+// Legacy permission type for backward compatibility
+type LegacyPermission =
   | 'view_dashboard'
   | 'view_applications'
   | 'edit_courses'
@@ -23,6 +28,8 @@ type Permission =
 
 interface PendingInvite {
   email: string
+  roleId?: string
+  roleName?: string
   permissions: Permission[]
 }
 
@@ -30,13 +37,15 @@ interface TeamInviteStepProps {
   className?: string
   onInvitesChange?: (invites: PendingInvite[]) => void
   showWrapper?: boolean
+  institutionId?: string  // Required for role selection
 }
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const PERMISSIONS: { id: Permission; label: string; description: string }[] = [
+// Legacy permissions for backward compatibility (when institutionId not provided)
+const LEGACY_PERMISSIONS: { id: LegacyPermission; label: string; description: string }[] = [
   { id: 'view_dashboard', label: 'View Dashboard', description: 'Access analytics and dashboard metrics' },
   { id: 'view_applications', label: 'View Applications', description: 'Read-only access to applications' },
   { id: 'edit_courses', label: 'Edit Courses', description: 'Add, edit, and delete courses and faculties' },
@@ -46,7 +55,7 @@ const PERMISSIONS: { id: Permission; label: string; description: string }[] = [
   { id: 'admin_access', label: 'Full Admin Access', description: 'All permissions + settings access' },
 ]
 
-const DEFAULT_PERMISSIONS: Permission[] = ['view_dashboard', 'view_applications']
+const DEFAULT_LEGACY_PERMISSIONS: LegacyPermission[] = ['view_dashboard', 'view_applications']
 
 // ============================================================================
 // Utility Functions
@@ -65,7 +74,7 @@ function isValidEmail(email: string): boolean {
  * Format permissions for display in pending invites list
  */
 function formatPermissionsDisplay(permissions: Permission[]): string {
-  if (permissions.length === PERMISSIONS.length) {
+  if (permissions.length === LEGACY_PERMISSIONS.length || permissions.length >= 10) {
     return 'all permissions'
   }
   if (permissions.length <= 2) {
@@ -82,10 +91,19 @@ export function TeamInviteStep({
   className,
   onInvitesChange,
   showWrapper = true,
+  institutionId,
 }: TeamInviteStepProps) {
   const [emailInput, setEmailInput] = React.useState('')
-  const [selectedPermissions, setSelectedPermissions] = React.useState<Permission[]>(DEFAULT_PERMISSIONS)
   const [emailError, setEmailError] = React.useState<string | null>(null)
+
+  // Role-first selection state (when institutionId is provided)
+  const [selectedRole, setSelectedRole] = React.useState<Role | null>(null)
+  const [selectedRoleId, setSelectedRoleId] = React.useState<string | null>(null)
+  const [showPermissionOverride, setShowPermissionOverride] = React.useState(false)
+  const [overriddenPermissions, setOverriddenPermissions] = React.useState<Permission[]>([])
+
+  // Legacy permission selection state (fallback when no institutionId)
+  const [legacyPermissions, setLegacyPermissions] = React.useState<LegacyPermission[]>(DEFAULT_LEGACY_PERMISSIONS)
 
   // Get state and actions from store
   const pendingInvites = useSetupStore((state) => state.pendingInvites)
@@ -95,13 +113,26 @@ export function TeamInviteStep({
   // Email input ref for focus management
   const emailInputRef = React.useRef<HTMLInputElement>(null)
 
+  // Determine if using role-first mode
+  const useRoleFirstMode = Boolean(institutionId)
+
   // Notify parent of invite changes (for compatibility)
   React.useEffect(() => {
     onInvitesChange?.(pendingInvites as PendingInvite[])
   }, [pendingInvites, onInvitesChange])
 
-  const handlePermissionToggle = React.useCallback((permissionId: Permission) => {
-    setSelectedPermissions((prev) => {
+  // Handle role selection
+  const handleRoleChange = React.useCallback((roleId: string, role: Role) => {
+    setSelectedRoleId(roleId)
+    setSelectedRole(role)
+    // Reset overridden permissions to role's default permissions
+    setOverriddenPermissions(role.permissions)
+    setShowPermissionOverride(false)
+  }, [])
+
+  // Handle legacy permission toggle (for backward compatibility)
+  const handleLegacyPermissionToggle = React.useCallback((permissionId: LegacyPermission) => {
+    setLegacyPermissions((prev) => {
       if (prev.includes(permissionId)) {
         return prev.filter((p) => p !== permissionId)
       }
@@ -129,20 +160,48 @@ export function TeamInviteStep({
       return
     }
 
-    // Validate at least one permission selected
-    if (selectedPermissions.length === 0) {
-      setEmailError('Select at least one permission')
-      return
+    if (useRoleFirstMode) {
+      // Role-first mode validation
+      if (!selectedRole) {
+        setEmailError('Select a role for this team member')
+        return
+      }
+
+      // Get permissions - use overridden if custom, otherwise use role's defaults
+      const permissions = showPermissionOverride ? overriddenPermissions : selectedRole.permissions
+
+      if (permissions.length === 0) {
+        setEmailError('Select at least one permission')
+        return
+      }
+
+      // Add invite with role info
+      addInvite(trimmedEmail, permissions, selectedRole.id, selectedRole.name)
+    } else {
+      // Legacy mode validation
+      if (legacyPermissions.length === 0) {
+        setEmailError('Select at least one permission')
+        return
+      }
+
+      // Add invite with legacy permissions (cast to Permission[])
+      addInvite(trimmedEmail, legacyPermissions as unknown as Permission[])
     }
 
-    // Add invite using store action with permissions
-    addInvite(trimmedEmail, selectedPermissions)
-
-    // Reset form (keep permissions selected for convenience)
+    // Reset form
     setEmailInput('')
     setEmailError(null)
     emailInputRef.current?.focus()
-  }, [emailInput, selectedPermissions, pendingInvites, addInvite])
+  }, [
+    emailInput,
+    pendingInvites,
+    useRoleFirstMode,
+    selectedRole,
+    showPermissionOverride,
+    overriddenPermissions,
+    legacyPermissions,
+    addInvite
+  ])
 
   const handleRemoveInvite = React.useCallback((emailToRemove: string) => {
     removeInvite(emailToRemove)
@@ -228,56 +287,113 @@ export function TeamInviteStep({
         </p>
       )}
 
-      {/* Permissions Section */}
+      {/* Role/Permissions Section */}
       <div className="pt-2">
-        <p className="mb-3 text-center">
-          <span className="text-traffic-green">//</span>
-          <span className="text-muted-foreground"> Select permissions:</span>
-        </p>
-        <fieldset>
-          <legend className="sr-only">Select permissions for team member</legend>
-          <div className="space-y-2">
-            {PERMISSIONS.map((permission) => {
-              const isChecked = selectedPermissions.includes(permission.id)
-              return (
-                <label
-                  key={permission.id}
+        {useRoleFirstMode && institutionId ? (
+          // Role-first mode: Select role, then optionally override permissions
+          <>
+            <p className="mb-3 text-center">
+              <span className="text-traffic-green">//</span>
+              <span className="text-muted-foreground"> Select role:</span>
+            </p>
+
+            <RoleSelector
+              institutionId={institutionId}
+              value={selectedRoleId}
+              onChange={handleRoleChange}
+              showPermissionsPreview={!showPermissionOverride}
+              placeholder="Select a role for this team member..."
+              className="mb-4"
+            />
+
+            {/* Permission Override Toggle */}
+            {selectedRole && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowPermissionOverride(!showPermissionOverride)}
                   className={cn(
-                    'flex items-start gap-3 p-2 rounded cursor-pointer transition-colors',
-                    'hover:bg-muted/30',
-                    isChecked && 'bg-muted/20'
+                    'flex items-center gap-2 w-full p-2 rounded transition-colors',
+                    'text-muted-foreground hover:text-foreground hover:bg-muted/30',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                   )}
                 >
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => handlePermissionToggle(permission.id)}
-                    className={cn(
-                      'mt-0.5 h-4 w-4 rounded border-2 border-muted-foreground',
-                      'text-traffic-green focus:ring-traffic-green focus:ring-offset-0',
-                      'accent-traffic-green cursor-pointer'
-                    )}
-                    aria-describedby={`permission-desc-${permission.id}`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <span className={cn(
-                      'block',
-                      isChecked ? 'text-traffic-green' : 'text-foreground'
-                    )}>
-                      {permission.label}
-                    </span>
-                    <span
-                      id={`permission-desc-${permission.id}`}
-                      className="block text-xs text-syntax-comment"
-                    >
-                      {permission.description}
-                    </span>
+                  {showPermissionOverride ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                  <span className="text-traffic-green">//</span>
+                  <span>
+                    {showPermissionOverride ? 'Hide' : 'Override'} permissions
+                  </span>
+                </button>
+
+                {/* Permission Override Grid */}
+                {showPermissionOverride && (
+                  <div className="mt-3 border border-border rounded-lg p-3 bg-muted/10">
+                    <RolePermissionGrid
+                      value={overriddenPermissions}
+                      onChange={setOverriddenPermissions}
+                    />
                   </div>
-                </label>
-              )
-            })}
-          </div>
-        </fieldset>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          // Legacy mode: Permission checkboxes directly
+          <>
+            <p className="mb-3 text-center">
+              <span className="text-traffic-green">//</span>
+              <span className="text-muted-foreground"> Select permissions:</span>
+            </p>
+            <fieldset>
+              <legend className="sr-only">Select permissions for team member</legend>
+              <div className="space-y-2">
+                {LEGACY_PERMISSIONS.map((permission) => {
+                  const isChecked = legacyPermissions.includes(permission.id)
+                  return (
+                    <label
+                      key={permission.id}
+                      className={cn(
+                        'flex items-start gap-3 p-2 rounded cursor-pointer transition-colors',
+                        'hover:bg-muted/30',
+                        isChecked && 'bg-muted/20'
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleLegacyPermissionToggle(permission.id)}
+                        className={cn(
+                          'mt-0.5 h-4 w-4 rounded border-2 border-muted-foreground',
+                          'text-traffic-green focus:ring-traffic-green focus:ring-offset-0',
+                          'accent-traffic-green cursor-pointer'
+                        )}
+                        aria-describedby={`permission-desc-${permission.id}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className={cn(
+                          'block',
+                          isChecked ? 'text-traffic-green' : 'text-foreground'
+                        )}>
+                          {permission.label}
+                        </span>
+                        <span
+                          id={`permission-desc-${permission.id}`}
+                          className="block text-xs text-syntax-comment"
+                        >
+                          {permission.description}
+                        </span>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </fieldset>
+          </>
+        )}
       </div>
 
       {/* Divider */}
@@ -298,15 +414,28 @@ export function TeamInviteStep({
                   key={invite.email}
                   className="flex items-center justify-between gap-2 p-2 rounded bg-muted/30 group"
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
                     <span className="text-traffic-yellow">*</span>
                     <span className="text-syntax-string truncate">
                       "{invite.email}"
                     </span>
                     <span className="text-foreground">:</span>
-                    <span className="text-syntax-key truncate" title={inviteWithPermissions.permissions?.join(', ')}>
-                      [{formatPermissionsDisplay(inviteWithPermissions.permissions || [])}]
-                    </span>
+                    {/* Show role name if available, otherwise show permissions */}
+                    {inviteWithPermissions.roleName ? (
+                      <span className="text-syntax-export truncate" title={`Role: ${inviteWithPermissions.roleName}`}>
+                        @{inviteWithPermissions.roleName}
+                      </span>
+                    ) : (
+                      <span className="text-syntax-key truncate" title={inviteWithPermissions.permissions?.join(', ')}>
+                        [{formatPermissionsDisplay(inviteWithPermissions.permissions || [])}]
+                      </span>
+                    )}
+                    {/* Show permissions count if role is used */}
+                    {inviteWithPermissions.roleName && inviteWithPermissions.permissions?.length > 0 && (
+                      <span className="text-syntax-comment text-xs">
+                        ({inviteWithPermissions.permissions.length} perms)
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"

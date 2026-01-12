@@ -1,6 +1,7 @@
 # Dashboard Component Inventory
 
 > Generated: 2026-01-06
+> Updated: 2026-01-12 (Role Management System)
 > Branch: registration_consolidation (merged to master)
 
 ## Business Logic Flow
@@ -78,9 +79,85 @@ Dashboard (/dashboard/[slug])
 | Component | Path | Purpose |
 |-----------|------|---------|
 | **SetupEditorMasterDetail** | `components/setup/SetupEditorMasterDetail.tsx` | Tree-based hierarchy editor |
-| **TeamInviteStep** | `components/setup/TeamInviteStep.tsx` | Team invitation form |
+| **TeamInviteStep** | `components/setup/TeamInviteStep.tsx` | Team invitation form (role-first or legacy mode) |
 | **InstitutionSelector** | `components/setup/InstitutionSelector.tsx` | Pre-configured institution selector |
 | **InstitutionPreview** | `components/setup/InstitutionPreview.tsx` | Institution data preview |
+
+---
+
+## Role Management Components (NEW)
+
+Institution-level custom roles with granular permissions. Located in `components/roles/`.
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| **RoleBadge** | `components/roles/RoleBadge.tsx` | Small colored badge for role name |
+| **RoleSelector** | `components/roles/RoleSelector.tsx` | Dropdown with permissions preview |
+| **RolePermissionGrid** | `components/roles/RolePermissionGrid.tsx` | Grouped permission checkboxes |
+| **RoleCard** | `components/roles/RoleCard.tsx` | Role display card with actions |
+| **RoleForm** | `components/roles/RoleForm.tsx` | Create/Edit role form |
+| **RoleDeleteDialog** | `components/roles/RoleDeleteDialog.tsx` | Delete confirmation dialog |
+
+### Role Hooks
+
+| Hook | Path | Purpose |
+|------|------|---------|
+| **useRoles** | `components/roles/hooks/useRoles.ts` | Fetch roles for institution |
+| **useCreateRole** | `components/roles/hooks/useRoleMutations.ts` | Create role mutation |
+| **useUpdateRole** | `components/roles/hooks/useRoleMutations.ts` | Update role mutation |
+| **useDeleteRole** | `components/roles/hooks/useRoleMutations.ts` | Delete role mutation |
+
+### Role-First Invite Flow
+
+TeamInviteStep now supports two modes:
+
+```tsx
+// Role-first mode (when institutionId provided)
+<TeamInviteStep institutionId={institutionId} />
+
+// Legacy mode (permission checkboxes)
+<TeamInviteStep />
+```
+
+---
+
+## Permissions System
+
+Centralized permission definitions in `lib/constants/permissions.ts`.
+
+### Canonical Permissions (10 total)
+
+| Permission | Category | Description |
+|------------|----------|-------------|
+| `view_dashboard` | access | View dashboard metrics |
+| `view_applications` | applications | Read-only application access |
+| `process_applications` | applications | Review and update applications |
+| `manage_applications` | applications | Full application management |
+| `edit_courses` | academic | Manage courses and programs |
+| `view_reports` | reporting | Access reports and analytics |
+| `export_data` | reporting | Export data to files |
+| `manage_team` | administration | Invite and manage team members |
+| `manage_settings` | administration | Configure institution settings |
+| `admin_access` | administration | All permissions (superuser) |
+
+### Permission Helpers
+
+```tsx
+import {
+  hasPermission,
+  hasAllPermissions,
+  hasAnyPermission,
+  expandAdminAccess,
+  PERMISSIONS,
+  PERMISSION_GROUPS,
+} from '@/lib/constants/permissions'
+
+// Check single permission (respects admin_access)
+if (hasPermission(user.permissions, 'manage_team')) { ... }
+
+// Expand admin to all permissions
+const effective = expandAdminAccess(user.permissions)
+```
 
 ---
 
@@ -200,6 +277,29 @@ All pre-configured South African institutions in `lib/institutions/data/`:
 - `POST /api/invitations/accept` - Accept invitation
 - `GET /api/invitations/validate` - Validate token
 
+### Roles (NEW)
+
+- `GET /api/institutions/[institutionId]/roles` - List roles with member counts
+- `POST /api/institutions/[institutionId]/roles` - Create custom role
+- `GET /api/institutions/[institutionId]/roles/[roleId]` - Get single role
+- `PATCH /api/institutions/[institutionId]/roles/[roleId]` - Update role
+- `DELETE /api/institutions/[institutionId]/roles/[roleId]` - Delete role
+
+### Members (Updated)
+
+- `GET /api/institutions/[institutionId]/members` - List with role info (roleId, roleName, roleColor)
+- `POST /api/institutions/[institutionId]/members` - Create with roleId support
+
 ### Authentication
+
 - `GET /api/auth/session-check` - Session validation
 - `POST /api/webhooks/clerk` - Clerk webhooks
+
+---
+
+## Database Migrations (Role System)
+
+| Migration | Purpose |
+|-----------|---------|
+| `011_institution_roles.sql` | Creates `institution_roles` table with RLS, auto-seeds admin role |
+| `012_update_institution_members.sql` | Adds `role_id` FK, links existing members to roles |

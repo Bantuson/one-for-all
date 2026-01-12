@@ -16,6 +16,7 @@ import type { PreConfiguredCampus } from '@/lib/institutions/types'
 interface InviteData {
   email: string
   permissions: string[]
+  roleId?: string
 }
 
 interface SetupRequestBody {
@@ -269,22 +270,73 @@ export async function POST(req: NextRequest) {
             continue
           }
 
-          // Map permissions to role for database compatibility
-          const role = mapPermissionsToRole(invite.permissions)
+          // Determine role, role_id, and permissions based on whether roleId is provided
+          let role: 'admin' | 'reviewer' | 'member'
+          let roleId: string | null = null
+          let permissionsToStore: string[] = invite.permissions
+
+          if (invite.roleId) {
+            // If roleId is provided, fetch the role from institution_roles
+            const { data: institutionRole, error: roleError } = await supabase
+              .from('institution_roles')
+              .select('id, slug, permissions')
+              .eq('id', invite.roleId)
+              .single()
+
+            if (roleError || !institutionRole) {
+              console.error('Failed to fetch role by ID:', invite.roleId, roleError)
+              // Fall back to permission-based role mapping
+              role = mapPermissionsToRole(invite.permissions)
+            } else {
+              // Use the role's slug for backward compatibility
+              // Map slug to valid role enum value
+              const slugToRole: Record<string, 'admin' | 'reviewer' | 'member'> = {
+                admin: 'admin',
+                reviewer: 'reviewer',
+                member: 'member',
+              }
+              role = slugToRole[institutionRole.slug] || 'member'
+              roleId = institutionRole.id
+              // Use the role's permissions instead of invite.permissions
+              permissionsToStore = institutionRole.permissions || invite.permissions
+            }
+          } else {
+            // No roleId provided - use legacy behavior with permission mapping
+            role = mapPermissionsToRole(invite.permissions)
+
+            // Try to find a matching role by slug for role_id assignment
+            const { data: matchingRole } = await supabase
+              .from('institution_roles')
+              .select('id')
+              .eq('institution_id', institution_id)
+              .eq('slug', role)
+              .single()
+
+            if (matchingRole) {
+              roleId = matchingRole.id
+            }
+          }
+
+          const insertData: Record<string, unknown> = {
+            institution_id,
+            user_id: null, // Will be set when invitation is accepted
+            role: role,
+            permissions: permissionsToStore, // Store permissions as JSON array
+            invited_by: invitingUser.id,
+            invitation_token: invitationToken,
+            invitation_status: 'pending',
+            invitation_expires_at: expiresAt.toISOString(),
+            invited_email: invite.email,
+          }
+
+          // Add role_id if we have one
+          if (roleId) {
+            insertData.role_id = roleId
+          }
 
           const { error: inviteError } = await supabase
             .from('institution_members')
-            .insert({
-              institution_id,
-              user_id: null, // Will be set when invitation is accepted
-              role: role,
-              permissions: invite.permissions, // Store raw permissions as JSON array
-              invited_by: invitingUser.id,
-              invitation_token: invitationToken,
-              invitation_status: 'pending',
-              invitation_expires_at: expiresAt.toISOString(),
-              invited_email: invite.email,
-            })
+            .insert(insertData)
 
           if (inviteError) {
             console.error('Invite creation error:', inviteError)

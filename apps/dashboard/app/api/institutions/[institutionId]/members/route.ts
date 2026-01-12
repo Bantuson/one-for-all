@@ -88,11 +88,13 @@ export async function GET(
 
     // Get all members - use explicit FK to avoid ambiguous relationship error
     // (institution_members has both user_id and invited_by pointing to users)
+    // Also join institution_roles for custom role information
     const { data: members, error: membersError } = await supabase
       .from('institution_members')
       .select(`
         id,
         role,
+        role_id,
         permissions,
         invitation_status,
         invited_email,
@@ -106,6 +108,13 @@ export async function GET(
           first_name,
           last_name,
           avatar_url
+        ),
+        institution_roles (
+          id,
+          name,
+          slug,
+          color,
+          permissions
         )
       `)
       .eq('institution_id', institutionId)
@@ -126,10 +135,25 @@ export async function GET(
         avatar_url: string | null
       } | null
 
+      const roleInfo = member.institution_roles as unknown as {
+        id: string
+        name: string
+        slug: string
+        color: string | null
+        permissions: string[]
+      } | null
+
+      // Use role permissions from institution_roles if available, otherwise fall back to member permissions
+      const effectivePermissions = roleInfo?.permissions || member.permissions || []
+
       return {
         id: member.id,
         role: member.role,
-        permissions: member.permissions || [],
+        roleId: member.role_id || null,
+        roleName: roleInfo?.name || null,
+        roleColor: roleInfo?.color || null,
+        rolePermissions: roleInfo?.permissions || null,
+        permissions: effectivePermissions,
         status: member.invitation_status,
         email: user?.email || member.invited_email,
         firstName: user?.first_name || null,
@@ -146,13 +170,38 @@ export async function GET(
     // Always include owner in members list if not already present
     const ownerInList = transformedMembers.some((m) => m.isOwner)
 
+    // Fetch admin role for owner if not in list
+    interface AdminRoleData {
+      id: string
+      name: string
+      slug: string
+      color: string | null
+      permissions: string[]
+    }
+    let adminRole: AdminRoleData | null = null
+
+    if (!ownerInList && ownerUser) {
+      const { data: adminRoleData } = await supabase
+        .from('institution_roles')
+        .select('id, name, slug, color, permissions')
+        .eq('institution_id', institutionId)
+        .eq('slug', 'admin')
+        .single()
+
+      adminRole = adminRoleData as AdminRoleData | null
+    }
+
     const finalMembers = ownerInList || !ownerUser
       ? transformedMembers
       : [
           {
             id: `owner-${institution?.created_by}`,
             role: 'owner',
-            permissions: ['manage_team', 'manage_settings', 'view_applications', 'review_applications'],
+            roleId: adminRole?.id || null,
+            roleName: adminRole?.name || 'Administrator',
+            roleColor: adminRole?.color || '#DC2626',
+            rolePermissions: adminRole?.permissions || ['manage_team', 'manage_settings', 'view_applications', 'review_applications'],
+            permissions: adminRole?.permissions || ['manage_team', 'manage_settings', 'view_applications', 'review_applications'],
             status: 'accepted',
             email: ownerUser.email,
             firstName: ownerUser.first_name,
@@ -286,12 +335,19 @@ export async function POST(
 
     const { institutionId } = await params
     const body = await request.json()
-    const { email, role, permissions = [] } = body
+    const { email, role, roleId, permissions = [] } = body
 
-    // Validate required fields
-    if (!email || !role) {
+    // Validate required fields - either role or roleId must be provided
+    if (!email) {
       return NextResponse.json(
-        { error: 'Email and role are required' },
+        { error: 'Email is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!role && !roleId) {
+      return NextResponse.json(
+        { error: 'Either role or roleId is required' },
         { status: 400 }
       )
     }
@@ -305,13 +361,15 @@ export async function POST(
       )
     }
 
-    // Validate role
-    const validRoles = ['admin', 'reviewer', 'member']
-    if (!validRoles.includes(role)) {
-      return NextResponse.json(
-        { error: 'Invalid role. Must be admin, reviewer, or member' },
-        { status: 400 }
-      )
+    // Only validate hardcoded roles if roleId is not provided
+    if (!roleId && role) {
+      const validRoles = ['admin', 'reviewer', 'member']
+      if (!validRoles.includes(role)) {
+        return NextResponse.json(
+          { error: 'Invalid role. Must be admin, reviewer, or member' },
+          { status: 400 }
+        )
+      }
     }
 
     const supabase = getSupabaseClient()
@@ -386,13 +444,63 @@ export async function POST(
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 7)
 
+    // Resolve role information - handle roleId, role text, or lookup by slug
+    let resolvedRoleId: string | null = null
+    let resolvedRoleName: string = role || 'member'
+    let resolvedRoleColor: string | null = null
+    let resolvedPermissions: string[] = permissions
+
+    if (roleId) {
+      // roleId provided - fetch role details from institution_roles
+      const { data: roleData, error: roleError } = await supabase
+        .from('institution_roles')
+        .select('id, name, slug, color, permissions')
+        .eq('id', roleId)
+        .eq('institution_id', institutionId)
+        .single()
+
+      if (roleError || !roleData) {
+        return NextResponse.json(
+          { error: 'Invalid roleId - role not found in this institution' },
+          { status: 400 }
+        )
+      }
+
+      resolvedRoleId = roleData.id
+      resolvedRoleName = roleData.slug // Use slug for backward compat with role column
+      resolvedRoleColor = roleData.color
+      // Copy permissions from role definition to member record
+      resolvedPermissions = (roleData.permissions as string[]) || []
+    } else if (role) {
+      // Only role text provided - try to find matching role by slug
+      const { data: matchingRole } = await supabase
+        .from('institution_roles')
+        .select('id, name, slug, color, permissions')
+        .eq('institution_id', institutionId)
+        .eq('slug', role)
+        .single()
+
+      if (matchingRole) {
+        // Found matching role - link to it
+        resolvedRoleId = matchingRole.id
+        resolvedRoleName = matchingRole.slug
+        resolvedRoleColor = matchingRole.color
+        // If no custom permissions provided, use role's permissions
+        if (permissions.length === 0) {
+          resolvedPermissions = (matchingRole.permissions as string[]) || []
+        }
+      }
+      // If not found, just use the text role (backward compat)
+    }
+
     const { data: invitation, error: insertError } = await supabase
       .from('institution_members')
       .insert({
         institution_id: institutionId,
         user_id: null,
-        role,
-        permissions,
+        role: resolvedRoleName,
+        role_id: resolvedRoleId,
+        permissions: resolvedPermissions,
         invited_email: email,
         invited_by: userRecord.id,
         invitation_token: invitationToken,
@@ -428,7 +536,7 @@ export async function POST(
         institutionName: institution.name,
         acceptUrl,
         expiresAt,
-        permissions,
+        permissions: resolvedPermissions,
       })
 
       const textContent = getInvitationEmailText({
@@ -436,7 +544,7 @@ export async function POST(
         institutionName: institution.name,
         acceptUrl,
         expiresAt,
-        permissions,
+        permissions: resolvedPermissions,
       })
 
       const emailResult = await sendEmail({
@@ -463,8 +571,10 @@ export async function POST(
       invitation: {
         id: invitation.id,
         email,
-        role,
-        permissions,
+        role: resolvedRoleName,
+        roleId: resolvedRoleId,
+        roleColor: resolvedRoleColor,
+        permissions: resolvedPermissions,
         status: 'pending',
         expiresAt: expiresAt.toISOString(),
         emailSent,

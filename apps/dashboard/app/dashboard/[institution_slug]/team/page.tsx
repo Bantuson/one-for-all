@@ -13,11 +13,23 @@ import {
   AlertCircle,
   UserPlus,
   MoveLeft,
+  Shield,
+  Plus,
 } from 'lucide-react'
 import Link from 'next/link'
 import { CodeCard, CodeCardHeader } from '@/components/ui/CodeCard'
 import { CommandButton } from '@/components/ui/CommandButton'
 import { Button } from '@/components/ui/Button'
+import {
+  RoleSelector,
+  RoleCard,
+  RoleForm,
+  RoleBadge,
+  RoleDeleteDialog,
+  useRoles,
+  useDeleteRole,
+  type Role,
+} from '@/components/roles'
 
 // ============================================================================
 // Types
@@ -26,6 +38,8 @@ import { Button } from '@/components/ui/Button'
 interface TeamMember {
   id: string
   role: string
+  roleId: string | null
+  roleColor: string | null
   permissions: string[]
   status: 'pending' | 'accepted'
   email: string
@@ -39,6 +53,8 @@ interface TeamMember {
   emailSentAt: string | null
 }
 
+type TabType = 'members' | 'roles'
+
 interface MembersResponse {
   members: TeamMember[]
   isOwner: boolean
@@ -46,7 +62,7 @@ interface MembersResponse {
 }
 
 // ============================================================================
-// Permission Labels
+// Permission Labels (kept for fallback display)
 // ============================================================================
 
 const PERMISSION_LABELS: Record<string, string> = {
@@ -57,6 +73,45 @@ const PERMISSION_LABELS: Record<string, string> = {
   manage_team: 'Team',
   manage_settings: 'Settings',
   admin_access: 'Admin',
+}
+
+// ============================================================================
+// Tab Button Component
+// ============================================================================
+
+function TabButton({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  count,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: React.ElementType
+  label: string
+  count?: number
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-4 py-2 font-mono text-sm transition-colors border-b-2 ${
+        active
+          ? 'border-traffic-green text-traffic-green'
+          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/50'
+      }`}
+    >
+      <Icon className="h-4 w-4" />
+      <span>{label}</span>
+      {count !== undefined && (
+        <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+          active ? 'bg-traffic-green/20' : 'bg-muted'
+        }`}>
+          {count}
+        </span>
+      )}
+    </button>
+  )
 }
 
 // ============================================================================
@@ -75,11 +130,20 @@ export default function TeamManagementPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [actionLoading, setActionLoading] = React.useState<string | null>(null)
 
+  // Tab state
+  const [activeTab, setActiveTab] = React.useState<TabType>('members')
+
   // Invite form state
   const [showInviteForm, setShowInviteForm] = React.useState(false)
   const [inviteEmail, setInviteEmail] = React.useState('')
-  const [invitePermissions, setInvitePermissions] = React.useState<string[]>(['view_dashboard'])
+  const [inviteRoleId, setInviteRoleId] = React.useState<string | null>(null)
   const [isInviting, setIsInviting] = React.useState(false)
+
+  // Role management state
+  const [showRoleForm, setShowRoleForm] = React.useState(false)
+  const [editingRole, setEditingRole] = React.useState<Role | null>(null)
+  const [deletingRole, setDeletingRole] = React.useState<Role | null>(null)
+  const [isDeletingRole, setIsDeletingRole] = React.useState(false)
 
   // Fetch institution ID first, then members
   const [institutionId, setInstitutionId] = React.useState<string | null>(null)
@@ -132,9 +196,20 @@ export default function TeamManagementPage() {
     }
   }, [institutionId, fetchMembers])
 
+  // Fetch roles
+  const { roles, isLoading: rolesLoading, mutate: refreshRoles } = useRoles(institutionId)
+
+  // Delete role mutation
+  const deleteRoleMutation = useDeleteRole(institutionId ?? '', deletingRole?.id ?? '')
+
   // Can user manage team?
   const canManageTeam = isOwner || currentUserRole === 'admin' ||
     members.find(m => m.email === inviteEmail)?.permissions?.includes('manage_team')
+
+  // Calculate member count per role
+  const getMemberCountForRole = React.useCallback((roleId: string) => {
+    return members.filter(m => m.roleId === roleId).length
+  }, [members])
 
   // Handle resend invitation
   const handleResend = async (member: TeamMember) => {
@@ -197,7 +272,7 @@ export default function TeamManagementPage() {
   // Handle new invite
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!institutionId || !inviteEmail) return
+    if (!institutionId || !inviteEmail || !inviteRoleId) return
 
     setIsInviting(true)
     setError(null)
@@ -209,13 +284,13 @@ export default function TeamManagementPage() {
         body: JSON.stringify({
           institution_id: institutionId,
           email: inviteEmail,
-          permissions: invitePermissions,
+          role_id: inviteRoleId,
         }),
       })
 
       if (response.ok) {
         setInviteEmail('')
-        setInvitePermissions(['view_dashboard'])
+        setInviteRoleId(null)
         setShowInviteForm(false)
         await fetchMembers()
       } else {
@@ -230,14 +305,29 @@ export default function TeamManagementPage() {
     }
   }
 
-  // Toggle permission in invite form
-  const togglePermission = (perm: string) => {
-    setInvitePermissions((prev) =>
-      prev.includes(perm)
-        ? prev.filter((p) => p !== perm)
-        : [...prev, perm]
-    )
-  }
+  // Handle role form success
+  const handleRoleFormSuccess = React.useCallback(() => {
+    setShowRoleForm(false)
+    setEditingRole(null)
+    refreshRoles()
+  }, [refreshRoles])
+
+  // Handle role delete
+  const handleDeleteRole = React.useCallback(async () => {
+    if (!deletingRole) return
+
+    setIsDeletingRole(true)
+    try {
+      await deleteRoleMutation.mutateAsync({})
+      setDeletingRole(null)
+      refreshRoles()
+    } catch (err) {
+      console.error('Delete role error:', err)
+      setError('Failed to delete role')
+    } finally {
+      setIsDeletingRole(false)
+    }
+  }, [deletingRole, deleteRoleMutation, refreshRoles])
 
   // Separate accepted and pending members
   const acceptedMembers = members.filter((m) => m.status === 'accepted')
@@ -275,8 +365,26 @@ export default function TeamManagementPage() {
 
       {/* Centered Comment - 19px offset from 3rd grid line (83px from top, 27px from content) */}
       <p className="text-sm text-muted-foreground text-center mt-[27px]">
-        <span className="text-traffic-green">//</span> Manage team members and permissions
+        <span className="text-traffic-green">//</span> Manage team members and roles
       </p>
+
+      {/* Tab Navigation */}
+      <div className="max-w-[70%] mx-auto mt-6 flex items-center border-b border-border">
+        <TabButton
+          active={activeTab === 'members'}
+          onClick={() => setActiveTab('members')}
+          icon={Users}
+          label="Members"
+          count={members.length}
+        />
+        <TabButton
+          active={activeTab === 'roles'}
+          onClick={() => setActiveTab('roles')}
+          icon={Shield}
+          label="Roles"
+          count={roles?.length}
+        />
+      </div>
 
       {/* Error display */}
       {error && (
@@ -291,245 +399,368 @@ export default function TeamManagementPage() {
         </div>
       )}
 
-      {/* Active Members - 15px offset from 5th grid line (143px from top) */}
-      <CodeCard className="max-w-[70%] mx-auto mt-[49px]">
-        <CodeCardHeader
-          filename="team.members"
-          status="active"
-          badge={
-            <span className="font-mono text-xs text-muted-foreground">
-              {acceptedMembers.length} active
-            </span>
-          }
-          rightContent={
-            canManageTeam ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setShowInviteForm(!showInviteForm)}
-                className="h-6 px-2 text-xs"
-              >
-                <UserPlus className="h-3 w-3 mr-1" />
-                Invite
-              </Button>
-            ) : undefined
-          }
-        />
-
-        {/* Inline Invite Form */}
-        {showInviteForm && (
-          <form onSubmit={handleInvite} className="p-4 border-b border-border bg-muted/30">
-            <div className="flex items-center gap-3 flex-wrap">
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                className="flex-1 min-w-[200px] px-3 py-1.5 rounded-md border border-border bg-background font-mono text-sm focus:outline-none focus:ring-2 focus:ring-traffic-green/50"
-                placeholder="colleague@example.com"
-                required
-              />
-              <div className="flex flex-wrap gap-1">
-                {Object.entries(PERMISSION_LABELS).slice(0, 4).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => togglePermission(key)}
-                    className={`px-2 py-1 rounded text-[10px] font-mono transition-colors ${
-                      invitePermissions.includes(key)
-                        ? 'bg-traffic-green/20 text-traffic-green border border-traffic-green/30'
-                        : 'bg-muted text-muted-foreground border border-border hover:border-traffic-green/30'
-                    }`}
+      {/* ============================================================ */}
+      {/* MEMBERS TAB */}
+      {/* ============================================================ */}
+      {activeTab === 'members' && (
+        <>
+          {/* Active Members - 15px offset from 5th grid line (143px from top) */}
+          <CodeCard className="max-w-[70%] mx-auto mt-6">
+            <CodeCardHeader
+              filename="team.members"
+              status="active"
+              badge={
+                <span className="font-mono text-xs text-muted-foreground">
+                  {acceptedMembers.length} active
+                </span>
+              }
+              rightContent={
+                canManageTeam ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowInviteForm(!showInviteForm)}
+                    className="h-6 px-2 text-xs"
                   >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowInviteForm(false)}
-                  className="h-7 px-2 text-xs"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-                <CommandButton
-                  command="send"
-                  variant="primary"
-                  size="sm"
-                  type="submit"
-                  disabled={isInviting || !inviteEmail}
-                  loading={isInviting}
-                  className="h-7"
-                />
-              </div>
-            </div>
-          </form>
-        )}
+                    <UserPlus className="h-3 w-3 mr-1" />
+                    Invite
+                  </Button>
+                ) : undefined
+              }
+            />
 
-        <div className="divide-y divide-border">
-          {acceptedMembers.length === 0 ? (
-            <div className="p-8 text-center">
-              <Users className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">No team members yet</p>
-            </div>
-          ) : (
-            acceptedMembers.map((member) => (
-              <div key={member.id} className="p-4 flex items-center gap-4">
-                {/* Avatar */}
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-                  {member.avatarUrl ? (
-                    <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="font-mono text-sm text-muted-foreground">
-                      {(member.firstName?.[0] || member.email?.[0] || '?').toUpperCase()}
-                    </span>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
+            {/* Inline Invite Form with RoleSelector */}
+            {showInviteForm && institutionId && (
+              <form onSubmit={handleInvite} className="p-4 border-b border-border bg-muted/30">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <input
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      className="flex-1 min-w-[200px] px-3 py-1.5 rounded-md border border-border bg-background font-mono text-sm focus:outline-none focus:ring-2 focus:ring-traffic-green/50"
+                      placeholder="colleague@example.com"
+                      required
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowInviteForm(false)}
+                        className="h-7 px-2 text-xs"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                      <CommandButton
+                        command="send"
+                        variant="primary"
+                        size="sm"
+                        type="submit"
+                        disabled={isInviting || !inviteEmail || !inviteRoleId}
+                        loading={isInviting}
+                        className="h-7"
+                      />
+                    </div>
+                  </div>
                   <div className="flex items-center gap-2">
-                    <p className="font-mono text-sm font-medium truncate">
-                      {member.firstName
-                        ? `${member.firstName} ${member.lastName || ''}`
-                        : member.email}
-                    </p>
-                    {member.isOwner && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-traffic-amber/20 text-traffic-amber">
-                        Owner
+                    <span className="text-xs font-mono text-muted-foreground">
+                      <span className="text-traffic-green">//</span> Select role:
+                    </span>
+                    <div className="flex-1 max-w-xs">
+                      <RoleSelector
+                        institutionId={institutionId}
+                        value={inviteRoleId}
+                        onChange={(roleId) => setInviteRoleId(roleId)}
+                        placeholder="Choose a role..."
+                      />
+                    </div>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            <div className="divide-y divide-border">
+              {acceptedMembers.length === 0 ? (
+                <div className="p-8 text-center">
+                  <Users className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">No team members yet</p>
+                </div>
+              ) : (
+                acceptedMembers.map((member) => (
+                  <div key={member.id} className="p-4 flex items-center gap-4">
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                      {member.avatarUrl ? (
+                        <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="font-mono text-sm text-muted-foreground">
+                          {(member.firstName?.[0] || member.email?.[0] || '?').toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-mono text-sm font-medium truncate">
+                          {member.firstName
+                            ? `${member.firstName} ${member.lastName || ''}`
+                            : member.email}
+                        </p>
+                        {member.isOwner && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-traffic-amber/20 text-traffic-amber">
+                            Owner
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                    </div>
+
+                    {/* Permissions (fallback when no roleColor) */}
+                    {!member.roleColor && (
+                      <div className="hidden md:flex flex-wrap gap-1 max-w-xs">
+                        {member.permissions.slice(0, 3).map((perm) => (
+                          <span
+                            key={perm}
+                            className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground"
+                          >
+                            {PERMISSION_LABELS[perm] || perm}
+                          </span>
+                        ))}
+                        {member.permissions.length > 3 && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground">
+                            +{member.permissions.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Role Badge */}
+                    {member.roleColor ? (
+                      <RoleBadge
+                        name={member.role}
+                        color={member.roleColor}
+                        size="sm"
+                      />
+                    ) : (
+                      <span className="px-2 py-1 rounded text-xs font-mono bg-traffic-green/10 text-traffic-green capitalize">
+                        {member.role}
                       </span>
                     )}
-                  </div>
-                  <p className="text-xs text-muted-foreground truncate">{member.email}</p>
-                </div>
 
-                {/* Permissions */}
-                <div className="hidden md:flex flex-wrap gap-1 max-w-xs">
-                  {member.permissions.slice(0, 3).map((perm) => (
-                    <span
-                      key={perm}
-                      className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground"
-                    >
-                      {PERMISSION_LABELS[perm] || perm}
-                    </span>
-                  ))}
-                  {member.permissions.length > 3 && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground">
-                      +{member.permissions.length - 3}
-                    </span>
-                  )}
-                </div>
-
-                {/* Role */}
-                <span className="px-2 py-1 rounded text-xs font-mono bg-traffic-green/10 text-traffic-green capitalize">
-                  {member.role}
-                </span>
-
-                {/* Actions */}
-                {canManageTeam && !member.isOwner && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemove(member)}
-                    disabled={actionLoading === member.id}
-                    className="text-traffic-red hover:text-traffic-red"
-                  >
-                    {actionLoading === member.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
+                    {/* Actions */}
+                    {canManageTeam && !member.isOwner && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemove(member)}
+                        disabled={actionLoading === member.id}
+                        className="text-traffic-red hover:text-traffic-red"
+                      >
+                        {actionLoading === member.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
                     )}
+                  </div>
+                ))
+              )}
+            </div>
+          </CodeCard>
+
+          {/* Pending Invitations */}
+          {pendingMembers.length > 0 && (
+            <CodeCard className="max-w-[70%] mx-auto mt-6">
+              <CodeCardHeader
+                filename="invitations.pending"
+                status="warning"
+                badge={
+                  <span className="font-mono text-xs text-traffic-amber">
+                    {pendingMembers.length} pending
+                  </span>
+                }
+              />
+              <div className="divide-y divide-border">
+                {pendingMembers.map((member) => (
+                  <div key={member.id} className="p-4 flex items-center gap-4">
+                    {/* Icon */}
+                    <div className="w-10 h-10 rounded-full bg-traffic-amber/10 flex items-center justify-center">
+                      <Mail className="h-5 w-5 text-traffic-amber" />
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono text-sm truncate">{member.email}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">
+                          Invited {formatDate(member.invitedAt)}
+                        </span>
+                        {member.expiresAt && (
+                          <span className="text-xs text-traffic-amber">
+                            Expires {formatDate(member.expiresAt)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Role Badge or Permissions fallback */}
+                    {member.roleColor ? (
+                      <RoleBadge
+                        name={member.role}
+                        color={member.roleColor}
+                        size="sm"
+                      />
+                    ) : (
+                      <div className="hidden md:flex flex-wrap gap-1 max-w-xs">
+                        {member.permissions.slice(0, 2).map((perm) => (
+                          <span
+                            key={perm}
+                            className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground"
+                          >
+                            {PERMISSION_LABELS[perm] || perm}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    {canManageTeam && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleResend(member)}
+                          disabled={actionLoading === member.id}
+                        >
+                          {actionLoading === member.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Resend
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemove(member)}
+                          disabled={actionLoading === member.id}
+                          className="text-traffic-red hover:text-traffic-red"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CodeCard>
+          )}
+        </>
+      )}
+
+      {/* ============================================================ */}
+      {/* ROLES TAB */}
+      {/* ============================================================ */}
+      {activeTab === 'roles' && (
+        <>
+          {/* Role Form (Create/Edit) */}
+          {(showRoleForm || editingRole) && institutionId && (
+            <div className="max-w-[70%] mx-auto mt-6">
+              <RoleForm
+                institutionId={institutionId}
+                role={editingRole ?? undefined}
+                onSuccess={handleRoleFormSuccess}
+                onCancel={() => {
+                  setShowRoleForm(false)
+                  setEditingRole(null)
+                }}
+              />
+            </div>
+          )}
+
+          {/* Roles List */}
+          {!showRoleForm && !editingRole && (
+            <div className="max-w-[70%] mx-auto mt-6">
+              {/* Header with Create button */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-traffic-green" />
+                  <span className="font-mono text-sm text-muted-foreground">
+                    <span className="text-traffic-green">//</span> Institution roles
+                  </span>
+                </div>
+                {canManageTeam && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowRoleForm(true)}
+                    className="h-7 px-3 text-xs font-mono"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Create Role
                   </Button>
                 )}
               </div>
-            ))
-          )}
-        </div>
-      </CodeCard>
 
-      {/* Pending Invitations */}
-      {pendingMembers.length > 0 && (
-        <CodeCard className="max-w-[70%] mx-auto mt-6">
-          <CodeCardHeader
-            filename="invitations.pending"
-            status="warning"
-            badge={
-              <span className="font-mono text-xs text-traffic-amber">
-                {pendingMembers.length} pending
-              </span>
-            }
-          />
-          <div className="divide-y divide-border">
-            {pendingMembers.map((member) => (
-              <div key={member.id} className="p-4 flex items-center gap-4">
-                {/* Icon */}
-                <div className="w-10 h-10 rounded-full bg-traffic-amber/10 flex items-center justify-center">
-                  <Mail className="h-5 w-5 text-traffic-amber" />
+              {/* Roles Grid */}
+              {rolesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-mono text-sm truncate">{member.email}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Clock className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">
-                      Invited {formatDate(member.invitedAt)}
-                    </span>
-                    {member.expiresAt && (
-                      <span className="text-xs text-traffic-amber">
-                        Expires {formatDate(member.expiresAt)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Permissions */}
-                <div className="hidden md:flex flex-wrap gap-1 max-w-xs">
-                  {member.permissions.slice(0, 2).map((perm) => (
-                    <span
-                      key={perm}
-                      className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground"
-                    >
-                      {PERMISSION_LABELS[perm] || perm}
-                    </span>
+              ) : roles && roles.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {roles.map((role) => (
+                    <RoleCard
+                      key={role.id}
+                      role={role}
+                      memberCount={getMemberCountForRole(role.id)}
+                      onEdit={canManageTeam && !role.isSystem ? () => setEditingRole(role) : undefined}
+                      onDelete={canManageTeam && !role.isSystem ? () => setDeletingRole(role) : undefined}
+                    />
                   ))}
                 </div>
-
-                {/* Actions */}
-                {canManageTeam && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleResend(member)}
-                      disabled={actionLoading === member.id}
-                    >
-                      {actionLoading === member.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <RefreshCw className="h-4 w-4 mr-1" />
-                          Resend
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRemove(member)}
-                      disabled={actionLoading === member.id}
-                      className="text-traffic-red hover:text-traffic-red"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+              ) : (
+                <CodeCard>
+                  <div className="p-8 text-center">
+                    <Shield className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground font-mono">
+                      <span className="text-traffic-green">//</span> No roles defined yet
+                    </p>
+                    {canManageTeam && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setShowRoleForm(true)}
+                        className="mt-4 font-mono"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create your first role
+                      </Button>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </CodeCard>
+                </CodeCard>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Role Delete Confirmation Dialog */}
+      {deletingRole && (
+        <RoleDeleteDialog
+          role={deletingRole}
+          memberCount={getMemberCountForRole(deletingRole.id)}
+          isOpen={!!deletingRole}
+          onConfirm={handleDeleteRole}
+          onCancel={() => setDeletingRole(null)}
+          isDeleting={isDeletingRole}
+        />
       )}
     </div>
   )
