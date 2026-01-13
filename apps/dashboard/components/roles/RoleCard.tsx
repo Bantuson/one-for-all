@@ -50,6 +50,9 @@ function getPermissionsSummary(permissions: Permission[]): string[] {
   const summary: string[] = []
 
   for (const [category, categoryPermissions] of Object.entries(PERMISSION_GROUPS)) {
+    // Skip "access" category - view_dashboard is default for all members
+    if (category === 'access') continue
+
     const matching = categoryPermissions.filter((p) => permissions.includes(p))
     if (matching.length > 0) {
       const categoryLabel = PERMISSION_CATEGORY_LABELS[category as PermissionCategory]
@@ -91,19 +94,19 @@ export function RoleCard({
   )
 
   return (
-    <CodeCard className={className}>
+    <CodeCard className={cn('h-full flex flex-col min-h-[280px]', className)}>
       <CodeCardHeader
         filename={`${role.name.toLowerCase().replace(/\s+/g, '-')}.role`}
         status={isSystem ? 'neutral' : 'active'}
         rightContent={
           <div className="flex items-center gap-2">
             {role.isDefault && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono">
+              <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">
                 default
               </span>
             )}
             {isSystem && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono flex items-center gap-1">
+              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-semibold flex items-center gap-1">
                 <Lock className="h-3 w-3" />
                 system
               </span>
@@ -112,7 +115,7 @@ export function RoleCard({
         }
       />
 
-      <CodeCardBody>
+      <CodeCardBody className="flex-1">
         {/* Role name with badge */}
         <div className="flex items-center gap-2 mb-2">
           <span className="text-syntax-export">export role</span>
@@ -164,7 +167,7 @@ export function RoleCard({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-h-[32px]">
           {!isSystem && onEdit && (
             <Button
               type="button"
@@ -188,11 +191,6 @@ export function RoleCard({
             >
               <Trash2 className="h-4 w-4" />
             </Button>
-          )}
-          {isSystem && (
-            <span className="text-xs text-muted-foreground font-mono">
-              // system roles cannot be modified
-            </span>
           )}
         </div>
       </CodeCardFooter>

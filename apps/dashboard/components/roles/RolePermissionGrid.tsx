@@ -5,11 +5,33 @@ import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   Permission,
+  PERMISSIONS,
   PERMISSION_DETAILS,
   PERMISSION_GROUPS,
   PERMISSION_CATEGORY_LABELS,
   type PermissionCategory,
 } from '@/lib/constants/permissions'
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/**
+ * Permissions that should NOT appear in the selection grid.
+ * view_dashboard is granted by default to all team members.
+ */
+const NON_SELECTABLE_PERMISSIONS: Permission[] = [PERMISSIONS.VIEW_DASHBOARD]
+
+/**
+ * Creates a filtered permission groups object excluding non-selectable permissions.
+ * Categories with no remaining permissions will have empty arrays.
+ */
+const SELECTABLE_PERMISSION_GROUPS: Record<PermissionCategory, Permission[]> = Object.fromEntries(
+  Object.entries(PERMISSION_GROUPS).map(([category, permissions]) => [
+    category,
+    permissions.filter((p) => !NON_SELECTABLE_PERMISSIONS.includes(p)),
+  ])
+) as Record<PermissionCategory, Permission[]>
 
 // ============================================================================
 // Types
@@ -62,7 +84,8 @@ export function RolePermissionGrid({
     (category: PermissionCategory) => {
       if (disabled || readOnly) return
 
-      const categoryPermissions = PERMISSION_GROUPS[category]
+      // Use selectable permissions for toggle logic
+      const categoryPermissions = SELECTABLE_PERMISSION_GROUPS[category]
       const allSelected = categoryPermissions.every((p) => value.includes(p))
 
       if (allSelected) {
@@ -77,21 +100,16 @@ export function RolePermissionGrid({
     [value, onChange, disabled, readOnly]
   )
 
-  const categories = Object.keys(PERMISSION_GROUPS) as PermissionCategory[]
+  // Filter to only categories that have selectable permissions
+  const categories = (Object.keys(SELECTABLE_PERMISSION_GROUPS) as PermissionCategory[]).filter(
+    (category) => SELECTABLE_PERMISSION_GROUPS[category].length > 0
+  )
 
   return (
     <div className={cn('space-y-4 font-mono text-sm', className)}>
-      {/* Header comment */}
-      <p className="text-center">
-        <span className="text-traffic-green">//</span>
-        <span className="text-muted-foreground">
-          {' '}
-          {readOnly ? 'Permissions assigned to this role' : 'Select permissions for this role'}
-        </span>
-      </p>
-
       {categories.map((category) => {
-        const permissions = PERMISSION_GROUPS[category]
+        // Use selectable permissions only (excludes view_dashboard)
+        const permissions = SELECTABLE_PERMISSION_GROUPS[category]
         const selectedCount = permissions.filter((p) => value.includes(p)).length
         const allSelected = selectedCount === permissions.length
         const someSelected = selectedCount > 0 && !allSelected
@@ -200,9 +218,9 @@ export function RolePermissionGrid({
       })}
 
       {/* Summary */}
-      <div className="pt-2 border-t border-border">
-        <p className="text-center text-syntax-comment">
-          // {value.length} permission{value.length !== 1 ? 's' : ''} selected
+      <div className="pt-2">
+        <p className="text-center font-mono">
+          <span className="font-semibold text-traffic-green text-sm">{value.length}</span>
         </p>
       </div>
     </div>

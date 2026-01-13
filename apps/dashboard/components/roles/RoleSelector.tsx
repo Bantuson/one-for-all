@@ -1,12 +1,13 @@
 'use client'
 
 import * as React from 'react'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { Loader2, AlertCircle, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/Select'
@@ -53,6 +54,10 @@ interface RoleSelectorProps {
   className?: string
   /** Placeholder text */
   placeholder?: string
+  /** Callback when "Create New Role" is clicked */
+  onCreateRole?: () => void
+  /** Whether to show the create option (default: true when onCreateRole provided) */
+  showCreateOption?: boolean
 }
 
 // ============================================================================
@@ -74,6 +79,8 @@ export function RoleSelector({
   showPermissionsPreview = false,
   className,
   placeholder = 'Select a role...',
+  onCreateRole,
+  showCreateOption,
 }: RoleSelectorProps) {
   const { roles, isLoading, error: fetchError } = useRoles(institutionId)
 
@@ -82,14 +89,21 @@ export function RoleSelector({
     return roles.find((role) => role.id === value) ?? null
   }, [value, roles])
 
+  // Determine if create option should be shown
+  const shouldShowCreateOption = showCreateOption ?? !!onCreateRole
+
   const handleValueChange = React.useCallback(
     (roleId: string) => {
+      if (roleId === '__create_new__' && onCreateRole) {
+        onCreateRole()
+        return // Don't update selection
+      }
       const role = roles?.find((r) => r.id === roleId)
       if (role) {
         onChange(roleId, role)
       }
     },
-    [roles, onChange]
+    [roles, onChange, onCreateRole]
   )
 
   // Group permissions by category for preview
@@ -121,7 +135,7 @@ export function RoleSelector({
       >
         <SelectTrigger
           className={cn(
-            'font-mono text-sm',
+            'text-sm',
             displayError && 'border-destructive focus:ring-destructive'
           )}
         >
@@ -153,15 +167,10 @@ export function RoleSelector({
               <SelectItem
                 key={role.id}
                 value={role.id}
-                className="font-mono text-sm"
+                className="text-sm"
               >
-                <div className="flex items-center gap-2 py-1">
+                <div className="flex items-center gap-2">
                   <RoleBadge name={role.name} color={role.color} size="sm" />
-                  {role.description && (
-                    <span className="text-muted-foreground text-xs">
-                      - {role.description}
-                    </span>
-                  )}
                   {role.isSystem && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                       system
@@ -171,16 +180,27 @@ export function RoleSelector({
               </SelectItem>
             ))
           ) : (
-            <div className="px-2 py-4 text-center text-sm text-muted-foreground font-mono">
+            <div className="px-2 py-4 text-center text-sm text-muted-foreground">
               <span className="text-traffic-green">//</span> No roles available
             </div>
+          )}
+          {shouldShowCreateOption && onCreateRole && (
+            <>
+              <SelectSeparator />
+              <SelectItem value="__create_new__" className="text-sm text-traffic-green">
+                <div className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  <span>Create New Role...</span>
+                </div>
+              </SelectItem>
+            </>
           )}
         </SelectContent>
       </Select>
 
       {/* Error display */}
       {displayError && (
-        <p className="flex items-center gap-1.5 text-sm font-mono">
+        <p className="flex items-center gap-1.5 text-sm">
           <AlertCircle className="h-4 w-4 text-destructive" />
           <span className="text-traffic-green">//</span>
           <span className="text-destructive">Error: {displayError}</span>

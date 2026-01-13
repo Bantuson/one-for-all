@@ -33,6 +33,8 @@ interface RoleFormProps {
   onCancel?: () => void
   /** Additional class names */
   className?: string
+  /** Whether to show the CodeCard wrapper (default: true) */
+  showWrapper?: boolean
 }
 
 interface FormState {
@@ -90,6 +92,7 @@ export function RoleForm({
   onSuccess,
   onCancel,
   className,
+  showWrapper = true,
 }: RoleFormProps) {
   const isEditing = !!role
   const createRole = useCreateRole(institutionId)
@@ -179,6 +182,189 @@ export function RoleForm({
     [formState, validateForm, isEditing, createRole, updateRole, onSuccess]
   )
 
+  // Form content (shared between wrapped and unwrapped versions)
+  const formContent = (
+    <div className="space-y-4">
+      {/* General error */}
+      {errors.general && (
+        <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+          <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
+          <p className="text-sm font-mono text-destructive">
+            {errors.general}
+          </p>
+        </div>
+      )}
+
+      {/* Name field */}
+      <div className="space-y-1.5">
+        <Label htmlFor="role-name" className="text-sm">
+          <span className="text-syntax-key">name</span>
+          <span className="text-foreground">:</span>
+          <span className="text-destructive ml-1">*</span>
+        </Label>
+        <Input
+          id="role-name"
+          type="text"
+          value={formState.name}
+          onChange={(e) => handleFieldChange('name', e.target.value)}
+          placeholder="e.g., Faculty Admin"
+          disabled={isSubmitting}
+          className={cn(
+            'font-mono',
+            errors.name && 'border-destructive focus-visible:ring-destructive'
+          )}
+          aria-invalid={!!errors.name}
+          aria-describedby={errors.name ? 'name-error' : undefined}
+        />
+        {errors.name && (
+          <p id="name-error" className="text-sm font-mono text-destructive">
+            <span className="text-traffic-green">//</span> {errors.name}
+          </p>
+        )}
+      </div>
+
+      {/* Description field */}
+      <div className="space-y-1.5">
+        <Label htmlFor="role-description" className="text-sm">
+          <span className="text-syntax-key">description</span>
+          <span className="text-foreground">:</span>
+        </Label>
+        <Input
+          id="role-description"
+          type="text"
+          value={formState.description}
+          onChange={(e) => handleFieldChange('description', e.target.value)}
+          placeholder="Brief description of the role..."
+          disabled={isSubmitting}
+          className="font-mono"
+        />
+      </div>
+
+      {/* Color picker */}
+      <div className="space-y-1.5">
+        <Label className="text-sm">
+          <span className="text-syntax-key">color</span>
+          <span className="text-foreground">:</span>
+        </Label>
+        <div className="flex items-center gap-3">
+          <div className="grid grid-cols-5 gap-2">
+            {DEFAULT_COLORS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => handleFieldChange('color', color)}
+                disabled={isSubmitting}
+                className={cn(
+                  'h-7 w-7 rounded-md border-2 transition-all',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                  formState.color === color
+                    ? 'border-foreground scale-110'
+                    : 'border-transparent hover:scale-105'
+                )}
+                style={{ backgroundColor: color }}
+                aria-label={`Select color ${color}`}
+                aria-pressed={formState.color === color}
+              >
+                {formState.color === color && (
+                  <Check className="h-4 w-4 text-white mx-auto" />
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground font-mono text-sm">=</span>
+            <RoleBadge
+              name={formState.name || 'Preview'}
+              color={formState.color}
+              size="md"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Permissions grid */}
+      <div className="space-y-1.5 pt-3 border-t border-border">
+        <Label className="text-sm">
+          <span className="text-syntax-key">permissions</span>
+          <span className="text-foreground">:</span>
+          <span className="text-destructive ml-1">*</span>
+        </Label>
+        {errors.permissions && (
+          <p className="text-sm font-mono text-destructive">
+            <span className="text-traffic-green">//</span> {errors.permissions}
+          </p>
+        )}
+        <RolePermissionGrid
+          value={formState.permissions}
+          onChange={(permissions) => handleFieldChange('permissions', permissions)}
+          disabled={isSubmitting}
+        />
+      </div>
+    </div>
+  )
+
+  // Footer buttons (shared between wrapped and unwrapped versions)
+  const footerButtons = (
+    <div className="flex items-center gap-2">
+      {onCancel && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onCancel}
+          disabled={isSubmitting}
+          className="font-mono"
+        >
+          $ cancel
+        </Button>
+      )}
+      <Button
+        type="submit"
+        variant="primary"
+        size="sm"
+        disabled={isSubmitting}
+        className="font-mono gap-2 bg-traffic-green text-white hover:bg-traffic-green/90"
+      >
+        {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+        $ {isEditing ? 'update' : 'create'} --save
+      </Button>
+    </div>
+  )
+
+  // Render without CodeCard wrapper for modal usage
+  if (!showWrapper) {
+    return (
+      <form onSubmit={handleSubmit} className={className}>
+        {formContent}
+        <div className="flex justify-end mt-4 pt-3 border-t border-border gap-2">
+          {onCancel && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onCancel}
+              disabled={isSubmitting}
+              className="font-mono"
+            >
+              $ cancel
+            </Button>
+          )}
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            disabled={isSubmitting}
+            className="font-mono gap-2 bg-traffic-green text-white hover:bg-traffic-green/90"
+          >
+            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            $ {isEditing ? 'update' : 'create'} --save
+          </Button>
+        </div>
+      </form>
+    )
+  }
+
+  // Render with CodeCard wrapper (default)
   return (
     <form onSubmit={handleSubmit} className={className}>
       <CodeCard>
@@ -188,180 +374,12 @@ export function RoleForm({
         />
 
         <CodeCardBody>
-          <div className="space-y-6">
-            {/* General error */}
-            {errors.general && (
-              <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
-                <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
-                <p className="text-sm font-mono text-destructive">
-                  {errors.general}
-                </p>
-              </div>
-            )}
-
-            {/* Name field */}
-            <div className="space-y-2">
-              <Label htmlFor="role-name" className="font-mono text-sm">
-                <span className="text-syntax-key">name</span>
-                <span className="text-foreground">:</span>
-                <span className="text-destructive ml-1">*</span>
-              </Label>
-              <Input
-                id="role-name"
-                type="text"
-                value={formState.name}
-                onChange={(e) => handleFieldChange('name', e.target.value)}
-                placeholder="e.g., Faculty Admin"
-                disabled={isSubmitting}
-                className={cn(
-                  'font-mono',
-                  errors.name && 'border-destructive focus-visible:ring-destructive'
-                )}
-                aria-invalid={!!errors.name}
-                aria-describedby={errors.name ? 'name-error' : undefined}
-              />
-              {errors.name && (
-                <p id="name-error" className="text-sm font-mono text-destructive">
-                  <span className="text-traffic-green">//</span> {errors.name}
-                </p>
-              )}
-            </div>
-
-            {/* Description field */}
-            <div className="space-y-2">
-              <Label htmlFor="role-description" className="font-mono text-sm">
-                <span className="text-syntax-key">description</span>
-                <span className="text-foreground">:</span>
-              </Label>
-              <Input
-                id="role-description"
-                type="text"
-                value={formState.description}
-                onChange={(e) => handleFieldChange('description', e.target.value)}
-                placeholder="Brief description of the role..."
-                disabled={isSubmitting}
-                className="font-mono"
-              />
-            </div>
-
-            {/* Color picker */}
-            <div className="space-y-2">
-              <Label className="font-mono text-sm">
-                <span className="text-syntax-key">color</span>
-                <span className="text-foreground">:</span>
-              </Label>
-              <div className="flex items-center gap-3">
-                <div className="flex flex-wrap gap-2">
-                  {DEFAULT_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => handleFieldChange('color', color)}
-                      disabled={isSubmitting}
-                      className={cn(
-                        'h-7 w-7 rounded-md border-2 transition-all',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                        formState.color === color
-                          ? 'border-foreground scale-110'
-                          : 'border-transparent hover:scale-105'
-                      )}
-                      style={{ backgroundColor: color }}
-                      aria-label={`Select color ${color}`}
-                      aria-pressed={formState.color === color}
-                    >
-                      {formState.color === color && (
-                        <Check className="h-4 w-4 text-white mx-auto" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground font-mono text-sm">=</span>
-                  <RoleBadge
-                    name={formState.name || 'Preview'}
-                    color={formState.color}
-                    size="md"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Default toggle */}
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formState.isDefault}
-                  onChange={(e) => handleFieldChange('isDefault', e.target.checked)}
-                  disabled={isSubmitting}
-                  className={cn(
-                    'h-4 w-4 rounded border-2 border-muted-foreground',
-                    'text-traffic-green focus:ring-traffic-green focus:ring-offset-0',
-                    'accent-traffic-green cursor-pointer'
-                  )}
-                />
-                <span className="font-mono text-sm">
-                  <span className="text-syntax-key">isDefault</span>
-                  <span className="text-foreground">:</span>
-                  <span className={formState.isDefault ? 'text-traffic-green' : 'text-syntax-comment'}>
-                    {' '}
-                    {formState.isDefault ? 'true' : 'false'}
-                  </span>
-                </span>
-              </label>
-              <span className="text-xs text-syntax-comment font-mono">
-                // Assign to new team members by default
-              </span>
-            </div>
-
-            {/* Permissions grid */}
-            <div className="space-y-2 pt-4 border-t border-border">
-              <Label className="font-mono text-sm">
-                <span className="text-syntax-key">permissions</span>
-                <span className="text-foreground">:</span>
-                <span className="text-destructive ml-1">*</span>
-              </Label>
-              {errors.permissions && (
-                <p className="text-sm font-mono text-destructive">
-                  <span className="text-traffic-green">//</span> {errors.permissions}
-                </p>
-              )}
-              <RolePermissionGrid
-                value={formState.permissions}
-                onChange={(permissions) => handleFieldChange('permissions', permissions)}
-                disabled={isSubmitting}
-              />
-            </div>
-          </div>
+          {formContent}
         </CodeCardBody>
 
         <CodeCardFooter>
-          <div className="flex items-center gap-2 text-sm font-mono text-syntax-comment">
-            <span className="text-traffic-green">//</span>
-            {isEditing ? 'Update role configuration' : 'Create new role'}
-          </div>
-          <div className="flex items-center gap-2">
-            {onCancel && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={onCancel}
-                disabled={isSubmitting}
-                className="font-mono"
-              >
-                $ cancel
-              </Button>
-            )}
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={isSubmitting}
-              className="font-mono gap-2"
-            >
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              $ {isEditing ? 'update' : 'create'} --save
-            </Button>
-          </div>
+          <div /> {/* Spacer for justify-between */}
+          {footerButtons}
         </CodeCardFooter>
       </CodeCard>
     </form>

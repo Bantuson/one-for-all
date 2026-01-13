@@ -1,7 +1,7 @@
 # Dashboard Component Inventory
 
 > Generated: 2026-01-06
-> Updated: 2026-01-12 (Role Management System)
+> Updated: 2026-01-13 (Skeleton Loading, Role UI Refinements)
 > Branch: registration_consolidation (merged to master)
 
 ## Business Logic Flow
@@ -94,7 +94,7 @@ Institution-level custom roles with granular permissions. Located in `components
 | **RoleBadge** | `components/roles/RoleBadge.tsx` | Small colored badge for role name |
 | **RoleSelector** | `components/roles/RoleSelector.tsx` | Dropdown with permissions preview |
 | **RolePermissionGrid** | `components/roles/RolePermissionGrid.tsx` | Grouped permission checkboxes |
-| **RoleCard** | `components/roles/RoleCard.tsx` | Role display card with actions |
+| **RoleCard** | `components/roles/RoleCard.tsx` | Role display card with actions (min-h-[280px], skips access category) |
 | **RoleForm** | `components/roles/RoleForm.tsx` | Create/Edit role form |
 | **RoleDeleteDialog** | `components/roles/RoleDeleteDialog.tsx` | Delete confirmation dialog |
 
@@ -125,17 +125,20 @@ TeamInviteStep now supports two modes:
 
 Centralized permission definitions in `lib/constants/permissions.ts`.
 
-### Canonical Permissions (10 total)
+### Canonical Permissions (13 total)
 
 | Permission | Category | Description |
 |------------|----------|-------------|
-| `view_dashboard` | access | View dashboard metrics |
+| `view_dashboard` | access | View dashboard metrics (auto-granted) |
 | `view_applications` | applications | Read-only application access |
 | `process_applications` | applications | Review and update applications |
 | `manage_applications` | applications | Full application management |
+| `edit_campuses` | academic | Create/edit/delete campuses |
+| `edit_faculties` | academic | Create/edit/delete faculties |
 | `edit_courses` | academic | Manage courses and programs |
 | `view_reports` | reporting | Access reports and analytics |
 | `export_data` | reporting | Export data to files |
+| `export_applications` | reporting | Export application data |
 | `manage_team` | administration | Invite and manage team members |
 | `manage_settings` | administration | Configure institution settings |
 | `admin_access` | administration | All permissions (superuser) |
@@ -201,6 +204,33 @@ const effective = expandAdminAccess(user.permissions)
 | **ModalHeader** | `components/ui/ModalHeader.tsx` | Reusable modal header |
 | **SyntaxText** | `components/ui/SyntaxText.tsx` | Syntax-highlighted text |
 | **VisuallyHidden** | `components/ui/VisuallyHidden.tsx` | Accessibility helper |
+
+---
+
+## Skeleton Loading Components (NEW)
+
+Located in `components/ui/Skeleton.tsx`. Loading states matching actual UI structure.
+
+### Core Skeletons
+| Component | Purpose |
+|-----------|---------|
+| **Skeleton** | Base animated pulse block |
+| **TrafficLightsSkeleton** | Three-dot header decoration |
+
+### Composite Skeletons
+| Component | Props | Purpose |
+|-----------|-------|---------|
+| **CodeCardSkeleton** | `showFooter`, `permissionLines` | Matches CodeCard structure |
+| **RolesTabSkeleton** | `count` (default 4) | 2-column grid of role cards |
+| **MembersTabSkeleton** | `memberCount` (default 3) | Member list with avatar rows |
+| **TeamPageSkeleton** | `className` | Full team page with tabs + card |
+
+### Utility Skeletons
+| Component | Props | Purpose |
+|-----------|-------|---------|
+| **TextSkeleton** | `size` (sm/md/lg/xl), `width` | Text placeholder |
+| **AvatarSkeleton** | `size` (sm/md/lg) | Circular avatar |
+| **ButtonSkeleton** | `size` (sm/md/lg/icon) | Button placeholder |
 
 ---
 
@@ -302,4 +332,4 @@ All pre-configured South African institutions in `lib/institutions/data/`:
 | Migration | Purpose |
 |-----------|---------|
 | `011_institution_roles.sql` | Creates `institution_roles` table with RLS, auto-seeds admin role |
-| `012_update_institution_members.sql` | Adds `role_id` FK, links existing members to roles |
+| `012_export_applications_permission.sql` | Adds export_applications, seeds default roles (Applications Admin, Academic Maintainer) |

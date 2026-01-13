@@ -21,6 +21,10 @@ export const PERMISSIONS = {
   PROCESS_APPLICATIONS: 'process_applications',
   /** Full management of applications including approval/rejection */
   MANAGE_APPLICATIONS: 'manage_applications',
+  /** Ability to create, edit, and delete campuses */
+  EDIT_CAMPUSES: 'edit_campuses',
+  /** Ability to create, edit, and delete faculties */
+  EDIT_FACULTIES: 'edit_faculties',
   /** Ability to create, edit, and delete courses */
   EDIT_COURSES: 'edit_courses',
   /** Access to view reports and analytics */
@@ -33,6 +37,8 @@ export const PERMISSIONS = {
   MANAGE_SETTINGS: 'manage_settings',
   /** Full administrative access - grants all permissions */
   ADMIN_ACCESS: 'admin_access',
+  /** Ability to export application data to external formats */
+  EXPORT_APPLICATIONS: 'export_applications',
 } as const;
 
 /**
@@ -90,6 +96,16 @@ export const PERMISSION_DETAILS: Record<Permission, PermissionDetail> = {
       'Full management of applications including final approval, rejection, and bulk operations',
     category: 'applications',
   },
+  [PERMISSIONS.EDIT_CAMPUSES]: {
+    label: 'Edit Campuses',
+    description: 'Create, update, and delete campuses',
+    category: 'academic',
+  },
+  [PERMISSIONS.EDIT_FACULTIES]: {
+    label: 'Edit Faculties',
+    description: 'Create, update, and delete faculties',
+    category: 'academic',
+  },
   [PERMISSIONS.EDIT_COURSES]: {
     label: 'Edit Courses',
     description:
@@ -123,6 +139,11 @@ export const PERMISSION_DETAILS: Record<Permission, PermissionDetail> = {
       'Full administrative access that implicitly grants all other permissions in the system',
     category: 'administration',
   },
+  [PERMISSIONS.EXPORT_APPLICATIONS]: {
+    label: 'Export Applications',
+    description: 'Export application data to external formats (CSV, Excel, PDF)',
+    category: 'administration',
+  },
 };
 
 /**
@@ -136,9 +157,9 @@ export const PERMISSION_GROUPS: Record<PermissionCategory, Permission[]> = {
     PERMISSIONS.PROCESS_APPLICATIONS,
     PERMISSIONS.MANAGE_APPLICATIONS,
   ],
-  academic: [PERMISSIONS.EDIT_COURSES],
+  academic: [PERMISSIONS.EDIT_CAMPUSES, PERMISSIONS.EDIT_FACULTIES, PERMISSIONS.EDIT_COURSES],
   reporting: [PERMISSIONS.VIEW_REPORTS, PERMISSIONS.EXPORT_DATA],
-  administration: [PERMISSIONS.MANAGE_TEAM, PERMISSIONS.MANAGE_SETTINGS, PERMISSIONS.ADMIN_ACCESS],
+  administration: [PERMISSIONS.MANAGE_TEAM, PERMISSIONS.MANAGE_SETTINGS, PERMISSIONS.ADMIN_ACCESS, PERMISSIONS.EXPORT_APPLICATIONS],
 };
 
 /**
@@ -151,6 +172,20 @@ export const PERMISSION_CATEGORY_LABELS: Record<PermissionCategory, string> = {
   reporting: 'Reporting',
   administration: 'Administration',
 };
+
+/**
+ * Array of all permission values.
+ * Useful when you need a static array of all permissions without calling a function.
+ */
+export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSIONS);
+
+/**
+ * Permissions that can be selected when assigning to team members.
+ * Excludes view_dashboard as it is granted to all team members by default.
+ */
+export const SELECTABLE_PERMISSIONS = ALL_PERMISSIONS.filter(
+  (p) => p !== PERMISSIONS.VIEW_DASHBOARD
+);
 
 /**
  * Returns an array of all permission values.

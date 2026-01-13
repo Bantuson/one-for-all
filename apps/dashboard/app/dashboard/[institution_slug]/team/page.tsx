@@ -20,6 +20,8 @@ import Link from 'next/link'
 import { CodeCard, CodeCardHeader } from '@/components/ui/CodeCard'
 import { CommandButton } from '@/components/ui/CommandButton'
 import { Button } from '@/components/ui/Button'
+import { DottedModal, DottedModalContent } from '@/components/ui/DottedModal'
+import { TeamPageSkeleton, RolesTabSkeleton } from '@/components/ui/Skeleton'
 import {
   RoleSelector,
   RoleCard,
@@ -95,16 +97,16 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2 font-mono text-sm transition-colors border-b-2 ${
+      className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
         active
-          ? 'border-traffic-green text-traffic-green'
-          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/50'
+          ? 'text-traffic-green font-medium'
+          : 'text-muted-foreground hover:text-foreground'
       }`}
     >
       <Icon className="h-4 w-4" />
       <span>{label}</span>
       {count !== undefined && (
-        <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
           active ? 'bg-traffic-green/20' : 'bg-muted'
         }`}>
           {count}
@@ -138,9 +140,9 @@ export default function TeamManagementPage() {
   const [inviteEmail, setInviteEmail] = React.useState('')
   const [inviteRoleId, setInviteRoleId] = React.useState<string | null>(null)
   const [isInviting, setIsInviting] = React.useState(false)
+  const [showInviteRoleModal, setShowInviteRoleModal] = React.useState(false)
 
   // Role management state
-  const [showRoleForm, setShowRoleForm] = React.useState(false)
   const [editingRole, setEditingRole] = React.useState<Role | null>(null)
   const [deletingRole, setDeletingRole] = React.useState<Role | null>(null)
   const [isDeletingRole, setIsDeletingRole] = React.useState(false)
@@ -305,10 +307,16 @@ export default function TeamManagementPage() {
     }
   }
 
-  // Handle role form success
+  // Handle role form success (edit modal)
   const handleRoleFormSuccess = React.useCallback(() => {
-    setShowRoleForm(false)
     setEditingRole(null)
+    refreshRoles()
+  }, [refreshRoles])
+
+  // Handle role creation success in invite flow
+  const handleInviteRoleCreated = React.useCallback((newRole: Role) => {
+    setInviteRoleId(newRole.id)
+    setShowInviteRoleModal(false)
     refreshRoles()
   }, [refreshRoles])
 
@@ -345,11 +353,7 @@ export default function TeamManagementPage() {
 
   // Loading state
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <TeamPageSkeleton />
   }
 
   return (
@@ -357,33 +361,42 @@ export default function TeamManagementPage() {
       {/* Home arrow - far left, vertically centered with comment */}
       <Link
         href={`/dashboard/${institutionSlug}`}
-        className="absolute left-5 top-[2px] text-traffic-red hover:text-traffic-red/80 transition-colors"
+        className="absolute left-5 top-[8px] text-traffic-red hover:text-traffic-red/80 transition-colors"
         title="Back to dashboard"
       >
         <MoveLeft className="h-[22px] w-[22px]" />
       </Link>
 
-      {/* Centered Comment - 19px offset from 3rd grid line (83px from top, 27px from content) */}
-      <p className="text-sm text-muted-foreground text-center mt-[27px]">
-        <span className="text-traffic-green">//</span> Manage team members and roles
-      </p>
-
       {/* Tab Navigation */}
-      <div className="max-w-[70%] mx-auto mt-6 flex items-center border-b border-border">
-        <TabButton
-          active={activeTab === 'members'}
-          onClick={() => setActiveTab('members')}
-          icon={Users}
-          label="Members"
-          count={members.length}
-        />
-        <TabButton
-          active={activeTab === 'roles'}
-          onClick={() => setActiveTab('roles')}
-          icon={Shield}
-          label="Roles"
-          count={roles?.length}
-        />
+      <div className="max-w-[70%] mx-auto mt-[20px] flex items-center justify-between">
+        <div className="flex items-center">
+          <TabButton
+            active={activeTab === 'members'}
+            onClick={() => setActiveTab('members')}
+            icon={Users}
+            label="Members"
+            count={members.length}
+          />
+          <TabButton
+            active={activeTab === 'roles'}
+            onClick={() => setActiveTab('roles')}
+            icon={Shield}
+            label="Roles"
+            count={roles?.length}
+          />
+        </div>
+
+        {activeTab === 'roles' && canManageTeam && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowInviteRoleModal(true)}
+            className="h-7 px-3 text-xs font-mono"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            Create Role
+          </Button>
+        )}
       </div>
 
       {/* Error display */}
@@ -404,8 +417,8 @@ export default function TeamManagementPage() {
       {/* ============================================================ */}
       {activeTab === 'members' && (
         <>
-          {/* Active Members - 15px offset from 5th grid line (143px from top) */}
-          <CodeCard className="max-w-[70%] mx-auto mt-6">
+          {/* Active Members */}
+          <CodeCard className="max-w-[70%] mx-auto mt-[34px]">
             <CodeCardHeader
               filename="team.members"
               status="active"
@@ -473,6 +486,7 @@ export default function TeamManagementPage() {
                         value={inviteRoleId}
                         onChange={(roleId) => setInviteRoleId(roleId)}
                         placeholder="Choose a role..."
+                        onCreateRole={() => setShowInviteRoleModal(true)}
                       />
                     </div>
                   </div>
@@ -494,7 +508,7 @@ export default function TeamManagementPage() {
                       {member.avatarUrl ? (
                         <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <span className="font-mono text-sm text-muted-foreground">
+                        <span className="text-sm font-medium text-muted-foreground">
                           {(member.firstName?.[0] || member.email?.[0] || '?').toUpperCase()}
                         </span>
                       )}
@@ -503,18 +517,18 @@ export default function TeamManagementPage() {
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-mono text-sm font-medium truncate">
+                        <p className="text-sm font-semibold truncate">
                           {member.firstName
                             ? `${member.firstName} ${member.lastName || ''}`
                             : member.email}
                         </p>
                         {member.isOwner && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-traffic-amber/20 text-traffic-amber">
+                          <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-traffic-amber/20 text-traffic-amber">
                             Owner
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                      <p className="text-sm text-muted-foreground truncate">{member.email}</p>
                     </div>
 
                     {/* Permissions (fallback when no roleColor) */}
@@ -523,13 +537,13 @@ export default function TeamManagementPage() {
                         {member.permissions.slice(0, 3).map((perm) => (
                           <span
                             key={perm}
-                            className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground"
+                            className="px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground"
                           >
                             {PERMISSION_LABELS[perm] || perm}
                           </span>
                         ))}
                         {member.permissions.length > 3 && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground">
+                          <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
                             +{member.permissions.length - 3}
                           </span>
                         )}
@@ -544,7 +558,7 @@ export default function TeamManagementPage() {
                         size="sm"
                       />
                     ) : (
-                      <span className="px-2 py-1 rounded text-xs font-mono bg-traffic-green/10 text-traffic-green capitalize">
+                      <span className="px-2 py-1 rounded text-xs font-semibold bg-traffic-green/10 text-traffic-green capitalize">
                         {member.role}
                       </span>
                     )}
@@ -573,7 +587,7 @@ export default function TeamManagementPage() {
 
           {/* Pending Invitations */}
           {pendingMembers.length > 0 && (
-            <CodeCard className="max-w-[70%] mx-auto mt-6">
+            <CodeCard className="max-w-[70%] mx-auto mt-[34px]">
               <CodeCardHeader
                 filename="invitations.pending"
                 status="warning"
@@ -619,7 +633,7 @@ export default function TeamManagementPage() {
                         {member.permissions.slice(0, 2).map((perm) => (
                           <span
                             key={perm}
-                            className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground"
+                            className="px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground"
                           >
                             {PERMISSION_LABELS[perm] || perm}
                           </span>
@@ -669,50 +683,11 @@ export default function TeamManagementPage() {
       {/* ============================================================ */}
       {activeTab === 'roles' && (
         <>
-          {/* Role Form (Create/Edit) */}
-          {(showRoleForm || editingRole) && institutionId && (
-            <div className="max-w-[70%] mx-auto mt-6">
-              <RoleForm
-                institutionId={institutionId}
-                role={editingRole ?? undefined}
-                onSuccess={handleRoleFormSuccess}
-                onCancel={() => {
-                  setShowRoleForm(false)
-                  setEditingRole(null)
-                }}
-              />
-            </div>
-          )}
-
           {/* Roles List */}
-          {!showRoleForm && !editingRole && (
-            <div className="max-w-[70%] mx-auto mt-6">
-              {/* Header with Create button */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-traffic-green" />
-                  <span className="font-mono text-sm text-muted-foreground">
-                    <span className="text-traffic-green">//</span> Institution roles
-                  </span>
-                </div>
-                {canManageTeam && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setShowRoleForm(true)}
-                    className="h-7 px-3 text-xs font-mono"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Create Role
-                  </Button>
-                )}
-              </div>
-
+          <div className="max-w-[70%] mx-auto mt-[34px]">
               {/* Roles Grid */}
               {rolesLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
+                <RolesTabSkeleton />
               ) : roles && roles.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2">
                   {roles.map((role) => (
@@ -736,7 +711,7 @@ export default function TeamManagementPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setShowRoleForm(true)}
+                        onClick={() => setShowInviteRoleModal(true)}
                         className="mt-4 font-mono"
                       >
                         <Plus className="h-4 w-4 mr-2" />
@@ -747,7 +722,6 @@ export default function TeamManagementPage() {
                 </CodeCard>
               )}
             </div>
-          )}
         </>
       )}
 
@@ -761,6 +735,43 @@ export default function TeamManagementPage() {
           onCancel={() => setDeletingRole(null)}
           isDeleting={isDeletingRole}
         />
+      )}
+
+      {/* Inline Role Creation Modal for Invite Flow */}
+      {institutionId && (
+        <DottedModal
+          isOpen={showInviteRoleModal}
+          onClose={() => setShowInviteRoleModal(false)}
+          title="Create New Role"
+        >
+          <DottedModalContent>
+            <RoleForm
+              institutionId={institutionId}
+              onSuccess={handleInviteRoleCreated}
+              onCancel={() => setShowInviteRoleModal(false)}
+              showWrapper={false}
+            />
+          </DottedModalContent>
+        </DottedModal>
+      )}
+
+      {/* Edit Role Modal */}
+      {editingRole && institutionId && (
+        <DottedModal
+          isOpen={!!editingRole}
+          onClose={() => setEditingRole(null)}
+          title={`Edit ${editingRole.name}`}
+        >
+          <DottedModalContent>
+            <RoleForm
+              institutionId={institutionId}
+              role={editingRole}
+              onSuccess={handleRoleFormSuccess}
+              onCancel={() => setEditingRole(null)}
+              showWrapper={false}
+            />
+          </DottedModalContent>
+        </DottedModal>
       )}
     </div>
   )

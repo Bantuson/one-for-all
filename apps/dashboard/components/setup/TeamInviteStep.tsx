@@ -6,9 +6,11 @@ import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { CodeCard, CodeCardHeader } from '@/components/ui/CodeCard'
+import { DottedModal, DottedModalContent } from '@/components/ui/DottedModal'
 import { useSetupStore } from '@/lib/stores/setupStore'
 import { RoleSelector } from '@/components/roles/RoleSelector'
 import { RolePermissionGrid } from '@/components/roles/RolePermissionGrid'
+import { RoleForm } from '@/components/roles'
 import type { Role } from '@/components/roles'
 import type { Permission } from '@/lib/constants/permissions'
 
@@ -102,6 +104,9 @@ export function TeamInviteStep({
   const [showPermissionOverride, setShowPermissionOverride] = React.useState(false)
   const [overriddenPermissions, setOverriddenPermissions] = React.useState<Permission[]>([])
 
+  // Role creation modal state
+  const [showRoleCreationModal, setShowRoleCreationModal] = React.useState(false)
+
   // Legacy permission selection state (fallback when no institutionId)
   const [legacyPermissions, setLegacyPermissions] = React.useState<LegacyPermission[]>(DEFAULT_LEGACY_PERMISSIONS)
 
@@ -128,6 +133,14 @@ export function TeamInviteStep({
     // Reset overridden permissions to role's default permissions
     setOverriddenPermissions(role.permissions)
     setShowPermissionOverride(false)
+  }, [])
+
+  // Handle role creation success
+  const handleRoleCreated = React.useCallback((newRole: Role) => {
+    setSelectedRoleId(newRole.id)
+    setSelectedRole(newRole)
+    setOverriddenPermissions(newRole.permissions)
+    setShowRoleCreationModal(false)
   }, [])
 
   // Handle legacy permission toggle (for backward compatibility)
@@ -304,6 +317,7 @@ export function TeamInviteStep({
               showPermissionsPreview={!showPermissionOverride}
               placeholder="Select a role for this team member..."
               className="mb-4"
+              onCreateRole={() => setShowRoleCreationModal(true)}
             />
 
             {/* Permission Override Toggle */}
@@ -473,24 +487,62 @@ export function TeamInviteStep({
   )
 
   if (!showWrapper) {
-    return <div className={cn('flex flex-col gap-6', className)}>{content}</div>
+    return (
+      <>
+        <div className={cn('flex flex-col gap-6', className)}>{content}</div>
+        {institutionId && (
+          <DottedModal
+            isOpen={showRoleCreationModal}
+            onClose={() => setShowRoleCreationModal(false)}
+            title="Create New Role"
+          >
+            <DottedModalContent>
+              <RoleForm
+                institutionId={institutionId}
+                onSuccess={handleRoleCreated}
+                onCancel={() => setShowRoleCreationModal(false)}
+                showWrapper={false}
+              />
+            </DottedModalContent>
+          </DottedModal>
+        )}
+      </>
+    )
   }
 
   return (
-    <div className={cn('flex flex-col gap-6', className)}>
-      <CodeCard>
-        <CodeCardHeader
-          filename="team-members.config"
-          status="active"
-          badge={
-            <span className="font-mono text-xs text-syntax-comment">
-              {pendingInvites.length} pending
-            </span>
-          }
-        />
-        {content}
-      </CodeCard>
-    </div>
+    <>
+      <div className={cn('flex flex-col gap-6', className)}>
+        <CodeCard>
+          <CodeCardHeader
+            filename="team-members.config"
+            status="active"
+            badge={
+              <span className="font-mono text-xs text-syntax-comment">
+                {pendingInvites.length} pending
+              </span>
+            }
+          />
+          {content}
+        </CodeCard>
+      </div>
+      {institutionId && (
+        <DottedModal
+          isOpen={showRoleCreationModal}
+          onClose={() => setShowRoleCreationModal(false)}
+          title="Create New Role"
+        >
+          <DottedModalContent>
+            <RoleForm
+              institutionId={institutionId}
+              onSuccess={handleRoleCreated}
+              onCancel={() => setShowRoleCreationModal(false)}
+              showWrapper={false}
+            />
+          </DottedModalContent>
+        </DottedModal>
+      )}
+    </>
   )
 }
 

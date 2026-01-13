@@ -22,7 +22,7 @@ export function ModalHeader({ title, onClose, className }: ModalHeaderProps) {
     >
       <div className="flex items-center gap-3">
         <TrafficLights status="active" size="sm" />
-        <h2 className="font-mono text-lg">
+        <h2 className="font-mono text-sm">
           <span className="text-syntax-export">export</span>
           <span className="text-syntax-key ml-2">{title}</span>
         </h2>

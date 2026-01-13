@@ -1,8 +1,9 @@
 'use client'
 
 import { ThemeProvider } from 'next-themes'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuth } from '@clerk/nextjs'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useUnifiedRegistrationStore } from '@/lib/stores/unifiedRegistrationStore'
 import { useSetupStore } from '@/lib/stores/setupStore'
 
@@ -38,10 +39,24 @@ function AuthStateListener() {
 }
 
 export function Providers({ children }: { children: ReactNode }) {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 60 * 1000, // 1 minute
+            refetchOnWindowFocus: false,
+          },
+        },
+      })
+  )
+
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-      <AuthStateListener />
-      {children}
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+        <AuthStateListener />
+        {children}
+      </ThemeProvider>
+    </QueryClientProvider>
   )
 }
