@@ -96,6 +96,23 @@ from .application_choices_tool import (
 )
 
 # =============================================================================
+# APS CALCULATOR & COURSE REQUIREMENTS TOOLS
+# =============================================================================
+from .aps_calculator import (
+    calculate_aps,
+    get_subject_points,
+    validate_aps_score,
+    store_aps_calculation,
+)
+from .course_requirements import (
+    get_course_requirements,
+    check_subject_requirements,
+    compare_to_cutoff,
+    get_eligible_courses,
+    check_full_eligibility,
+)
+
+# =============================================================================
 # EXTERNAL SUBMISSION TOOLS (No database access)
 # =============================================================================
 from .application_submission_tool import application_submission_tool
@@ -286,6 +303,18 @@ __all__ = [
     "submit_application_with_choices",
     "get_application_choices",
     "update_choice_status",
+    # =========================================================================
+    # APS CALCULATOR & COURSE REQUIREMENTS TOOLS
+    # =========================================================================
+    "calculate_aps",
+    "get_subject_points",
+    "validate_aps_score",
+    "store_aps_calculation",
+    "get_course_requirements",
+    "check_subject_requirements",
+    "compare_to_cutoff",
+    "get_eligible_courses",
+    "check_full_eligibility",
     # =========================================================================
     # EXTERNAL SUBMISSION TOOLS (No database access)
     # =========================================================================

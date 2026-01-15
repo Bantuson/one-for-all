@@ -349,3 +349,117 @@ document_flagging_notification_task:
   agent: document_reviewer_agent
   context:
     - document_review_task
+
+
+# =============================================================================
+# APS RANKING AGENT TASKS
+# =============================================================================
+
+aps_calculation_task:
+  description: >
+    Calculate the APS (Admission Point Score) for the provided application.
+
+    Use the academic_info from the application which contains matric subjects
+    and their percentage marks in the following format:
+    {"subjects": [{"name": "Mathematics", "percentage": 75}, ...]}
+
+    STEPS:
+    1. Use calculate_aps tool with the academic_info JSON
+    2. The tool applies the standard SA APS scale:
+       - 80-100%: 7 points
+       - 70-79%: 6 points
+       - 60-69%: 5 points
+       - 50-59%: 4 points
+       - 40-49%: 3 points
+       - 30-39%: 2 points
+       - 0-29%: 1 point
+    3. Life Orientation is weighted at 50% (max 3.5 points)
+    4. Total APS = Sum of 6 best subjects + (LO * 0.5)
+
+    Your final answer MUST be a JSON with:
+    - application_id: The application being processed
+    - total_aps: The calculated APS score (integer)
+    - breakdown: Subject-by-subject point allocation
+    - life_orientation: LO subject details and contribution
+    - subjects_counted: Number of subjects used in calculation
+  expected_output: >
+    JSON with total_aps, breakdown, life_orientation, and calculation details.
+  agent: aps_ranking_agent
+
+
+aps_eligibility_task:
+  description: >
+    Check eligibility for the applicant's selected courses based on their APS.
+
+    STEPS:
+    1. Use get_course_requirements to fetch minimum APS and subject requirements
+    2. Use compare_to_cutoff to check APS against course minimum
+    3. Use check_subject_requirements to verify mandatory subject levels
+    4. For comprehensive check, use check_full_eligibility
+
+    ELIGIBILITY STATUS CODES:
+    - "highly_eligible": APS exceeds minimum by 5+ points
+    - "eligible": APS meets or exceeds minimum
+    - "borderline": APS is 1-3 points below minimum (may be considered)
+    - "ineligible_aps": APS significantly below requirement
+    - "ineligible_subjects": Subject requirements not met
+
+    IMPORTANT: Mathematics vs Mathematical Literacy
+    - Programmes requiring "Mathematics" will NOT accept "Mathematical Literacy"
+    - Check subject_requirements carefully for this distinction
+
+    Your final answer MUST be a JSON with:
+    - course_id: The course being assessed
+    - course_name: Name of the course
+    - applicant_aps: The applicant's APS
+    - min_aps_required: Course minimum requirement
+    - eligibility_status: One of the status codes above
+    - subject_check: Results of subject requirements verification
+    - recommendation: Clear guidance for the applicant
+  expected_output: >
+    JSON with eligibility_status, subject_check, and recommendation.
+  agent: aps_ranking_agent
+  context:
+    - aps_calculation_task
+
+
+aps_ranking_task:
+  description: >
+    Rank multiple applications by their calculated APS scores.
+
+    This task processes a batch of applications (from agent_session.target_ids)
+    and produces a ranked list for admissions processing.
+
+    STEPS:
+    1. Process each application in target_ids
+    2. Calculate APS for each using calculate_aps
+    3. Store each calculation via store_aps_calculation
+    4. Sort applications by APS (descending)
+    5. Assign rank positions (1 = highest APS)
+
+    RANKING CONSIDERATIONS:
+    - Ties: Applications with same APS share the same rank
+    - Cutoff: Identify applications above/below course minimum
+    - Subject requirements: Note any with subject deficiencies
+
+    Your final answer MUST be a JSON with:
+    - total_processed: Number of applications processed
+    - ranked_applications: Array sorted by APS with:
+      - rank: Position (1 = highest)
+      - application_id: Application ID
+      - applicant_name: (if available)
+      - total_aps: Calculated APS
+      - meets_cutoff: Boolean for course minimum
+      - subject_eligible: Boolean for subject requirements
+    - summary:
+      - above_cutoff_count: Applications meeting minimum
+      - below_cutoff_count: Applications below minimum
+      - avg_aps: Average APS of batch
+      - highest_aps: Top APS score
+      - lowest_aps: Bottom APS score
+  expected_output: >
+    JSON with ranked_applications array and summary statistics.
+  agent: aps_ranking_agent
+  context:
+    - aps_calculation_task
+    - aps_eligibility_task
