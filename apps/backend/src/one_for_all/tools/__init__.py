@@ -34,6 +34,15 @@ from .document_review_tools import (
 )
 
 # =============================================================================
+# VISION TOOLS (GPT-4V Document Analysis)
+# =============================================================================
+from .vision_tools import (
+    vision_analyze_document,
+    vision_extract_document_text,
+    vision_compare_documents,
+)
+
+# =============================================================================
 # OTP & MESSAGING TOOLS
 # =============================================================================
 from .sendgrid_otp_sender import sendgrid_otp_sender
@@ -206,6 +215,12 @@ __all__ = [
     "document_flag_tool",
     "document_approve_tool",
     "get_application_documents",
+    # =========================================================================
+    # VISION TOOLS (GPT-4V Document Analysis)
+    # =========================================================================
+    "vision_analyze_document",
+    "vision_extract_document_text",
+    "vision_compare_documents",
     # =========================================================================
     # NEW API-BASED TOOLS (Preferred)
     # =========================================================================

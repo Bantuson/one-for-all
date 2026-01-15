@@ -19,6 +19,14 @@ from one_for_all.tools import (
     resend_otp_check,
     # Student Number Tools
     generate_student_number,
+    # Document Review Tools
+    document_flag_tool,
+    document_approve_tool,
+    get_application_documents,
+    # Vision Tools (GPT-4V)
+    vision_analyze_document,
+    vision_extract_document_text,
+    vision_compare_documents,
     # Deprecated Supabase Tools (still used in agents.yaml)
     supabase_user_store,
     supabase_user_lookup,
@@ -67,6 +75,14 @@ if TEST_MODE:
         "resend_otp_check": resend_otp_check,
         # Student Number Tools (REAL - uses database)
         "generate_student_number": generate_student_number,
+        # Document Review Tools (REAL - uses database)
+        "document_flag_tool": document_flag_tool,
+        "document_approve_tool": document_approve_tool,
+        "get_application_documents": get_application_documents,
+        # Vision Tools (GPT-4V) - REAL for document analysis
+        "vision_analyze_document": vision_analyze_document,
+        "vision_extract_document_text": vision_extract_document_text,
+        "vision_compare_documents": vision_compare_documents,
         # Supabase Tools (REAL - uses database)
         "supabase_user_store": supabase_user_store,
         "supabase_user_lookup": supabase_user_lookup,
@@ -99,6 +115,14 @@ else:
         "resend_otp_check": resend_otp_check,
         # Student Number Tools
         "generate_student_number": generate_student_number,
+        # Document Review Tools
+        "document_flag_tool": document_flag_tool,
+        "document_approve_tool": document_approve_tool,
+        "get_application_documents": get_application_documents,
+        # Vision Tools (GPT-4V)
+        "vision_analyze_document": vision_analyze_document,
+        "vision_extract_document_text": vision_extract_document_text,
+        "vision_compare_documents": vision_compare_documents,
         # Deprecated Supabase Tools (still referenced in agents.yaml)
         "supabase_user_store": supabase_user_store,
         "supabase_user_lookup": supabase_user_lookup,
