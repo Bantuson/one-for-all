@@ -35,6 +35,8 @@ dev = [
     "vcrpy>=6.0.1",
     "httpx>=0.27.0",
     "locust>=2.0.0",
+    "deepeval>=0.21.0",
+    "sentence-transformers>=2.2.0",
 ]
 
 [tool.setuptools.package-data]
@@ -58,6 +60,8 @@ markers = [
     "requires_db: Tests that require database access",
     "requires_api: Tests that require external API access",
     "vcr: Tests that use VCR cassettes for LLM response replay",
+    "llm: Tests that evaluate LLM outputs using DeepEval",
+    "semantic: Tests that use semantic similarity for validation",
 ]
 
 [tool.coverage.run]

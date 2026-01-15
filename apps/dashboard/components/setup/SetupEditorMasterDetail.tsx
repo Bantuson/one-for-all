@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import {
   ChevronRight,
   ChevronDown,
@@ -1645,6 +1646,7 @@ function CampusDetailPanel({ campus, onUpdateCampus, onAddFaculty }: CampusDetai
 export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailProps) {
   const {
     institutionData,
+    institutionId,
     editedCampuses,
     editingItemId,
     setEditingItem,
@@ -1661,6 +1663,10 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
     mode,
     manualInstitutionName,
   } = useSetupStore()
+
+  const router = useRouter()
+  const params = useParams()
+  const institutionSlug = params.institution_slug as string
 
   // Selection state
   const [selectedCampusId, setSelectedCampusId] = useState<string | null>(null)
@@ -1910,18 +1916,30 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
   // Applications view handlers
   const handleViewCourseApplications = useCallback(
     (course: PreConfiguredCourse, courseDbId: string | undefined) => {
-      if (!selectedCampus || !selectedFaculty) return
+      // Use slug from URL (dashboard context), fallback to institutionData.id (registration context)
+      const slug = institutionSlug || institutionData?.id
+      console.log('[CourseCard] Click - institutionSlug:', institutionSlug, 'slug:', slug)
 
-      setSelectedCourseForApps({
-        courseCode: course.code,
-        courseName: course.name,
-        courseId: courseDbId || course.code, // Use DB ID if available, fallback to code
-        campusId: selectedCampus._id,
-        facultyCode: selectedFaculty.code,
-        facultyName: selectedFaculty.name,
-      })
+      if (!slug) {
+        console.error('[CourseCard] No institution context available, using fallback')
+        // Fallback: set local state to show inline dialog (old behavior)
+        if (!selectedCampus || !selectedFaculty) return
+        setSelectedCourseForApps({
+          courseCode: course.code,
+          courseName: course.name,
+          courseId: courseDbId || course.code,
+          campusId: selectedCampus._id,
+          facultyCode: selectedFaculty.code,
+          facultyName: selectedFaculty.name,
+        })
+        return
+      }
+
+      const courseId = courseDbId || course.code
+      // Navigate to the applications page with course filter
+      router.push(`/dashboard/${slug}/applications?course=${courseId}`)
     },
-    [selectedCampus, selectedFaculty]
+    [institutionSlug, institutionData?.id, router, selectedCampus, selectedFaculty]
   )
 
   const handleBackToCoursesFromApps = useCallback(() => {
@@ -1963,7 +1981,7 @@ export function SetupEditorMasterDetail({ className }: SetupEditorMasterDetailPr
         }
 
         const response = await fetch(
-          `/api/institutions/${institutionId}/courses/${selectedCourseForApps.courseId}/applications`
+          `/api/courses/${selectedCourseForApps.courseId}/applications`
         )
 
         if (!response.ok) {

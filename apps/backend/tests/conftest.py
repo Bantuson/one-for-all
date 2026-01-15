@@ -4,6 +4,7 @@ Shared pytest fixtures for integration and unit tests.
 This module provides common test fixtures including:
 - Test mode configuration
 - VCR cassette configuration for LLM response recording
+- DeepEval configuration for LLM output validation
 - CrewAI crew instances
 - Sample undergraduate and postgraduate profiles
 - Database cleanup utilities
@@ -13,6 +14,12 @@ import pytest
 import os
 from pathlib import Path
 from typing import Dict, Any
+
+# =============================================================================
+# DeepEval Configuration
+# =============================================================================
+# Disable telemetry by default for privacy
+os.environ.setdefault("DEEPEVAL_TELEMETRY_ENABLED", "false")
 
 
 # =============================================================================
@@ -72,6 +79,59 @@ def vcr_cassette_dir(request):
     Organizes cassettes by test module for easier navigation.
     """
     return str(Path(__file__).parent / "cassettes")
+
+
+# =============================================================================
+# DeepEval Configuration for LLM Testing
+# =============================================================================
+
+@pytest.fixture(scope="session")
+def deepeval_config():
+    """
+    Configure DeepEval for the test session.
+
+    This fixture:
+    - Sets up DeepEval API key if available
+    - Returns configuration dict indicating if DeepEval is enabled
+    - Tests can use this to conditionally skip if not configured
+
+    Usage:
+        def test_llm_output(deepeval_config):
+            if not deepeval_config["enabled"]:
+                pytest.skip("DeepEval not configured")
+            # ... run DeepEval tests
+    """
+    api_key = os.environ.get("DEEPEVAL_API_KEY", "")
+    if api_key:
+        try:
+            from deepeval import set_api_key
+            set_api_key(api_key)
+        except ImportError:
+            pass  # DeepEval not installed, tests will skip
+    return {"enabled": bool(api_key)}
+
+
+@pytest.fixture(scope="session")
+def sentence_transformer_model():
+    """
+    Lazy-load sentence transformer model for semantic similarity tests.
+
+    This fixture loads the model once per session to avoid repeated
+    model loading overhead. Returns None if sentence-transformers
+    is not installed.
+
+    Usage:
+        def test_semantic(sentence_transformer_model):
+            if sentence_transformer_model is None:
+                pytest.skip("sentence-transformers not installed")
+            embeddings = sentence_transformer_model.encode(["text1", "text2"])
+    """
+    try:
+        from sentence_transformers import SentenceTransformer
+        return SentenceTransformer('all-MiniLM-L6-v2')
+    except ImportError:
+        return None
+
 
 # Add src to path for imports
 import sys

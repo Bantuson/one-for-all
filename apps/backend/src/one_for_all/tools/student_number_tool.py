@@ -3,10 +3,17 @@ Student Number Generator Tool
 
 CrewAI tool for generating institution-specific student numbers via Supabase RPC.
 
+This module provides tools for:
+- Generating institution-specific student numbers on application submission
+- Retrieving platform-wide student numbers (always visible)
+- Retrieving institution student numbers (only visible after acceptance)
+- Validating student numbers against institution format rules
+
 In TEST_MODE, student numbers are prefixed with "TEST-" for easy cleanup.
 """
 
 import asyncio
+import re
 from datetime import datetime
 
 from crewai.tools import tool
@@ -18,57 +25,215 @@ from one_for_all.config.test_config import TEST_MODE
 @tool
 def generate_student_number(institution_id: str, applicant_id: str) -> str:
     """
-    Generate a unique student number for an applicant at a specific institution.
+    Generate institution-specific student number on application submission.
 
-    Calls the Supabase RPC function to generate an institution-specific student number
-    following the format rules (e.g., UP: u24012345, UCT: SMITH12345).
-    Updates the applicant_accounts table with the generated student number.
+    Calls the Supabase RPC function generate_institution_student_number to create
+    a unique student number following institution-specific format rules.
+    The number is stored in applicant_accounts.institution_student_numbers JSONB
+    but is NOT revealed to the applicant until their application is accepted.
 
     Args:
         institution_id: UUID of the institution
         applicant_id: UUID of the applicant
 
     Returns:
-        Generated student number or error message
+        Success message (NOT the actual number - it's only revealed after acceptance)
+        or error message if generation failed
     """
     async def async_logic():
         if not supabase:
             return "ERROR: Supabase client not configured"
 
         try:
-            # Call the RPC function to generate student number
+            # Call the RPC function to generate institution student number
             result = supabase.rpc(
-                "generate_student_number",
+                "generate_institution_student_number",
                 {"p_institution_id": institution_id, "p_applicant_id": applicant_id}
             ).execute()
 
-            if not result.data:
-                return "ERROR: Failed to generate student number - no data returned"
+            if result.data is None:
+                return "ERROR: Failed to generate student number - no format configured for this institution"
 
             student_number = result.data
 
             # In test mode, prefix with TEST- for cleanup identification
-            if TEST_MODE and not student_number.startswith("TEST-"):
-                student_number = f"TEST-{student_number}"
+            if TEST_MODE and student_number and not student_number.startswith("TEST-"):
+                # Get institution code to update the JSONB properly
+                inst_result = supabase.table("institution_student_number_formats").select(
+                    "institution_code"
+                ).eq("institution_id", institution_id).eq("is_active", True).single().execute()
 
-                # Update the applicant record with the test prefix
-                try:
-                    supabase.table("applicant_accounts").update(
-                        {"primary_student_number": student_number}
-                    ).eq("id", applicant_id).execute()
-                except Exception as update_error:
-                    # Log but don't fail if update fails
-                    pass
+                if inst_result.data:
+                    inst_code = inst_result.data.get("institution_code")
+                    test_number = f"TEST-{student_number}"
 
-            # The RPC function handles updating the applicant record
-            # Return the generated student number
-            return f"Student number generated: {student_number}"
+                    # Update with test prefix
+                    try:
+                        supabase.table("applicant_accounts").update({
+                            "institution_student_numbers": supabase.rpc(
+                                "jsonb_set",
+                                {
+                                    "target": supabase.table("applicant_accounts")
+                                        .select("institution_student_numbers")
+                                        .eq("id", applicant_id)
+                                        .single(),
+                                    "path": [inst_code],
+                                    "new_value": test_number
+                                }
+                            )
+                        }).eq("id", applicant_id).execute()
+                    except Exception:
+                        # If JSONB update fails, do it the simple way
+                        current = supabase.table("applicant_accounts").select(
+                            "institution_student_numbers"
+                        ).eq("id", applicant_id).single().execute()
+
+                        if current.data:
+                            inst_numbers = current.data.get("institution_student_numbers", {}) or {}
+                            inst_numbers[inst_code] = test_number
+                            supabase.table("applicant_accounts").update({
+                                "institution_student_numbers": inst_numbers
+                            }).eq("id", applicant_id).execute()
+
+            # Return success message without revealing the number
+            # The number is only revealed after acceptance via get_institution_student_number
+            return "SUCCESS: Institution student number generated and stored. Number will be revealed upon application acceptance."
 
         except Exception as e:
             error_msg = str(e)
             if "function" in error_msg.lower() and "does not exist" in error_msg.lower():
-                return "ERROR: generate_student_number function not found in database. Run the migration first."
+                return "ERROR: generate_institution_student_number function not found in database. Run migration 016_student_numbers.sql first."
             return f"ERROR: Failed to generate student number - {error_msg}"
+
+    return asyncio.run(async_logic())
+
+
+@tool
+def get_platform_student_number(applicant_id: str) -> str:
+    """
+    Get the platform-wide student number for an applicant.
+
+    The platform student number (format: OFA-2kYY-NNNN) is assigned automatically
+    when an applicant account is created and can always be shown to the applicant.
+
+    Args:
+        applicant_id: UUID of the applicant
+
+    Returns:
+        Platform student number or error message
+    """
+    async def async_logic():
+        if not supabase:
+            return "ERROR: Supabase client not configured"
+
+        try:
+            result = supabase.table("applicant_accounts").select(
+                "platform_student_number"
+            ).eq("id", applicant_id).single().execute()
+
+            if not result.data:
+                return f"ERROR: Applicant {applicant_id} not found"
+
+            platform_number = result.data.get("platform_student_number")
+
+            if not platform_number:
+                return "NO_PLATFORM_NUMBER: Applicant does not have a platform student number assigned yet"
+
+            return f"Platform Student Number: {platform_number}"
+
+        except Exception as e:
+            error_msg = str(e)
+            if "No rows" in error_msg or "0 rows" in error_msg:
+                return f"ERROR: Applicant {applicant_id} not found"
+            return f"ERROR: Failed to retrieve platform student number - {error_msg}"
+
+    return asyncio.run(async_logic())
+
+
+@tool
+def get_institution_student_number(applicant_id: str, institution_code: str) -> str:
+    """
+    Get institution student number - only if application is accepted.
+
+    Institution-specific student numbers are generated on application submission
+    but are only revealed to the applicant after their application has been accepted.
+    This ensures students only see their student number when they've been admitted.
+
+    Args:
+        applicant_id: UUID of the applicant
+        institution_code: Short code of the institution (e.g., UP, UCT, WITS)
+
+    Returns:
+        Student number if accepted, or NOT_REVEALED message if not yet accepted
+    """
+    async def async_logic():
+        if not supabase:
+            return "ERROR: Supabase client not configured"
+
+        try:
+            # First check if the applicant has any accepted applications for this institution
+            # Query application_choices joined with applications to find accepted status
+            accepted_check = supabase.table("application_choices").select(
+                "id, status, application_id"
+            ).eq("status", "accepted").execute()
+
+            # If no results, we need to check via the institutions table
+            institution_result = supabase.table("institutions").select(
+                "id"
+            ).eq("code", institution_code.upper()).single().execute()
+
+            if not institution_result.data:
+                return f"ERROR: Institution with code '{institution_code}' not found"
+
+            institution_id = institution_result.data.get("id")
+
+            # Get applications for this applicant at this institution
+            apps_result = supabase.table("applications").select(
+                "id"
+            ).eq("applicant_id", applicant_id).execute()
+
+            if not apps_result.data:
+                return f"NOT_REVEALED: No applications found for this applicant"
+
+            app_ids = [app.get("id") for app in apps_result.data]
+
+            # Check if any application_choices for this institution are accepted
+            has_accepted = False
+            for app_id in app_ids:
+                choice_result = supabase.table("application_choices").select(
+                    "id, status"
+                ).eq("application_id", app_id).eq(
+                    "institution_id", institution_id
+                ).eq("status", "accepted").execute()
+
+                if choice_result.data and len(choice_result.data) > 0:
+                    has_accepted = True
+                    break
+
+            if not has_accepted:
+                return f"NOT_REVEALED: Student number for {institution_code} will be available after your application is accepted"
+
+            # Application is accepted, retrieve the student number
+            applicant_result = supabase.table("applicant_accounts").select(
+                "institution_student_numbers"
+            ).eq("id", applicant_id).single().execute()
+
+            if not applicant_result.data:
+                return f"ERROR: Applicant {applicant_id} not found"
+
+            inst_numbers = applicant_result.data.get("institution_student_numbers", {}) or {}
+            student_number = inst_numbers.get(institution_code.upper())
+
+            if not student_number:
+                return f"NO_NUMBER: No student number found for {institution_code}. Contact admissions office."
+
+            return f"Institution Student Number ({institution_code}): {student_number}"
+
+        except Exception as e:
+            error_msg = str(e)
+            if "No rows" in error_msg or "0 rows" in error_msg:
+                return f"ERROR: Record not found"
+            return f"ERROR: Failed to retrieve institution student number - {error_msg}"
 
     return asyncio.run(async_logic())
 
@@ -76,7 +241,11 @@ def generate_student_number(institution_id: str, applicant_id: str) -> str:
 @tool
 def get_applicant_student_numbers(applicant_id: str) -> str:
     """
-    Retrieve all student numbers for an applicant across institutions.
+    Retrieve all student numbers for an applicant (platform + visible institution numbers).
+
+    This returns the platform student number and any institution student numbers
+    where the applicant has an accepted application. Institution numbers for
+    non-accepted applications are hidden.
 
     Args:
         applicant_id: UUID of the applicant
@@ -89,26 +258,55 @@ def get_applicant_student_numbers(applicant_id: str) -> str:
             return "ERROR: Supabase client not configured"
 
         try:
+            # Get applicant data
             result = supabase.table("applicant_accounts").select(
-                "id, student_numbers, primary_student_number, student_number_generated_at"
+                "id, platform_student_number, institution_student_numbers"
             ).eq("id", applicant_id).single().execute()
 
             if not result.data:
                 return f"ERROR: Applicant {applicant_id} not found"
 
             data = result.data
-            student_numbers = data.get("student_numbers", {})
-            primary = data.get("primary_student_number")
-            generated_at = data.get("student_number_generated_at")
+            platform_number = data.get("platform_student_number")
+            all_inst_numbers = data.get("institution_student_numbers", {}) or {}
 
-            if not student_numbers and not primary:
-                return "NO_STUDENT_NUMBERS: Applicant has no student numbers assigned yet"
+            # Get accepted institution codes for this applicant
+            apps_result = supabase.table("applications").select("id").eq(
+                "applicant_id", applicant_id
+            ).execute()
+
+            visible_inst_numbers = {}
+
+            if apps_result.data:
+                app_ids = [app.get("id") for app in apps_result.data]
+
+                for app_id in app_ids:
+                    # Get accepted choices with institution info
+                    choices_result = supabase.table("application_choices").select(
+                        "institution_id"
+                    ).eq("application_id", app_id).eq("status", "accepted").execute()
+
+                    if choices_result.data:
+                        for choice in choices_result.data:
+                            inst_id = choice.get("institution_id")
+                            # Get institution code
+                            inst_result = supabase.table("institutions").select(
+                                "code"
+                            ).eq("id", inst_id).single().execute()
+
+                            if inst_result.data:
+                                inst_code = inst_result.data.get("code")
+                                if inst_code and inst_code in all_inst_numbers:
+                                    visible_inst_numbers[inst_code] = all_inst_numbers[inst_code]
+
+            if not platform_number and not visible_inst_numbers:
+                return "NO_STUDENT_NUMBERS: No student numbers available yet"
 
             return str({
                 "applicant_id": applicant_id,
-                "student_numbers": student_numbers,
-                "primary_student_number": primary,
-                "generated_at": generated_at
+                "platform_student_number": platform_number,
+                "institution_student_numbers": visible_inst_numbers,
+                "note": "Only institution numbers for accepted applications are shown"
             })
 
         except Exception as e:
@@ -169,19 +367,19 @@ def validate_student_number(institution_code: str, student_number: str) -> str:
 def assign_student_number_manually(
     applicant_id: str,
     institution_code: str,
-    student_number: str,
-    set_as_primary: bool = False
+    student_number: str
 ) -> str:
     """
     Manually assign a student number to an applicant for a specific institution.
 
-    Use this when student numbers are provided externally (e.g., from university API).
+    Use this when student numbers are provided externally (e.g., from university API
+    response after successful submission). This updates the institution_student_numbers
+    JSONB field in applicant_accounts.
 
     Args:
         applicant_id: UUID of the applicant
-        institution_code: Short code of the institution (e.g., UP, UCT)
+        institution_code: Short code of the institution (e.g., UP, UCT, WITS)
         student_number: The student number to assign
-        set_as_primary: Whether to set this as the primary student number
 
     Returns:
         Success confirmation or error message
@@ -191,34 +389,24 @@ def assign_student_number_manually(
             return "ERROR: Supabase client not configured"
 
         try:
-            # Get current student numbers
+            # Get current institution student numbers
             current = supabase.table("applicant_accounts").select(
-                "student_numbers"
+                "institution_student_numbers"
             ).eq("id", applicant_id).single().execute()
 
             if not current.data:
                 return f"ERROR: Applicant {applicant_id} not found"
 
-            student_numbers = current.data.get("student_numbers", {}) or {}
-            student_numbers[institution_code.upper()] = student_number
-
-            # Prepare update data
-            update_data = {
-                "student_numbers": student_numbers,
-                "student_number_generated_at": datetime.utcnow().isoformat()
-            }
-
-            if set_as_primary:
-                update_data["primary_student_number"] = student_number
+            inst_numbers = current.data.get("institution_student_numbers", {}) or {}
+            inst_numbers[institution_code.upper()] = student_number
 
             # Update the record
-            result = supabase.table("applicant_accounts").update(
-                update_data
-            ).eq("id", applicant_id).execute()
+            result = supabase.table("applicant_accounts").update({
+                "institution_student_numbers": inst_numbers
+            }).eq("id", applicant_id).execute()
 
             if result.data:
-                primary_msg = " (set as primary)" if set_as_primary else ""
-                return f"Student number '{student_number}' assigned to applicant for {institution_code}{primary_msg}"
+                return f"SUCCESS: Student number '{student_number}' assigned for {institution_code}"
             else:
                 return "ERROR: Failed to update applicant record"
 

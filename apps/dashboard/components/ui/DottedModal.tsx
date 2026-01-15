@@ -10,6 +10,7 @@ interface DottedModalProps {
   title: string
   children: React.ReactNode
   className?: string
+  headerExtra?: React.ReactNode
 }
 
 export function DottedModal({
@@ -18,6 +19,7 @@ export function DottedModal({
   title,
   children,
   className,
+  headerExtra,
 }: DottedModalProps) {
   // Handle escape key
   React.useEffect(() => {
@@ -70,7 +72,7 @@ export function DottedModal({
           role="dialog"
           aria-modal="true"
         >
-          <ModalHeader title={title} onClose={onClose} />
+          <ModalHeader title={title} onClose={onClose} extra={headerExtra} />
           {children}
         </div>
       </div>
@@ -100,7 +102,7 @@ interface DottedModalFooterProps {
 
 export function DottedModalFooter({ children, className }: DottedModalFooterProps) {
   return (
-    <div className={cn('px-6 py-4 border-t border-border bg-muted/50 flex justify-end gap-3', className)}>
+    <div className={cn('px-6 py-4 border-t border-border bg-card flex justify-end gap-3', className)}>
       {children}
     </div>
   )

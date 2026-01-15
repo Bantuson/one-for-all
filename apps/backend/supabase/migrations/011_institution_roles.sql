@@ -136,7 +136,7 @@ CREATE POLICY "Service role full access to institution_roles"
 CREATE OR REPLACE FUNCTION public.seed_default_admin_role()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Insert the default admin role with all permissions
+    -- 1. Administrator (system role, locked)
     INSERT INTO public.institution_roles (
         institution_id,
         name,
@@ -153,10 +153,58 @@ BEGIN
         'Administrator',
         'admin',
         'Full access to all institution features and settings',
-        '["view_dashboard", "view_applications", "edit_courses", "process_applications", "export_data", "manage_team", "manage_applications", "view_reports", "manage_settings", "admin_access"]'::jsonb,
+        '["view_dashboard", "view_applications", "edit_courses", "process_applications", "export_data", "manage_team", "manage_applications", "view_reports", "manage_settings", "admin_access", "export_applications", "edit_campuses", "edit_faculties"]'::jsonb,
         true,
         true,
-        '#DC2626',
+        '#1f2937',
+        NEW.created_by
+    );
+
+    -- 2. Applications Administrator (editable default)
+    INSERT INTO public.institution_roles (
+        institution_id,
+        name,
+        slug,
+        description,
+        permissions,
+        is_system,
+        is_default,
+        color,
+        created_by
+    )
+    VALUES (
+        NEW.id,
+        'Applications Administrator',
+        'applications-admin',
+        'Process applications for intake considerations',
+        '["view_dashboard", "view_applications", "process_applications", "manage_applications"]'::jsonb,
+        false,
+        true,
+        '#22c55e',
+        NEW.created_by
+    );
+
+    -- 3. Academic Data Maintainer (editable default)
+    INSERT INTO public.institution_roles (
+        institution_id,
+        name,
+        slug,
+        description,
+        permissions,
+        is_system,
+        is_default,
+        color,
+        created_by
+    )
+    VALUES (
+        NEW.id,
+        'Academic Data Maintainer',
+        'academic-maintainer',
+        'Manage institution academic data structure. Export application data.',
+        '["view_dashboard", "view_applications", "edit_campuses", "edit_faculties", "edit_courses", "export_applications"]'::jsonb,
+        false,
+        true,
+        '#3b82f6',
         NEW.created_by
     );
 

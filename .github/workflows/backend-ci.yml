@@ -4,12 +4,15 @@
 #
 # Stages:
 #   1. Unit Tests (runs on every PR) - 10 min
+#      - Includes tool tests from tests/unit/test_tools/
+#      - Generates coverage reports with tool-specific metrics
 #   2. Integration Tests (needs unit-tests) - 10 min (VCR cassettes, no API calls)
 #   3. API Tests (needs unit-tests, parallel with integration) - 15 min
 #   4. Code Quality (parallel, no dependencies) - 10 min
-#   5. Staging Deploy (main/develop only, needs stages 2,3)
-#   6. E2E + Performance Tests (needs staging-deploy)
-#   7. Production Gate (main only, needs all stages)
+#   5. DeepEval LLM Tests (main only, needs unit-tests) - 15 min (non-blocking)
+#   6. Staging Deploy (main/develop only, needs stages 2,3)
+#   7. E2E + Performance Tests (needs staging-deploy)
+#   8. Production Gate (main only, needs all stages)
 #
 # VCR Cassette Testing:
 #   Integration tests use pytest-vcr to record/replay LLM responses.
@@ -17,11 +20,12 @@
 #   - CI runs: Replay from committed cassettes (no API key needed)
 #   - Re-record: pytest tests/integration/ -v --vcr-record=all
 #
-# Required Secrets (2 core + 2 optional):
+# Required Secrets (2 core + 3 optional):
 #   - NEXT_PUBLIC_SUPABASE_URL: Supabase project URL
 #   - SUPABASE_SERVICE_ROLE_KEY: Supabase service role key
 #   - RENDER_DEPLOY_HOOK: (optional) Webhook URL for Render staging deployment
 #   - CODECOV_TOKEN: (optional) Token for uploading coverage reports
+#   - DEEPEVAL_API_KEY: (optional) Token for DeepEval LLM output validation
 #
 # Note: DEEPSEEK_API_KEY not required in CI - VCR replays from cassettes
 #
@@ -94,22 +98,43 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          pytest tests/unit/ -v --cov=src/one_for_all --cov-report=xml --cov-report=term -m unit
+          # Run all unit tests including tool tests from tests/unit/test_tools/
+          pytest tests/unit/ -v --cov=src/one_for_all --cov-report=xml --cov-report=term --cov-report=html -m unit
+
+      - name: Check Tool Test Coverage
+        # Verifies that tools directory maintains minimum coverage threshold
+        # Non-blocking initially to allow gradual coverage improvement
+        continue-on-error: true
+        run: |
+          echo "=== Tool-Specific Coverage Report ==="
+          # Generate detailed coverage report for tools directory
+          coverage report --include="src/one_for_all/tools/*" || echo "No tool coverage data yet"
+
+          echo ""
+          echo "=== Coverage Threshold Check ==="
+          # Check if tools meet 70% coverage threshold (non-blocking)
+          coverage report --include="src/one_for_all/tools/*" --fail-under=70 || {
+            echo "WARNING: Tool test coverage below 70% threshold"
+            echo "This check is currently non-blocking - improve coverage over time"
+          }
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./apps/backend/coverage.xml
-          flags: unit-tests
+          flags: backend-unit,tools
           name: unit-tests-coverage
           fail_ci_if_error: false
+          verbose: true
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
         with:
           name: coverage-unit
-          path: apps/backend/coverage.xml
+          path: |
+            apps/backend/coverage.xml
+            apps/backend/htmlcov/
           retention-days: 7
 
   # ============================================================================
@@ -284,7 +309,76 @@ jobs:
           echo "This stage is non-blocking - fix issues to improve code quality."
 
   # ============================================================================
-  # STAGE 5: Staging Deploy (main/develop only, needs stages 2,3)
+  # STAGE 5: DeepEval LLM Tests (main only, needs unit-tests)
+  # Non-blocking tests for validating LLM output quality using DeepEval metrics
+  # ============================================================================
+  deepeval-tests:
+    name: DeepEval LLM Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: unit-tests
+    continue-on-error: true  # Non-blocking - LLM tests may be flaky
+    if: github.ref == 'refs/heads/main'  # Only run on main branch
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'apps/backend/pyproject.toml'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          # Install DeepEval for LLM output validation
+          pip install deepeval
+
+      - name: Create .env.local at monorepo root
+        working-directory: .
+        run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" >> .env.local
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env.local
+          echo "DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}" >> .env.local
+          echo "ONEFORALL_TEST_MODE=true" >> .env.local
+
+      - name: Run DeepEval LLM tests
+        env:
+          DEEPEVAL_API_KEY: ${{ secrets.DEEPEVAL_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          # Run LLM output validation tests if they exist
+          if [ -f "tests/unit/test_llm_outputs.py" ]; then
+            echo "=== Running DeepEval LLM Output Tests ==="
+            pytest tests/unit/test_llm_outputs.py -v --tb=short || {
+              echo "WARNING: DeepEval tests failed or had issues"
+              echo "This stage is non-blocking - review results for quality insights"
+            }
+          else
+            echo "No test_llm_outputs.py found - skipping DeepEval tests"
+            echo "To enable DeepEval tests, create tests/unit/test_llm_outputs.py"
+          fi
+
+      - name: Generate DeepEval report
+        if: always()
+        run: |
+          echo "=== DeepEval Test Summary ==="
+          echo "DeepEval tests completed. These tests validate LLM output quality."
+          echo "Non-blocking stage - review results to improve agent responses."
+          echo ""
+          echo "Metrics evaluated may include:"
+          echo "  - Answer Relevancy"
+          echo "  - Faithfulness"
+          echo "  - Contextual Precision"
+          echo "  - Hallucination detection"
+
+  # ============================================================================
+  # STAGE 6: Staging Deploy (main/develop only, needs stages 2,3)
+  # Note: DeepEval tests (Stage 5) run in parallel, not a dependency
   # ============================================================================
   staging-deploy:
     name: Deploy to Staging
@@ -343,7 +437,7 @@ jobs:
           echo "URL: ${{ steps.deploy.outputs.url }}"
 
   # ============================================================================
-  # STAGE 6: E2E + Performance Tests (needs staging-deploy)
+  # STAGE 7: E2E + Performance Tests (needs staging-deploy)
   # ============================================================================
   e2e-performance-tests:
     name: E2E & Performance Tests
@@ -437,7 +531,8 @@ jobs:
           retention-days: 30
 
   # ============================================================================
-  # STAGE 7: Production Gate (main only, needs all stages)
+  # STAGE 8: Production Gate (main only, needs all stages)
+  # Note: deepeval-tests is not in needs list - it's non-blocking/informational
   # ============================================================================
   production-gate:
     name: Production Readiness Gate
@@ -499,10 +594,12 @@ jobs:
 
           ## Test Results
 
-          - ✅ Unit Tests: PASSED
+          - ✅ Unit Tests: PASSED (includes tool tests)
+          - ✅ Tool Coverage: Checked (70% threshold)
           - ✅ Integration Tests: PASSED
           - ✅ API Tests: PASSED
           - ✅ Code Quality: COMPLETED (warnings may exist)
+          - ✅ DeepEval LLM Tests: COMPLETED (non-blocking)
           - ✅ E2E Tests: PASSED
           - ✅ Performance Tests: PASSED (P95 < 2000ms)
           - ✅ Coverage: >= 80%

@@ -278,3 +278,74 @@ nsfas_status_check_task:
   agent: nsfas_agent
   context:
     - nsfas_submission_task
+
+
+document_review_task:
+  description: >
+    Review all uploaded documents for application {application_id}.
+
+    STEPS:
+    1. Use get_application_documents to fetch all documents for this application
+    2. For each document, check:
+       - Legibility: Can text/images be clearly read?
+       - Completeness: Are all required pages present?
+       - Accuracy: Does information match the applicant's details?
+       - Validity: Check expiry dates where applicable (ID, certificates)
+
+    3. For each document, make a decision:
+       - Use document_approve_tool if the document is valid and complete
+       - Use document_flag_tool if there are issues, providing a CLEAR reason
+
+    FLAGGING REASONS MUST BE SPECIFIC AND ACTIONABLE:
+    ✓ Good: "ID document image is too blurry - please upload a clearer photo"
+    ✓ Good: "Matric certificate is missing page 2 - please upload complete document"
+    ✗ Bad: "Document has issues"
+    ✗ Bad: "Not acceptable"
+
+    Your final answer MUST be a JSON with:
+    - reviewed_count: Total documents reviewed
+    - approved: Array of approved document IDs
+    - flagged: Array of objects with {document_id, document_type, reason}
+  expected_output: >
+    JSON with reviewed_count, approved (array of IDs), flagged (array with document_id, document_type, reason)
+  agent: document_reviewer_agent
+
+
+document_flagging_notification_task:
+  description: >
+    For each flagged document from the document_review_task context,
+    compose and send a notification to the applicant explaining what
+    needs to be corrected and how to resubmit.
+
+    NOTIFICATION GUIDELINES:
+    1. Use applicant's preferred contact method (WhatsApp, Email, SMS)
+    2. Be polite and helpful in tone
+    3. Clearly state WHICH document has the issue
+    4. Explain WHAT is wrong (use the flag_reason)
+    5. Provide clear instructions on HOW to resubmit
+
+    TEMPLATE STRUCTURE:
+    Subject: Action Required - Document Review for Your Application
+
+    Dear [Applicant Name],
+
+    We have reviewed your application documents and need you to resubmit
+    the following:
+
+    Document: [Document Type]
+    Issue: [Flag Reason]
+    Action: Please upload a new version that addresses the issue above.
+
+    [Include upload instructions or link]
+
+    If you have questions, please contact support.
+
+    Your final answer MUST confirm:
+    - Number of notifications sent
+    - Contact methods used
+    - Brief summary of each notification
+  expected_output: >
+    Confirmation of notifications sent with message content summary
+  agent: document_reviewer_agent
+  context:
+    - document_review_task

@@ -8,19 +8,21 @@ import { cn } from '@/lib/utils'
 
 interface SkeletonProps {
   className?: string
+  style?: React.CSSProperties
 }
 
 /**
  * Base skeleton component with animated pulse effect.
  * Used as the building block for all skeleton UI elements.
  */
-export function Skeleton({ className }: SkeletonProps) {
+export function Skeleton({ className, style }: SkeletonProps) {
   return (
     <div
       className={cn(
         'animate-pulse bg-muted/40 rounded',
         className
       )}
+      style={style}
       aria-hidden="true"
     />
   )

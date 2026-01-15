@@ -8,9 +8,10 @@ interface ModalHeaderProps {
   title: string
   onClose: () => void
   className?: string
+  extra?: React.ReactNode
 }
 
-export function ModalHeader({ title, onClose, className }: ModalHeaderProps) {
+export function ModalHeader({ title, onClose, className, extra }: ModalHeaderProps) {
   return (
     <div
       className={cn(
@@ -27,13 +28,16 @@ export function ModalHeader({ title, onClose, className }: ModalHeaderProps) {
           <span className="text-syntax-key ml-2">{title}</span>
         </h2>
       </div>
-      <button
-        onClick={onClose}
-        className="p-1.5 rounded-md hover:bg-muted transition-colors"
-        aria-label="Close modal"
-      >
-        <X className="h-5 w-5 text-muted-foreground" />
-      </button>
+      <div className="flex items-center gap-3">
+        {extra}
+        <button
+          onClick={onClose}
+          className="p-1.5 rounded-md hover:bg-muted transition-colors"
+          aria-label="Close modal"
+        >
+          <X className="h-5 w-5 text-muted-foreground" />
+        </button>
+      </div>
     </div>
   )
 }

@@ -20,7 +20,12 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 
     const { data: course, error } = await supabase
       .from('courses')
-      .select('*')
+      .select(`
+        *,
+        opening_date,
+        closing_date,
+        computed_status
+      `)
       .eq('id', id)
       .single()
 
@@ -60,6 +65,8 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       requirements,
       status,
       programme_type,
+      opening_date,
+      closing_date,
     } = body
 
     const supabase = createServiceClient()
@@ -75,6 +82,8 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     if (requirements !== undefined) updates.requirements = requirements
     if (status !== undefined) updates.status = status
     if (programme_type !== undefined) updates.programme_type = programme_type
+    if (opening_date !== undefined) updates.opening_date = opening_date
+    if (closing_date !== undefined) updates.closing_date = closing_date
 
     const { data: course, error } = await supabase
       .from('courses')

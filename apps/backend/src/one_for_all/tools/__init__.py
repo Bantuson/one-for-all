@@ -25,6 +25,15 @@ from .document_validator import (
 )
 
 # =============================================================================
+# DOCUMENT REVIEW TOOLS
+# =============================================================================
+from .document_review_tools import (
+    document_flag_tool,
+    document_approve_tool,
+    get_application_documents,
+)
+
+# =============================================================================
 # OTP & MESSAGING TOOLS
 # =============================================================================
 from .sendgrid_otp_sender import sendgrid_otp_sender
@@ -50,9 +59,31 @@ from .whatsapp_handler import (
 # =============================================================================
 from .student_number_tool import (
     generate_student_number,
+    get_platform_student_number,
+    get_institution_student_number,
     get_applicant_student_numbers,
     validate_student_number,
     assign_student_number_manually,
+)
+
+# =============================================================================
+# COURSE VALIDATION TOOLS
+# =============================================================================
+from .course_validation_tool import (
+    validate_course_for_submission,
+    get_course_application_dates,
+    validate_courses_batch,
+    list_open_courses,
+)
+
+# =============================================================================
+# APPLICATION CHOICES TOOLS
+# =============================================================================
+from .application_choices_tool import (
+    create_application_choice,
+    submit_application_with_choices,
+    get_application_choices,
+    update_choice_status,
 )
 
 # =============================================================================
@@ -170,6 +201,12 @@ __all__ = [
     "get_document_type_requirements",
     "validate_batch_documents",
     # =========================================================================
+    # DOCUMENT REVIEW TOOLS
+    # =========================================================================
+    "document_flag_tool",
+    "document_approve_tool",
+    "get_application_documents",
+    # =========================================================================
     # NEW API-BASED TOOLS (Preferred)
     # =========================================================================
     # Applicant
@@ -215,9 +252,25 @@ __all__ = [
     # STUDENT NUMBER TOOLS
     # =========================================================================
     "generate_student_number",
+    "get_platform_student_number",
+    "get_institution_student_number",
     "get_applicant_student_numbers",
     "validate_student_number",
     "assign_student_number_manually",
+    # =========================================================================
+    # COURSE VALIDATION TOOLS
+    # =========================================================================
+    "validate_course_for_submission",
+    "get_course_application_dates",
+    "validate_courses_batch",
+    "list_open_courses",
+    # =========================================================================
+    # APPLICATION CHOICES TOOLS
+    # =========================================================================
+    "create_application_choice",
+    "submit_application_with_choices",
+    "get_application_choices",
+    "update_choice_status",
     # =========================================================================
     # EXTERNAL SUBMISSION TOOLS (No database access)
     # =========================================================================

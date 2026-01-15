@@ -33,6 +33,8 @@ interface CourseData {
     requiredSubjects?: string[]
   }
   status?: 'open' | 'closed'
+  openingDate?: string | null
+  closingDate?: string | null
 }
 
 interface EditCourseModalProps {
@@ -52,6 +54,8 @@ interface FormState {
   minimumAps: number
   requiredSubjects: string
   status: 'open' | 'closed'
+  openingDate: string
+  closingDate: string
 }
 
 export function EditCourseModal({
@@ -69,6 +73,8 @@ export function EditCourseModal({
     minimumAps: 0,
     requiredSubjects: '',
     status: 'open',
+    openingDate: '',
+    closingDate: '',
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -83,6 +89,8 @@ export function EditCourseModal({
         minimumAps: course.requirements?.minimumAps || 0,
         requiredSubjects: course.requirements?.requiredSubjects?.join(', ') || '',
         status: course.status || 'open',
+        openingDate: course.openingDate || '',
+        closingDate: course.closingDate || '',
       })
     }
   }, [course])
@@ -111,6 +119,8 @@ export function EditCourseModal({
           requiredSubjects: subjects.length > 0 ? subjects : undefined,
         },
         status: formState.status,
+        openingDate: formState.openingDate || null,
+        closingDate: formState.closingDate || null,
       }
 
       if (useApi && course.id) {
@@ -127,6 +137,8 @@ export function EditCourseModal({
             requiredSubjects: subjects.length > 0 ? subjects : undefined,
           },
           status: formState.status,
+          opening_date: formState.openingDate || null,
+          closing_date: formState.closingDate || null,
         }
 
         const response = await fetch(`/api/courses/${course.id}`, {
@@ -256,6 +268,49 @@ export function EditCourseModal({
               <option value="open">open</option>
               <option value="closed">closed</option>
             </select>
+          </div>
+
+          {/* Application Dates */}
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border">
+            <div>
+              <label
+                htmlFor="opening-date"
+                className="block text-xs font-mono text-syntax-key mb-1"
+              >
+                &apos;opening_date&apos;:
+              </label>
+              <input
+                id="opening-date"
+                type="date"
+                value={formState.openingDate}
+                onChange={(e) => setFormState(prev => ({ ...prev, openingDate: e.target.value }))}
+                className="w-full px-3 py-2 border border-border rounded-md bg-background font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                aria-describedby="opening-date-desc"
+              />
+              <p id="opening-date-desc" className="text-xs text-muted-foreground mt-1">
+                When applications open
+              </p>
+            </div>
+            <div>
+              <label
+                htmlFor="closing-date"
+                className="block text-xs font-mono text-syntax-key mb-1"
+              >
+                &apos;closing_date&apos;:
+              </label>
+              <input
+                id="closing-date"
+                type="date"
+                value={formState.closingDate}
+                onChange={(e) => setFormState(prev => ({ ...prev, closingDate: e.target.value }))}
+                min={formState.openingDate || undefined}
+                className="w-full px-3 py-2 border border-border rounded-md bg-background font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                aria-describedby="closing-date-desc"
+              />
+              <p id="closing-date-desc" className="text-xs text-muted-foreground mt-1">
+                When applications close
+              </p>
+            </div>
           </div>
         </div>
       </DottedModalContent>
