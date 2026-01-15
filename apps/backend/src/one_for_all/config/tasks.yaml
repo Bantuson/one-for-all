@@ -463,3 +463,108 @@ aps_ranking_task:
   context:
     - aps_calculation_task
     - aps_eligibility_task
+
+
+# =============================================================================
+# REVIEWER ASSISTANT AGENT TASKS
+# =============================================================================
+
+reviewer_assistant_question_task:
+  description: >
+    Answer a reviewer's question about an application, policy, or eligibility.
+
+    QUESTION: {question}
+
+    CONTEXT (if provided):
+    - Institution ID: {institution_id}
+    - Application ID: {application_id}
+    - Course ID: {course_id}
+
+    STEPS:
+    1. Analyze the question to determine what type of information is needed:
+       - Eligibility questions: Use check_eligibility tool
+       - Document questions: Use get_missing_documents tool
+       - Comparison questions: Use compare_applicant tool
+       - Requirement questions: Use get_admission_criteria tool
+       - Policy questions: Use search_policies tool
+       - Summary requests: Use get_application_summary tool
+
+    2. Retrieve relevant information using the appropriate tools
+
+    3. Synthesize the information into a clear, helpful response
+
+    4. Include citations for any policy references
+
+    5. Provide actionable recommendations where appropriate
+
+    EXAMPLE QUESTIONS:
+    - "Is this applicant eligible for conditional acceptance?"
+    - "What documents are missing for this application?"
+    - "What are the minimum requirements for BCom Accounting?"
+    - "How does this applicant compare to accepted students?"
+
+    Your final answer MUST be a JSON object with:
+    - answer: Clear response to the question
+    - citations: Array of sources/policies referenced
+    - recommendations: Array of suggested actions (if applicable)
+    - confidence: High/Medium/Low based on data availability
+  expected_output: >
+    JSON with answer, citations, recommendations, and confidence level
+  agent: reviewer_assistant_agent
+
+
+reviewer_eligibility_check_task:
+  description: >
+    Perform a detailed eligibility check for an application.
+
+    Application ID: {application_id}
+    Course ID: {course_id}
+
+    STEPS:
+    1. Use get_application_summary to retrieve applicant details
+    2. Use get_admission_criteria to get course requirements
+    3. Use check_eligibility to compare applicant against requirements
+    4. Use compare_applicant to see how they rank against accepted students
+    5. Use get_missing_documents to check document completeness
+
+    PRODUCE A COMPREHENSIVE ELIGIBILITY REPORT including:
+    - Overall eligibility status (Eligible/Conditional/Not Eligible)
+    - APS comparison with requirement
+    - Subject requirement check (especially Maths vs Maths Literacy)
+    - Document status
+    - Comparison with accepted students
+    - Final recommendation with reasoning
+
+    Your answer MUST include:
+    - Clear eligibility verdict
+    - Supporting evidence from each check
+    - Any conditions or missing requirements
+    - Recommendation for reviewer action
+  expected_output: >
+    Comprehensive eligibility report with verdict and recommendations
+  agent: reviewer_assistant_agent
+
+
+reviewer_application_summary_task:
+  description: >
+    Generate a comprehensive summary of an application for quick review.
+
+    Application ID: {application_id}
+
+    STEPS:
+    1. Use get_application_summary to retrieve all application details
+    2. Use get_missing_documents to check document status
+    3. If course choices are present, use get_admission_criteria for each
+
+    CREATE A REVIEWER-FRIENDLY SUMMARY including:
+    - Applicant overview (name, contact, ID)
+    - Academic profile (APS, key subjects, highlights)
+    - Course choices with eligibility indication
+    - Document status (complete/missing/flagged)
+    - Application timeline
+    - Any flags or concerns
+
+    Format the summary for quick scanning by busy reviewers.
+  expected_output: >
+    Structured application summary optimized for reviewer workflow
+  agent: reviewer_assistant_agent

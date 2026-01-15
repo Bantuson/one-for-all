@@ -10,8 +10,10 @@ This module contains specialized crew implementations for different workflows:
 
 from .document_reviewer_crew import DocumentReviewerCrew
 from .aps_ranking_crew import APSRankingCrew
+from .reviewer_assistant_crew import ReviewerAssistantCrew
 
 __all__ = [
     "DocumentReviewerCrew",
     "APSRankingCrew",
+    "ReviewerAssistantCrew",
 ]
