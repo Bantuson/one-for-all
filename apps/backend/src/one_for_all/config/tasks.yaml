@@ -349,3 +349,110 @@ document_flagging_notification_task:
   agent: document_reviewer_agent
   context:
     - document_review_task
+
+
+# =============================================================================
+# ANALYTICS TASKS
+# =============================================================================
+
+analytics_query_task:
+  description: >
+    Process a natural language analytics question for institution {institution_id}.
+
+    QUESTION: {analytics_question}
+
+    STEPS:
+    1. Analyze the question to determine what data is needed
+    2. Use generate_sql_query to convert the question to SQL
+       - Ensure the query is properly scoped to institution_id
+       - Use appropriate JOINs and aggregations
+    3. Use execute_analytics_query to run the SQL
+    4. Validate the results make sense for the question
+
+    SPECIAL CASES:
+    - For basic stats (total applications, status counts), use get_application_stats
+    - For trend data, ensure proper date ordering
+    - For comparisons, include meaningful labels
+
+    Your final answer MUST be a JSON object with:
+    - sql_query: The SQL that was executed
+    - data: Array of result rows
+    - row_count: Number of results
+    - data_type: "categorical", "time_series", "proportion", or "comparison"
+  expected_output: >
+    JSON with sql_query, data array, row_count, and data_type classification
+  agent: analytics_agent
+
+
+analytics_visualization_task:
+  description: >
+    Create a Recharts visualization for the analytics results.
+
+    ORIGINAL QUESTION: {analytics_question}
+    SAVE CHART: {save_chart}
+    PIN CHART: {pin_chart}
+
+    Using the data from analytics_query_task, select the best chart type:
+
+    CHART TYPE SELECTION:
+    - data_type="categorical" -> Bar Chart (faculties, courses, campuses)
+    - data_type="proportion" -> Pie Chart (status distribution, rates)
+    - data_type="time_series" -> Line Chart (trends over time)
+    - data_type="comparison" -> Bar Chart (comparing values)
+
+    STEPS:
+    1. Determine the appropriate chart type based on data_type
+    2. Use the corresponding generate_*_chart tool
+    3. If save_chart is true:
+       - Use save_chart with institution_id={institution_id}
+       - Set is_pinned={pin_chart}
+
+    COLOR RULES:
+    - Status data (accepted/pending/rejected) uses traffic light colors
+    - Categorical data uses the standard palette
+    - Time series uses primary blue color
+
+    Your final answer MUST be a JSON object with:
+    - chart_config: Complete Recharts configuration
+    - chart_type: "bar", "pie", "line", or "area"
+    - title: Chart title
+    - saved: true/false
+    - chart_id: UUID if saved, null otherwise
+  expected_output: >
+    JSON with chart_config, chart_type, title, saved status, and chart_id
+  agent: analytics_agent
+  context:
+    - analytics_query_task
+
+
+get_pinned_charts_task:
+  description: >
+    Retrieve all pinned charts for institution {institution_id}.
+
+    Use get_saved_charts with pinned_only=true to fetch only the charts
+    that should appear on the analytics dashboard.
+
+    Your final answer MUST be a JSON object with:
+    - charts: Array of saved chart objects
+    - total: Count of pinned charts
+  expected_output: >
+    JSON with charts array and total count
+  agent: analytics_agent
+
+
+toggle_chart_pin_task:
+  description: >
+    Update the pinned status of chart {chart_id}.
+
+    New pinned status: {is_pinned}
+
+    Use toggle_chart_pin to update the chart's pinned status.
+    Pinned charts appear on the main analytics dashboard.
+
+    Your final answer MUST confirm:
+    - chart_id that was updated
+    - new pinned status
+    - success/failure message
+  expected_output: >
+    Confirmation of pin status update
+  agent: analytics_agent
