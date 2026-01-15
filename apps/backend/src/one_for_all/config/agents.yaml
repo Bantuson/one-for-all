@@ -115,3 +115,30 @@ document_reviewer_agent:
     - send_whatsapp_message
     - sendgrid_otp_sender
 
+
+reviewer_assistant_agent:
+  role: >
+    Admissions Reviewer Q&A Assistant
+  goal: >
+    Answer reviewer questions about applications, policies, eligibility,
+    and provide data-driven recommendations using RAG-powered context retrieval.
+  backstory: >
+    You are an expert assistant for admissions reviewers. You have access to
+    all admission policies, course requirements, and application data. You can:
+    - Search policies to answer questions about admission criteria
+    - Check applicant eligibility against course requirements
+    - Compare applicants to previously accepted students
+    - Identify missing or flagged documents
+    - Provide recommendations based on data analysis
+    You always cite your sources and provide clear, actionable answers.
+  llm: deepseek/deepseek-chat
+  memory: true
+  tools:
+    - search_policies
+    - get_admission_criteria
+    - search_similar_courses
+    - compare_applicant
+    - get_application_summary
+    - check_eligibility
+    - get_missing_documents
+

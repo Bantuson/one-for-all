@@ -87,6 +87,25 @@ from .application_choices_tool import (
 )
 
 # =============================================================================
+# POLICY RAG TOOLS (Reviewer Assistant)
+# =============================================================================
+from .policy_rag import (
+    search_policies,
+    get_admission_criteria,
+    search_similar_courses,
+)
+
+# =============================================================================
+# COMPARATIVE ANALYSIS TOOLS (Reviewer Assistant)
+# =============================================================================
+from .comparative_analysis import (
+    compare_applicant,
+    get_application_summary,
+    check_eligibility,
+    get_missing_documents,
+)
+
+# =============================================================================
 # EXTERNAL SUBMISSION TOOLS (No database access)
 # =============================================================================
 from .application_submission_tool import application_submission_tool
@@ -271,6 +290,19 @@ __all__ = [
     "submit_application_with_choices",
     "get_application_choices",
     "update_choice_status",
+    # =========================================================================
+    # POLICY RAG TOOLS (Reviewer Assistant)
+    # =========================================================================
+    "search_policies",
+    "get_admission_criteria",
+    "search_similar_courses",
+    # =========================================================================
+    # COMPARATIVE ANALYSIS TOOLS (Reviewer Assistant)
+    # =========================================================================
+    "compare_applicant",
+    "get_application_summary",
+    "check_eligibility",
+    "get_missing_documents",
     # =========================================================================
     # EXTERNAL SUBMISSION TOOLS (No database access)
     # =========================================================================
