@@ -9,7 +9,8 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "format": "prettier --write .",
-    "test": "vitest"
+    "test": "vitest",
+    "agent-runner": "bun run scripts/agent-runner.ts"
   },
   "dependencies": {
     "@clerk/backend": "^2.29.0",

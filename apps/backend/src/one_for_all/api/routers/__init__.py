@@ -1,5 +1,5 @@
 """API Routers."""
 
-from . import applicants, applications, health, nsfas, rag, sessions
+from . import agents, applicants, applications, health, nsfas, rag, sessions
 
-__all__ = ["applicants", "applications", "health", "nsfas", "rag", "sessions"]
+__all__ = ["agents", "applicants", "applications", "health", "nsfas", "rag", "sessions"]

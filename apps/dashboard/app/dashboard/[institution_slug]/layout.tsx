@@ -1,4 +1,5 @@
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { RealtimeSubscriptionProvider } from '@/components/dashboard/RealtimeSubscriptionProvider'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 
@@ -33,11 +34,13 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
-      <DashboardHeader institution={institution} />
-      <main className="flex-1 overflow-y-auto" id="dashboard-main">
-        {children}
-      </main>
-    </div>
+    <RealtimeSubscriptionProvider institutionId={institution.id}>
+      <div className="flex flex-col h-screen overflow-hidden">
+        <DashboardHeader institution={institution} />
+        <main className="flex-1 overflow-y-auto" id="dashboard-main">
+          {children}
+        </main>
+      </div>
+    </RealtimeSubscriptionProvider>
   )
 }

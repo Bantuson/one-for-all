@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
+import { createBrowserClient } from '@supabase/ssr'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { AgentType, AgentSession } from '@/components/agents/AgentInstructionModal'
 
 // ============================================================================
@@ -22,6 +24,9 @@ interface AgentState {
 
   // Error state
   error: string | null
+
+  // Realtime subscription
+  realtimeChannel: RealtimeChannel | null
 }
 
 interface AgentActions {
@@ -44,6 +49,10 @@ interface AgentActions {
   addSession: (session: AgentSession) => void
   removeSession: (sessionId: string) => void
 
+  // Realtime subscription
+  subscribeToRealtime: (institutionId: string) => void
+  unsubscribeFromRealtime: () => void
+
   // Computed
   getActiveCount: () => number
   getRunningSessions: () => AgentSession[]
@@ -65,6 +74,7 @@ const initialState: AgentState = {
   institutionId: null,
   activeSessionId: null,
   error: null,
+  realtimeChannel: null,
 }
 
 // ============================================================================
@@ -198,6 +208,93 @@ export const useAgentStore = create<AgentStore>()(
         set((state) => ({
           sessions: state.sessions.filter((s) => s.id !== sessionId),
         }))
+      },
+
+      // Realtime subscription
+      subscribeToRealtime: (institutionId: string) => {
+        // Unsubscribe from existing channel first
+        const existingChannel = get().realtimeChannel
+        if (existingChannel) {
+          const supabase = createBrowserClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+          )
+          supabase.removeChannel(existingChannel)
+        }
+
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        )
+
+        const channel = supabase
+          .channel(`agent-sessions-${institutionId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'agent_sessions',
+              filter: `institution_id=eq.${institutionId}`,
+            },
+            (payload) => {
+              const rawSession = payload.new as {
+                id: string
+                agent_type: string
+                status: string
+                processed_items?: number
+                total_items?: number
+                created_at: string
+              }
+
+              if (payload.eventType === 'INSERT') {
+                const session: AgentSession = {
+                  id: rawSession.id,
+                  agentType: rawSession.agent_type as AgentType,
+                  status: rawSession.status as AgentSession['status'],
+                  processedItems: rawSession.processed_items || 0,
+                  totalItems: rawSession.total_items || 0,
+                  createdAt: rawSession.created_at,
+                }
+                get().addSession(session)
+              } else if (payload.eventType === 'UPDATE') {
+                const session: AgentSession = {
+                  id: rawSession.id,
+                  agentType: rawSession.agent_type as AgentType,
+                  status: rawSession.status as AgentSession['status'],
+                  processedItems: rawSession.processed_items || 0,
+                  totalItems: rawSession.total_items || 0,
+                  createdAt: rawSession.created_at,
+                }
+                get().updateSessionStatus(session.id, session.status)
+                if (rawSession.processed_items !== undefined) {
+                  get().updateSessionProgress(
+                    session.id,
+                    rawSession.processed_items,
+                    rawSession.total_items || 0
+                  )
+                }
+              } else if (payload.eventType === 'DELETE') {
+                const oldSession = payload.old as { id: string }
+                get().removeSession(oldSession.id)
+              }
+            }
+          )
+          .subscribe()
+
+        set({ realtimeChannel: channel })
+      },
+
+      unsubscribeFromRealtime: () => {
+        const channel = get().realtimeChannel
+        if (channel) {
+          const supabase = createBrowserClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+          )
+          supabase.removeChannel(channel)
+          set({ realtimeChannel: null })
+        }
       },
 
       // Computed

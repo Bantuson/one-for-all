@@ -219,6 +219,52 @@ interface AgentSession {
 }
 ```
 
+### ReviewerChat Component (NEW)
+
+Chat interface for Reviewer Assistant agent. Located at `components/agents/ReviewerChat.tsx`.
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| **ReviewerChat** | `components/agents/ReviewerChat.tsx` | Chat modal for Q&A with Reviewer Assistant |
+| **ChatMessageBubble** | (internal) | Message rendering with citations/recommendations |
+
+**Chat Message Interface:**
+```typescript
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: Date
+  citations?: string[]
+  recommendations?: string[]
+  confidence?: 'High' | 'Medium' | 'Low'
+  isLoading?: boolean
+}
+```
+
+**Quick Questions (Pre-built prompts):**
+- Check Eligibility - "Is this applicant eligible for conditional acceptance?"
+- Missing Documents - "What documents are missing for this application?"
+- Course Requirements - "What are the minimum requirements for this course?"
+- Compare Applicant - "How does this applicant compare to accepted students?"
+
+### RealtimeSubscriptionProvider (NEW)
+
+Client component for Supabase Realtime subscriptions. Located at `components/dashboard/RealtimeSubscriptionProvider.tsx`.
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| **RealtimeSubscriptionProvider** | `components/dashboard/RealtimeSubscriptionProvider.tsx` | Manages agent_sessions realtime subscription per institution |
+
+**Usage:**
+```tsx
+<RealtimeSubscriptionProvider institutionId={institutionId}>
+  {children}
+</RealtimeSubscriptionProvider>
+```
+
+Automatically subscribes to `agent_sessions` table changes on mount and cleans up on unmount.
+
 ### Agent Store (Zustand)
 
 Located in `lib/stores/agentStore.ts`:
@@ -230,6 +276,21 @@ Located in `lib/stores/agentStore.ts`:
 | `createSession(institutionId, agentType, instructions)` | Start new agent |
 | `updateSessionStatus(id, status)` | Update session state |
 | `getActiveCount()` | Count running sessions |
+
+### Extended Agent Store Functions (NEW)
+
+| Function | Purpose |
+|----------|---------|
+| `subscribeToRealtime(institutionId)` | Subscribe to Supabase Realtime for agent_sessions changes |
+| `unsubscribeFromRealtime()` | Cleanup realtime channel subscription |
+| `addSession(session)` | Add session from realtime INSERT event |
+| `removeSession(sessionId)` | Remove session from realtime DELETE event |
+| `updateSessionProgress(id, processed, total)` | Update progress from realtime UPDATE event |
+
+**Selectors (performance optimization):**
+```typescript
+import { selectIsModalOpen, selectSessions, selectIsLoadingSessions, selectActiveCount } from '@/lib/stores/agentStore'
+```
 
 ---
 
@@ -470,6 +531,29 @@ All pre-configured South African institutions in `lib/institutions/data/`:
   - Types: `document_flagged`, `status_update`, `reminder`
   - Auto-formats SA phone numbers to WhatsApp format
 
+### Backend Agent Execution (NEW)
+
+Python FastAPI router for CrewAI execution. Located at `apps/backend/src/one_for_all/api/routers/agents.py`.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/v1/agents/document-review/execute` | Execute DocumentReviewerCrew |
+| `POST /api/v1/agents/aps-ranking/execute` | Execute APSRankingCrew |
+| `POST /api/v1/agents/reviewer-assistant/execute` | Execute ReviewerAssistantCrew |
+| `POST /api/v1/agents/analytics/execute` | Execute AnalyticsCrew |
+
+**Request/Response:**
+```python
+class ExecuteRequest(BaseModel):
+    session_id: str
+
+class ExecuteResponse(BaseModel):
+    success: bool
+    session_id: str
+    result: dict | None
+    error: str | None
+```
+
 ---
 
 ## Database Migrations
@@ -495,3 +579,35 @@ All pre-configured South African institutions in `lib/institutions/data/`:
 | Migration | Purpose |
 |-----------|---------|
 | `024_agent_sandbox.sql` | Agent sessions, decisions, saved charts tables with RLS |
+
+---
+
+## Scripts
+
+### Bun Agent Runner (NEW)
+
+Background worker that polls for pending agent sessions and triggers Python execution.
+
+| Script | Path | Purpose |
+|--------|------|---------|
+| **agent-runner.ts** | `apps/dashboard/scripts/agent-runner.ts` | Poll pending sessions, trigger backend crews |
+
+**Run command:**
+```bash
+pnpm agent-runner  # or: bun run scripts/agent-runner.ts
+```
+
+**Architecture:**
+```
+agent-runner.ts (Bun)
+    │
+    ├── Polls agent_sessions (status=pending) every 2s
+    ├── Updates status to "running"
+    ├── Calls Python backend: POST /api/v1/agents/[type]/execute
+    └── Updates status to "completed" or "failed" with output_result
+```
+
+**Environment Variables:**
+- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY` - Service role key for DB access
+- `BACKEND_URL` - Python backend URL (default: http://localhost:8000)

@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .middleware import AuditMiddleware
-from .routers import applicants, applications, health, nsfas, rag, sessions
+from .routers import agents, applicants, applications, health, nsfas, rag, sessions
 
 
 def create_app() -> FastAPI:
@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(applications.router)
     app.include_router(nsfas.router)
     app.include_router(rag.router)
+    app.include_router(agents.router)
 
     # Include legacy routers for CrewAI tool compatibility
     app.include_router(applications.legacy_router)

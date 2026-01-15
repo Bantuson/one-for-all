@@ -7,6 +7,7 @@ This document outlines the full implementation roadmap for the AI-powered admiss
 ## Overview
 
 The admissions processing system uses CrewAI agents to automate and assist with:
+
 - Document verification and validation
 - APS (Admission Point Score) calculation
 - Application ranking and selection
@@ -65,15 +66,16 @@ The admissions processing system uses CrewAI agents to automate and assist with:
 
 **Status: DONE**
 
-| Task | Status | Files |
-|------|--------|-------|
-| Fix notes persistence | Done | `api/applications/[id]/notes/route.ts` |
-| Fix status updates | Done | `api/applications/[id]/status/route.ts` |
-| Add toast notifications | Done | `ApplicationDetailModal.tsx` |
-| WhatsApp notification endpoint | Done | `api/notifications/whatsapp/route.ts` |
-| Update `.env.example` with Twilio vars | Done | `.env.example` |
+| Task                                   | Status | Files                                   |
+| -------------------------------------- | ------ | --------------------------------------- |
+| Fix notes persistence                  | Done   | `api/applications/[id]/notes/route.ts`  |
+| Fix status updates                     | Done   | `api/applications/[id]/status/route.ts` |
+| Add toast notifications                | Done   | `ApplicationDetailModal.tsx`            |
+| WhatsApp notification endpoint         | Done   | `api/notifications/whatsapp/route.ts`   |
+| Update `.env.example` with Twilio vars | Done   | `.env.example`                          |
 
 **Key Changes:**
+
 - Removed FK hint syntax from Supabase queries that caused PGRST200 errors
 - Added `notify.success()` and `notify.error()` toast feedback to all handlers
 - Created Twilio WhatsApp API integration for applicant notifications
@@ -85,13 +87,13 @@ The admissions processing system uses CrewAI agents to automate and assist with:
 
 **Status: DONE**
 
-| Task | Status | Files |
-|------|--------|-------|
-| Database migration | Done | `024_agent_sandbox.sql` |
-| AgentActivityButton | Done | `components/agents/AgentActivityButton.tsx` |
-| AgentInstructionModal | Done | `components/agents/AgentInstructionModal.tsx` |
-| Zustand agentStore | Done | `lib/stores/agentStore.ts` |
-| Agent sessions API | Done | `api/institutions/[id]/agent-sessions/route.ts` |
+| Task                  | Status | Files                                           |
+| --------------------- | ------ | ----------------------------------------------- |
+| Database migration    | Done   | `024_agent_sandbox.sql`                         |
+| AgentActivityButton   | Done   | `components/agents/AgentActivityButton.tsx`     |
+| AgentInstructionModal | Done   | `components/agents/AgentInstructionModal.tsx`   |
+| Zustand agentStore    | Done   | `lib/stores/agentStore.ts`                      |
+| Agent sessions API    | Done   | `api/institutions/[id]/agent-sessions/route.ts` |
 
 **Database Schema:**
 
@@ -144,15 +146,15 @@ CREATE TABLE saved_charts (
 
 **Goal:** Automated document verification using GPT-4V vision analysis.
 
-| Task | Description |
-|------|-------------|
-| Create `document_reviewer_agent` in CrewAI | YAML config + Python tools |
-| Implement vision analysis tool | GPT-4V for document inspection |
-| Add document type detection | ID, transcript, certificate classification |
-| Implement signature detection | Check for missing signatures |
-| Add clarity/quality scoring | Image quality assessment |
-| Create decision recording | Store decisions in `agent_decisions` |
-| Supabase Realtime integration | Push updates to dashboard |
+| Task                                       | Description                                |
+| ------------------------------------------ | ------------------------------------------ |
+| Create `document_reviewer_agent` in CrewAI | YAML config + Python tools                 |
+| Implement vision analysis tool             | GPT-4V for document inspection             |
+| Add document type detection                | ID, transcript, certificate classification |
+| Implement signature detection              | Check for missing signatures               |
+| Add clarity/quality scoring                | Image quality assessment                   |
+| Create decision recording                  | Store decisions in `agent_decisions`       |
+| Supabase Realtime integration              | Push updates to dashboard                  |
 
 **Agent Configuration (agents.yaml):**
 
@@ -176,13 +178,13 @@ document_reviewer_agent:
 
 **Tools:**
 
-| Tool | Purpose |
-|------|---------|
-| `vision_analyze_document` | Send document image to GPT-4V for analysis |
-| `get_document_metadata` | Retrieve expected document type, requirements |
-| `flag_document` | Flag document with reason, trigger WhatsApp |
-| `approve_document` | Mark document as approved |
-| `record_decision` | Store decision in agent_decisions table |
+| Tool                      | Purpose                                       |
+| ------------------------- | --------------------------------------------- |
+| `vision_analyze_document` | Send document image to GPT-4V for analysis    |
+| `get_document_metadata`   | Retrieve expected document type, requirements |
+| `flag_document`           | Flag document with reason, trigger WhatsApp   |
+| `approve_document`        | Mark document as approved                     |
+| `record_decision`         | Store decision in agent_decisions table       |
 
 ---
 
@@ -190,15 +192,15 @@ document_reviewer_agent:
 
 **Status: PLANNED**
 
-**Goal:** Calculate Admission Point Scores based on matric results.
+**Goal:** Calculate Admission Point Scores based on transcript results.
 
-| Task | Description |
-|------|-------------|
-| Create `aps_ranking_agent` | YAML config + calculation tools |
-| Implement APS calculation logic | Subject-to-points mapping |
-| Support multiple APS systems | Different institutions use different scales |
-| Integrate with course requirements | Compare APS to minimum requirements |
-| Generate ranking recommendations | Rank applicants by APS + criteria |
+| Task                               | Description                                 |
+| ---------------------------------- | ------------------------------------------- |
+| Create `aps_ranking_agent`         | YAML config + calculation tools             |
+| Implement APS calculation logic    | Subject-to-points mapping                   |
+| Support multiple APS systems       | Different institutions use different scales |
+| Integrate with course requirements | Compare APS to minimum requirements         |
+| Generate ranking recommendations   | Rank applicants by APS + criteria           |
 
 **APS Calculation Example (Eduvos BCom Accounting):**
 
@@ -226,15 +228,16 @@ Points Scale:
 
 **Goal:** AI-powered decision support for human reviewers.
 
-| Task | Description |
-|------|-------------|
-| Create `reviewer_assistant_agent` | Context-aware Q&A support |
-| Implement RAG for policy lookup | Vector search on institution policies |
-| Add comparative analysis | Compare applicant to similar cases |
-| Generate recommendation summaries | Structured decision support |
-| Track reviewer interactions | Log questions and responses |
+| Task                              | Description                           |
+| --------------------------------- | ------------------------------------- |
+| Create `reviewer_assistant_agent` | Context-aware Q&A support             |
+| Implement RAG for policy lookup   | Vector search on institution policies |
+| Add comparative analysis          | Compare applicant to similar cases    |
+| Generate recommendation summaries | Structured decision support           |
+| Track reviewer interactions       | Log questions and responses           |
 
 **Use Cases:**
+
 - "Is this applicant eligible for conditional acceptance?"
 - "What documents are missing for this application?"
 - "How does this applicant compare to others for this course?"
@@ -247,15 +250,16 @@ Points Scale:
 
 **Goal:** Generate insights and visualizations from admissions data.
 
-| Task | Description |
-|------|-------------|
-| Create `analytics_agent` | Data analysis + visualization |
-| Implement Recharts integration | Server-side chart config generation |
-| Add natural language queries | "Show acceptance rate by faculty" |
-| Create archivable charts | Save to `saved_charts` table |
-| Build analytics dashboard section | Display pinned charts |
+| Task                              | Description                         |
+| --------------------------------- | ----------------------------------- |
+| Create `analytics_agent`          | Data analysis + visualization       |
+| Implement Recharts integration    | Server-side chart config generation |
+| Add natural language queries      | "Show acceptance rate by faculty"   |
+| Create archivable charts          | Save to `saved_charts` table        |
+| Build analytics dashboard section | Display pinned charts               |
 
 **Chart Types:**
+
 - Bar: Status distribution, applications by course
 - Line: Application trends over time
 - Pie/Donut: Acceptance rates, demographic breakdowns
@@ -270,15 +274,16 @@ Points Scale:
 
 **Goal:** Automated applicant communications and bulk operations.
 
-| Task | Description |
-|------|-------------|
-| Create `notification_sender_agent` | WhatsApp/Email automation |
-| Implement template management | Institution-specific templates |
-| Add bulk notification support | Batch status notifications |
-| Create scheduling system | Timed notifications |
-| Track delivery status | Twilio webhooks integration |
+| Task                               | Description                    |
+| ---------------------------------- | ------------------------------ |
+| Create `notification_sender_agent` | WhatsApp/Email automation      |
+| Implement template management      | Institution-specific templates |
+| Add bulk notification support      | Batch status notifications     |
+| Create scheduling system           | Timed notifications            |
+| Track delivery status              | Twilio webhooks integration    |
 
 **Notification Types:**
+
 - Document flagged (resubmission required)
 - Application status change
 - Interview scheduling
@@ -339,21 +344,21 @@ Agent sessions update the dashboard in real-time:
 ```typescript
 // Subscribe to agent session updates
 const channel = supabase
-  .channel('agent-sessions')
+  .channel("agent-sessions")
   .on(
-    'postgres_changes',
+    "postgres_changes",
     {
-      event: '*',
-      schema: 'public',
-      table: 'agent_sessions',
+      event: "*",
+      schema: "public",
+      table: "agent_sessions",
       filter: `institution_id=eq.${institutionId}`,
     },
     (payload) => {
       // Update agentStore with new session data
-      agentStore.getState().addSession(transformSession(payload.new))
+      agentStore.getState().addSession(transformSession(payload.new));
     }
   )
-  .subscribe()
+  .subscribe();
 ```
 
 ### CrewAI Backend Integration
@@ -383,15 +388,15 @@ async def process_agent_session(session_id: str):
 
 ## Testing Strategy
 
-| Phase | Test Type | Focus |
-|-------|-----------|-------|
-| Phase 0 | Manual | Toast notifications, WhatsApp delivery |
-| Phase 1 | Unit + Integration | API routes, store mutations |
-| Phase 2 | E2E | Document upload → agent review → flag/approve |
-| Phase 3 | Unit | APS calculation accuracy |
-| Phase 4 | Integration | RAG retrieval quality |
-| Phase 5 | Visual | Chart rendering, data accuracy |
-| Phase 6 | E2E | Notification delivery, template rendering |
+| Phase   | Test Type          | Focus                                         |
+| ------- | ------------------ | --------------------------------------------- |
+| Phase 0 | Manual             | Toast notifications, WhatsApp delivery        |
+| Phase 1 | Unit + Integration | API routes, store mutations                   |
+| Phase 2 | E2E                | Document upload → agent review → flag/approve |
+| Phase 3 | Unit               | APS calculation accuracy                      |
+| Phase 4 | Integration        | RAG retrieval quality                         |
+| Phase 5 | Visual             | Chart rendering, data accuracy                |
+| Phase 6 | E2E                | Notification delivery, template rendering     |
 
 ---
 
@@ -407,27 +412,27 @@ async def process_agent_session(session_id: str):
 
 ## Success Metrics
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Document review time | -70% | Manual vs. agent-assisted |
-| APS calculation accuracy | 99%+ | Spot-check sample |
-| Reviewer decision support | +50% | Staff survey |
-| Notification delivery rate | 95%+ | Twilio webhooks |
-| Analytics query response | <5s | Agent response time |
+| Metric                     | Target | Measurement               |
+| -------------------------- | ------ | ------------------------- |
+| Document review time       | -70%   | Manual vs. agent-assisted |
+| APS calculation accuracy   | 99%+   | Spot-check sample         |
+| Reviewer decision support  | +50%   | Staff survey              |
+| Notification delivery rate | 95%+   | Twilio webhooks           |
+| Analytics query response   | <5s    | Agent response time       |
 
 ---
 
 ## Timeline Estimate
 
-| Phase | Estimated Effort |
-|-------|------------------|
-| Phase 0 | DONE |
-| Phase 1 | DONE |
-| Phase 2 | 2-3 days |
-| Phase 3 | 1-2 days |
-| Phase 4 | 2-3 days |
-| Phase 5 | 2-3 days |
-| Phase 6 | 1-2 days |
+| Phase   | Estimated Effort |
+| ------- | ---------------- |
+| Phase 0 | DONE             |
+| Phase 1 | DONE             |
+| Phase 2 | 2-3 days         |
+| Phase 3 | 1-2 days         |
+| Phase 4 | 2-3 days         |
+| Phase 5 | 2-3 days         |
+| Phase 6 | 1-2 days         |
 
 **Total remaining: ~8-13 days of development**
 

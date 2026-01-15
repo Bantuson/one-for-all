@@ -1,16 +1,20 @@
 'use client'
 
-import { Search, Activity, Settings, Users } from 'lucide-react'
+import { Search, Settings, Users } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { SettingsDropdown } from './SettingsDropdown'
 import { CommandPalette } from './CommandPalette'
 import { TrafficLights } from '@/components/ui/TrafficLights'
 import { cn } from '@/lib/utils'
+import { AgentActivityButton, AgentInstructionModal } from '@/components/agents'
+import { useAgentStore } from '@/lib/stores/agentStore'
+import type { AgentType } from '@/components/agents/AgentInstructionModal'
 
 interface DashboardHeaderProps {
   institution: {
+    id: string
     name: string
     slug: string
     logo_url?: string
@@ -19,6 +23,26 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ institution }: DashboardHeaderProps) {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [isAgentModalOpen, setIsAgentModalOpen] = useState(false)
+
+  // Agent store
+  const { sessions, isLoadingSessions, fetchSessions, createSession } = useAgentStore()
+  const activeSessions = sessions.filter((s) => s.status === 'running').length
+
+  // Fetch sessions on mount and when institution changes
+  useEffect(() => {
+    if (institution.id) {
+      fetchSessions(institution.id)
+    }
+  }, [institution.id, fetchSessions])
+
+  // Handler for creating agent sessions
+  const handleAgentSubmit = useCallback(
+    async (agentType: AgentType, instructions: string) => {
+      await createSession(institution.id, agentType, instructions)
+    },
+    [institution.id, createSession]
+  )
 
   // Ctrl+K keyboard shortcut
   useEffect(() => {
@@ -72,15 +96,12 @@ export function DashboardHeader({ institution }: DashboardHeaderProps) {
 
         {/* Right: Action Buttons - Traffic Light Colors */}
         <div className="flex items-center gap-1 w-72 justify-end">
-          {/* Usage/Stats - RED */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-traffic-red hover:text-traffic-red hover:bg-traffic-red/10 transition-colors"
-            title="Usage"
-          >
-            <Activity className="h-5 w-5" />
-          </Button>
+          {/* Agent Sandbox Button */}
+          <AgentActivityButton
+            activeCount={activeSessions}
+            isLoading={isLoadingSessions}
+            onClick={() => setIsAgentModalOpen(true)}
+          />
 
           {/* Team - YELLOW */}
           <Link href={`/dashboard/${institution.slug}/team`}>
@@ -113,6 +134,16 @@ export function DashboardHeader({ institution }: DashboardHeaderProps) {
         open={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
         institutionSlug={institution.slug}
+      />
+
+      {/* Agent Instruction Modal */}
+      <AgentInstructionModal
+        isOpen={isAgentModalOpen}
+        onClose={() => setIsAgentModalOpen(false)}
+        institutionId={institution.id}
+        recentSessions={sessions.slice(0, 5)}
+        isLoadingSessions={isLoadingSessions}
+        onSubmit={handleAgentSubmit}
       />
     </header>
   )
