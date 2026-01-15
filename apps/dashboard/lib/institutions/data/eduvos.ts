@@ -11,7 +11,11 @@
  * - Applied Science (Biomedicine, Biotech): Midrand & Pretoria only (requires labs)
  */
 
-import type { PreConfiguredInstitution, PreConfiguredProgrammeType, PreConfiguredFaculty } from '../types'
+import type {
+  PreConfiguredInstitution,
+  PreConfiguredProgrammeType,
+  PreConfiguredFaculty,
+} from '../types'
 
 // ============================================================================
 // Core Faculties (Available at ALL campuses)
@@ -29,6 +33,7 @@ const FACULTY_COMMERCE: PreConfiguredFaculty = {
       durationYears: 3,
       description: 'NQF 7 - General commerce degree',
       requirements: { minimumAps: 24 },
+      // Add opening and closing dates for automated system updates.
     },
     {
       name: 'BCom Accounting',
@@ -208,7 +213,10 @@ const FACULTY_APPLIED_SCIENCE: PreConfiguredFaculty = {
       level: 'undergraduate',
       durationYears: 3,
       description: 'NQF 7 - Medical sciences and healthcare',
-      requirements: { minimumAps: 26, requiredSubjects: ['Mathematics', 'Physical Sciences'] },
+      requirements: {
+        minimumAps: 26,
+        requiredSubjects: ['Mathematics', 'Physical Sciences'],
+      },
     },
     {
       name: 'BSc Biotechnology Management',
@@ -353,14 +361,25 @@ const FACULTY_LAW_MASTERS: PreConfiguredFaculty = {
 const UNDERGRADUATE_CORE: PreConfiguredProgrammeType = {
   type: 'undergraduate',
   displayName: 'Undergraduate Programmes',
-  faculties: [FACULTY_COMMERCE, FACULTY_HUMANITIES, FACULTY_TECHNOLOGY, FACULTY_LAW],
+  faculties: [
+    FACULTY_COMMERCE,
+    FACULTY_HUMANITIES,
+    FACULTY_TECHNOLOGY,
+    FACULTY_LAW,
+  ],
 }
 
 // Full undergraduate with Applied Science (Midrand & Pretoria only)
 const UNDERGRADUATE_WITH_APPLIED_SCIENCE: PreConfiguredProgrammeType = {
   type: 'undergraduate',
   displayName: 'Undergraduate Programmes',
-  faculties: [FACULTY_COMMERCE, FACULTY_HUMANITIES, FACULTY_TECHNOLOGY, FACULTY_APPLIED_SCIENCE, FACULTY_LAW],
+  faculties: [
+    FACULTY_COMMERCE,
+    FACULTY_HUMANITIES,
+    FACULTY_TECHNOLOGY,
+    FACULTY_APPLIED_SCIENCE,
+    FACULTY_LAW,
+  ],
 }
 
 // Core certificate programmes (all campuses)
@@ -374,14 +393,22 @@ const CERTIFICATE_CORE: PreConfiguredProgrammeType = {
 const CERTIFICATE_WITH_APPLIED_SCIENCE: PreConfiguredProgrammeType = {
   type: 'certificate',
   displayName: 'Certificate Programmes',
-  faculties: [FACULTY_COMMERCE_CERT, FACULTY_TECHNOLOGY_CERT, FACULTY_APPLIED_SCIENCE_CERT],
+  faculties: [
+    FACULTY_COMMERCE_CERT,
+    FACULTY_TECHNOLOGY_CERT,
+    FACULTY_APPLIED_SCIENCE_CERT,
+  ],
 }
 
 // Honours programmes (all campuses)
 const HONOURS: PreConfiguredProgrammeType = {
   type: 'honours',
   displayName: 'Honours Programmes',
-  faculties: [FACULTY_COMMERCE_HONOURS, FACULTY_HUMANITIES_HONOURS, FACULTY_TECHNOLOGY_HONOURS],
+  faculties: [
+    FACULTY_COMMERCE_HONOURS,
+    FACULTY_HUMANITIES_HONOURS,
+    FACULTY_TECHNOLOGY_HONOURS,
+  ],
 }
 
 // Masters programmes (all campuses)

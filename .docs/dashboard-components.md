@@ -1,8 +1,8 @@
 # Dashboard Component Inventory
 
 > Generated: 2026-01-06
-> Updated: 2026-01-13 (Skeleton Loading, Role UI Refinements)
-> Branch: registration_consolidation (merged to master)
+> Updated: 2026-01-15 (Agent Sandbox Infrastructure, WhatsApp Notifications)
+> Branch: main
 
 ## Business Logic Flow
 
@@ -24,6 +24,10 @@ Dashboard (/dashboard/[slug])
 ├── DashboardHeader (search, team, settings)
 ├── DashboardEditor / SetupEditorMasterDetail
 ├── Team Page (/team) - CRUD operations
+├── Applications Page (/applications) - Application management
+│   ├── Status filtering (9 options including Documents Flagged)
+│   ├── ApplicationCard grid (4-column responsive)
+│   └── ApplicationDetailModal (full detail + document review)
 └── Settings Dropdown (theme toggle, sign out)
 ```
 
@@ -118,6 +122,114 @@ TeamInviteStep now supports two modes:
 // Legacy mode (permission checkboxes)
 <TeamInviteStep />
 ```
+
+---
+
+## Applications Management Components (NEW)
+
+Application viewing, filtering, and review workflow. Located in `components/applications/`.
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| **ApplicationCard** | `components/applications/ApplicationCard.tsx` | Application summary card (260px fixed height) |
+| **ChoiceStatusBadge** | `components/applications/ChoiceStatusBadge.tsx` | Choice status badge (7 statuses, 2 sizes) |
+| **ChoicePriorityBadge** | `components/applications/ChoicePriorityBadge.tsx` | Priority indicator (shows only 2nd choice) |
+| **DocumentRow** | `components/applications/DocumentRow.tsx` | Document with View/Approve/Flag actions |
+| **NoteCard** | `components/applications/NoteCard.tsx` | Color-coded application note |
+| **NotesGrid** | `components/applications/NotesGrid.tsx` | 4-column grid of NoteCards |
+| **AddNoteForm** | `components/applications/AddNoteForm.tsx` | Note creation form with color/type selection |
+| **CourseStatusBadge** | `components/courses/CourseStatusBadge.tsx` | Course status (Coming Soon/Open/Closed) |
+
+### Application Pages
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| **applications/page.tsx** | `app/dashboard/[institution_slug]/applications/page.tsx` | Main applications list with filtering |
+| **applications/loading.tsx** | `app/dashboard/[institution_slug]/applications/loading.tsx` | Skeleton loading state |
+
+### Application Type Definitions
+
+Located in `lib/types/applications.ts`:
+
+#### Status Types
+| Type | Values |
+|------|--------|
+| **ApplicationStatus** | `submitted`, `pending`, `under_review`, `approved`, `rejected`, `waitlisted`, `incomplete` |
+| **ChoiceStatus** | `pending`, `under_review`, `conditionally_accepted`, `accepted`, `rejected`, `waitlisted`, `withdrawn` |
+| **DocumentReviewStatus** | `pending`, `approved`, `flagged`, `rejected` |
+| **NoteType** | `general`, `flag`, `review`, `followup` |
+| **NoteColor** | `gray`, `green`, `yellow`, `red`, `blue`, `purple` |
+
+#### Core Interfaces
+- **Application** - Main application with personal info, academic info, status history
+- **ApplicationChoice** - Choice with priority, course, status, review metadata
+- **ApplicationDocument** - Document with review status and flag fields
+- **ApplicationNote** - Timestamped note with color and type
+- **ApplicationRow** - Flattened format for table/card display
+
+#### Color Mappings
+- `CHOICE_STATUS_COLORS` - Status → Tailwind class mapping
+- `APPLICATION_STATUS_COLORS` - Application status colors
+- `DOCUMENT_STATUS_COLORS` - Document review status colors
+- `NOTE_COLORS` - Note color classes with border
+
+#### Helper Functions
+```typescript
+// Transform API camelCase response to snake_case ApplicationRow
+transformApiResponseToApplicationRow(item: ApplicationChoiceApiResponse): ApplicationRow
+
+// Get full name from personal info fields
+getApplicantFullName(personalInfo: ApplicationPersonalInfo): string
+
+// Format application ID for display (first 8 chars)
+formatApplicationId(id: string): string
+```
+
+---
+
+## Agent Sandbox Components (NEW)
+
+AI-powered agent infrastructure for automated admissions processing. Located in `components/agents/`.
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| **AgentActivityButton** | `components/agents/AgentActivityButton.tsx` | Header button with active session badge (8x8 rounded) |
+| **AgentInstructionModal** | `components/agents/AgentInstructionModal.tsx` | Agent selection + instructions modal (DottedModal-based) |
+
+### Agent Types
+
+| Type | Icon | Purpose |
+|------|------|---------|
+| `document_reviewer` | FileSearch | Review and verify uploaded documents |
+| `aps_ranking` | Calculator | Calculate admission point scores |
+| `reviewer_assistant` | HelpCircle | Help with application review decisions |
+| `analytics` | BarChart3 | Generate insights and visualizations |
+| `notification_sender` | Send | Automated applicant notifications |
+
+### Agent Session Interface
+
+```typescript
+interface AgentSession {
+  id: string
+  agentType: AgentType
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+  processedItems: number
+  totalItems: number
+  createdAt: string
+}
+```
+
+### Agent Store (Zustand)
+
+Located in `lib/stores/agentStore.ts`:
+
+| Function | Purpose |
+|----------|---------|
+| `openModal()` / `closeModal()` | Modal visibility control |
+| `fetchSessions(institutionId)` | Load agent sessions |
+| `createSession(institutionId, agentType, instructions)` | Start new agent |
+| `updateSessionStatus(id, status)` | Update session state |
+| `getActiveCount()` | Count running sessions |
 
 ---
 
@@ -240,6 +352,7 @@ Located in `components/ui/Skeleton.tsx`. Loading states matching actual UI struc
 |-----------|------|---------|
 | **LoginModal** | `components/modals/LoginModal.tsx` | Sign-in modal with Clerk |
 | **EditCourseModal** | `components/modals/EditCourseModal.tsx` | Course editing modal |
+| **ApplicationDetailModal** | `components/modals/ApplicationDetailModal.tsx` | Full application detail with document review |
 
 ---
 
@@ -249,6 +362,7 @@ Located in `components/ui/Skeleton.tsx`. Loading states matching actual UI struc
 |-------|------|---------|
 | **unifiedRegistrationStore** | `lib/stores/unifiedRegistrationStore.ts` | Primary registration state |
 | **setupStore** | `lib/stores/setupStore.ts` | Setup editor state |
+| **agentStore** | `lib/stores/agentStore.ts` | Agent session state (modal, sessions, realtime) |
 
 ---
 
@@ -325,11 +439,59 @@ All pre-configured South African institutions in `lib/institutions/data/`:
 - `GET /api/auth/session-check` - Session validation
 - `POST /api/webhooks/clerk` - Clerk webhooks
 
+### Applications (NEW)
+
+- `GET /api/institutions/[institutionId]/applications` - List applications with choices (paginated, filterable)
+- `GET /api/courses/[id]/applications` - List applications for specific course
+
+### Application Detail (NEW)
+
+- `GET /api/applications/[id]/notes` - Fetch application notes
+- `POST /api/applications/[id]/notes` - Create application note
+- `GET /api/applications/[id]/status` - Get choice statuses
+- `PATCH /api/applications/[id]/status` - Update choice status(es)
+- `GET /api/applications/[id]/documents/[docId]` - Get document details
+- `PATCH /api/applications/[id]/documents/[docId]` - Update document review status (approve/flag)
+- `GET /api/applications/[id]/student-number` - Get student numbers (access controlled)
+
+### Application Choices (NEW)
+
+- `GET /api/application-choices/[choiceId]` - Get specific choice
+- `PATCH /api/application-choices/[choiceId]` - Update choice status
+
+### Agent Sessions (NEW)
+
+- `GET /api/institutions/[institutionId]/agent-sessions` - List recent agent sessions (limit 20)
+- `POST /api/institutions/[institutionId]/agent-sessions` - Create agent session (admin/reviewer only)
+
+### Notifications (NEW)
+
+- `POST /api/notifications/whatsapp` - Send WhatsApp notification via Twilio
+  - Types: `document_flagged`, `status_update`, `reminder`
+  - Auto-formats SA phone numbers to WhatsApp format
+
 ---
 
-## Database Migrations (Role System)
+## Database Migrations
 
+### Role System
 | Migration | Purpose |
 |-----------|---------|
 | `011_institution_roles.sql` | Creates `institution_roles` table with RLS, auto-seeds admin role |
-| `012_export_applications_permission.sql` | Adds export_applications, seeds default roles (Applications Admin, Academic Maintainer) |
+
+### Applications System (NEW)
+| Migration | Purpose |
+|-----------|---------|
+| `012_export_applications_permission.sql` | Adds export_applications permission |
+| `013_course_dates.sql` | Course opening/closing dates for computed status |
+| `014_application_choices.sql` | Application choices table (priority, status, review metadata) |
+| `015_migrate_application_choices.sql` | Migrate existing applications to choices |
+| `016_student_numbers.sql` | Student numbers table (platform + institution) |
+| `017_seed_student_number_formats.sql` | Seed institution student number formats |
+| `019_application_notes.sql` | Application notes table with color/type |
+| `020_document_flagging.sql` | Document flagging fields (review_status, flag_reason) |
+
+### Agent Sandbox (NEW)
+| Migration | Purpose |
+|-----------|---------|
+| `024_agent_sandbox.sql` | Agent sessions, decisions, saved charts tables with RLS |

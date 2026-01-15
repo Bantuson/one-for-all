@@ -4,6 +4,7 @@ import * as React from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
+import { notify } from '@/lib/toast'
 import { DottedModal, DottedModalContent, DottedModalFooter } from '@/components/ui/DottedModal'
 import { NotesGrid } from '@/components/applications/NotesGrid'
 import { AddNoteForm } from '@/components/applications/AddNoteForm'
@@ -249,9 +250,14 @@ export function ApplicationDetailModal({
         const data = await response.json()
         setNotes((prev) => [data.note, ...prev])
         setShowNoteForm(false)
+        notify.success('Note saved')
+      } else {
+        const error = await response.json()
+        notify.error(error.error || 'Failed to save note')
       }
     } catch (error) {
       console.error('Failed to save note:', error)
+      notify.error('Failed to save note')
     } finally {
       setIsSavingNote(false)
     }
@@ -269,9 +275,14 @@ export function ApplicationDetailModal({
 
       if (response.ok) {
         setCurrentStatus(newStatus)
+        notify.success(`Status updated to ${CHOICE_STATUS_LABELS[newStatus]}`)
+      } else {
+        const error = await response.json()
+        notify.error(error.error || 'Failed to update status')
       }
     } catch (error) {
       console.error('Failed to update status:', error)
+      notify.error('Failed to update status')
     } finally {
       setIsUpdatingStatus(false)
     }
@@ -302,12 +313,15 @@ export function ApplicationDetailModal({
         setDocuments((prev) =>
           prev.map((doc) => (doc.id === documentId ? data.document : doc))
         )
+        notify.success('Document approved')
       } else {
         const error = await response.json()
         console.error('Document approve error:', error)
+        notify.error(error.error || 'Failed to approve document')
       }
     } catch (error) {
       console.error('Failed to approve document:', error)
+      notify.error('Failed to approve document')
     } finally {
       setIsUpdatingDocument(null)
     }
@@ -331,12 +345,42 @@ export function ApplicationDetailModal({
         setDocuments((prev) =>
           prev.map((doc) => (doc.id === documentId ? data.document : doc))
         )
+        notify.success('Document flagged')
+
+        // Send WhatsApp notification to applicant (non-blocking)
+        const applicantPhone = personalInfo?.phone
+        if (applicantPhone) {
+          const flaggedDoc = documents.find((d) => d.id === documentId)
+          fetch('/api/notifications/whatsapp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone: applicantPhone,
+              type: 'document_flagged',
+              applicantName: fullName,
+              documentType: flaggedDoc?.document_type || 'Application Document',
+              flagReason: reason,
+            }),
+          })
+            .then((res) => {
+              if (res.ok) {
+                notify.success('WhatsApp notification sent')
+              } else {
+                console.warn('WhatsApp notification failed (non-critical)')
+              }
+            })
+            .catch((err) => {
+              console.warn('WhatsApp notification error:', err)
+            })
+        }
       } else {
         const error = await response.json()
         console.error('Document flag error:', error)
+        notify.error(error.error || 'Failed to flag document')
       }
     } catch (error) {
       console.error('Failed to flag document:', error)
+      notify.error('Failed to flag document')
     } finally {
       setIsUpdatingDocument(null)
     }
