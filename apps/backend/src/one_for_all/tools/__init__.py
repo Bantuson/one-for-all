@@ -132,6 +132,24 @@ from .comparative_analysis import (
 )
 
 # =============================================================================
+# ANALYTICS TOOLS
+# =============================================================================
+from .analytics_queries import (
+    generate_sql_query,
+    execute_analytics_query,
+    get_application_stats,
+)
+from .chart_config import (
+    generate_bar_chart,
+    generate_pie_chart,
+    generate_line_chart,
+    generate_area_chart,
+    save_chart,
+    get_saved_charts,
+    toggle_chart_pin,
+)
+
+# =============================================================================
 # EXTERNAL SUBMISSION TOOLS (No database access)
 # =============================================================================
 from .application_submission_tool import application_submission_tool
@@ -347,6 +365,19 @@ __all__ = [
     "get_application_summary",
     "check_eligibility",
     "get_missing_documents",
+    # =========================================================================
+    # ANALYTICS TOOLS
+    # =========================================================================
+    "generate_sql_query",
+    "execute_analytics_query",
+    "get_application_stats",
+    "generate_bar_chart",
+    "generate_pie_chart",
+    "generate_line_chart",
+    "generate_area_chart",
+    "save_chart",
+    "get_saved_charts",
+    "toggle_chart_pin",
     # =========================================================================
     # EXTERNAL SUBMISSION TOOLS (No database access)
     # =========================================================================
