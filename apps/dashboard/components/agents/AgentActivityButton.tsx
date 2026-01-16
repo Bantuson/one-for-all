@@ -27,11 +27,9 @@ export function AgentActivityButton({
       onClick={onClick}
       className={cn(
         'relative flex items-center justify-center',
-        'h-8 w-8 rounded-full',
-        'bg-muted/50 hover:bg-muted',
-        'border border-border hover:border-primary/50',
+        'h-8 w-8',
         'text-muted-foreground hover:text-primary',
-        'transition-all duration-200',
+        'transition-colors duration-200',
         'focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background',
         className
       )}

@@ -10,7 +10,7 @@ import {
   AlertTriangle,
   Send,
 } from 'lucide-react'
-import { DottedModal, DottedModalFooter } from '@/components/ui/DottedModal'
+import { DottedModal } from '@/components/ui/DottedModal'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { AgentSidebar } from './AgentSidebar'
@@ -143,10 +143,10 @@ function AgentSwitchWarning({
 }
 
 // ============================================================================
-// Agent Card Component
+// Slim Agent Card Component
 // ============================================================================
 
-function AgentCard({
+function SlimAgentCard({
   agent,
   isSelected,
   onClick,
@@ -155,29 +155,21 @@ function AgentCard({
   isSelected: boolean
   onClick: () => void
 }) {
-  const { label, description, icon: Icon, color } = agent
+  const { label, icon: Icon, color } = agent
 
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'flex flex-col items-center p-3 rounded-lg border transition-all text-center min-w-0',
+        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all text-xs',
         isSelected
-          ? 'border-primary bg-primary/5 ring-2 ring-primary/30'
-          : 'border-border hover:border-primary/50 hover:bg-muted/30'
+          ? 'bg-primary/10 text-primary border border-primary/30'
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
       )}
     >
-      <div
-        className={cn(
-          'w-10 h-10 rounded-full flex items-center justify-center mb-2',
-          isSelected ? 'bg-primary/10' : 'bg-muted/50'
-        )}
-      >
-        <Icon className={cn('h-5 w-5', color)} />
-      </div>
-      <span className="text-sm font-medium truncate w-full">{label}</span>
-      <span className="text-[10px] text-muted-foreground truncate w-full">{description}</span>
+      <Icon className={cn('h-3.5 w-3.5', isSelected && color)} />
+      <span className="font-medium">{label}</span>
     </button>
   )
 }
@@ -357,6 +349,41 @@ export function AgentInstructionModal({
   // Filter running sessions for badge display
   const runningSessions = recentSessions.filter((s) => s.status === 'running')
 
+  // Local input state for the unified input field
+  const [inputValue, setInputValue] = React.useState('')
+  const inputRef = React.useRef<HTMLTextAreaElement>(null)
+
+  // Context-aware action handler
+  const handleAction = async () => {
+    if (selectedAgent && !isAgentActive) {
+      // No active session - start new one
+      await handleRunAgent()
+    } else if (isAgentActive && inputValue.trim()) {
+      // Active session with message - send it
+      await handleSendMessage(inputValue.trim())
+      setInputValue('')
+    }
+  }
+
+  // Handle keyboard submit
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleAction()
+    }
+  }
+
+  // Determine button state and label
+  const buttonDisabled = !selectedAgent || isSubmitting || (isAgentActive && !inputValue.trim())
+  const buttonLabel = !isAgentActive ? 'Run Agent' : 'Send'
+
+  // Get placeholder text
+  const getPlaceholder = () => {
+    if (!selectedAgent) return 'Select an agent to get started...'
+    if (!isAgentActive) return 'Click Run Agent to start a session...'
+    return 'Type your message...'
+  }
+
   return (
     <DottedModal
       isOpen={isOpen}
@@ -371,7 +398,7 @@ export function AgentInstructionModal({
         ) : undefined
       }
     >
-      <div className="flex h-[calc(85vh-120px)] relative">
+      <div className="flex h-[calc(85vh-60px)] relative">
         {/* Agent Switch Warning Overlay */}
         <AgentSwitchWarning
           isOpen={showSwitchWarning}
@@ -395,21 +422,7 @@ export function AgentInstructionModal({
 
         {/* Main Area */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Agent Cards Row */}
-          <div className="p-4 border-b border-border bg-card/50">
-            <div className="grid grid-cols-4 gap-3">
-              {AGENT_TYPES.map((agent) => (
-                <AgentCard
-                  key={agent.type}
-                  agent={agent}
-                  isSelected={selectedAgent === agent.type}
-                  onClick={() => handleAgentSelect(agent.type)}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Chat Area */}
+          {/* Chat Area - takes remaining space */}
           <AgentChatArea
             messages={messages}
             isLoading={isSubmitting}
@@ -417,33 +430,66 @@ export function AgentInstructionModal({
             agentType={selectedAgent || undefined}
             isAgentActive={isAgentActive}
             className="flex-1"
+            hideInput
           />
+
+          {/* Bottom section: Slim agent cards + Input */}
+          <div className="border-t border-border p-3 space-y-2">
+            {/* Slim Agent Cards Row */}
+            <div className="flex items-center gap-2">
+              {AGENT_TYPES.map((agent) => (
+                <SlimAgentCard
+                  key={agent.type}
+                  agent={agent}
+                  isSelected={selectedAgent === agent.type}
+                  onClick={() => handleAgentSelect(agent.type)}
+                />
+              ))}
+            </div>
+
+            {/* Input + Action Button */}
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={inputRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={getPlaceholder()}
+                disabled={isSubmitting || !selectedAgent}
+                rows={1}
+                className={cn(
+                  'flex-1 px-3 py-2 rounded-lg resize-none',
+                  'bg-muted/30 border border-border',
+                  'text-sm font-mono text-foreground',
+                  'placeholder:text-muted-foreground/50',
+                  'focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50',
+                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                )}
+                style={{ minHeight: '40px', maxHeight: '80px' }}
+                aria-label="Chat message input"
+              />
+              <Button
+                size="sm"
+                onClick={handleAction}
+                disabled={buttonDisabled}
+                className="gap-2 h-10"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5" />
+                    {buttonLabel}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
-
-      <DottedModalFooter>
-        <Button variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
-          Cancel
-        </Button>
-        <Button
-          size="sm"
-          onClick={handleRunAgent}
-          disabled={!selectedAgent || isSubmitting || isAgentActive}
-          className="gap-2"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Starting...
-            </>
-          ) : (
-            <>
-              <Send className="h-3.5 w-3.5" />
-              Run Agent
-            </>
-          )}
-        </Button>
-      </DottedModalFooter>
     </DottedModal>
   )
 }

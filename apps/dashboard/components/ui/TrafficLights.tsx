@@ -115,6 +115,7 @@ export function TrafficLightsHeader({
 interface TrafficLightsFilenameProps {
   status?: TrafficLightStatus
   filename: string
+  filenameSize?: 'xs' | 'sm'
   badge?: React.ReactNode
   rightContent?: React.ReactNode
   className?: string
@@ -123,6 +124,7 @@ interface TrafficLightsFilenameProps {
 export function TrafficLightsFilename({
   status = 'neutral',
   filename,
+  filenameSize = 'sm',
   badge,
   rightContent,
   className,
@@ -131,7 +133,10 @@ export function TrafficLightsFilename({
     <div className={cn('flex items-center justify-between w-full', className)}>
       <div className="flex items-center gap-3">
         <TrafficLights status={status} size="sm" />
-        <span className="text-sm font-mono text-foreground">{filename}</span>
+        <span className={cn(
+          'font-mono text-foreground',
+          filenameSize === 'xs' ? 'text-xs' : 'text-sm'
+        )}>{filename}</span>
         {badge}
       </div>
       {rightContent && (

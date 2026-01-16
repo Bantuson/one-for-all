@@ -1,7 +1,7 @@
 # Dashboard Component Inventory
 
 > Generated: 2026-01-06
-> Updated: 2026-01-15 (Agent Sandbox Infrastructure, WhatsApp Notifications)
+> Updated: 2026-01-16 (Agent Chat Experience, Session Management)
 > Branch: main
 
 ## Business Logic Flow
@@ -187,14 +187,28 @@ formatApplicationId(id: string): string
 
 ---
 
-## Agent Sandbox Components (NEW)
+## Agent Sandbox Components
 
 AI-powered agent infrastructure for automated admissions processing. Located in `components/agents/`.
 
 | Component | Path | Purpose |
 |-----------|------|---------|
 | **AgentActivityButton** | `components/agents/AgentActivityButton.tsx` | Header button with active session badge (8x8 rounded) |
-| **AgentInstructionModal** | `components/agents/AgentInstructionModal.tsx` | Agent selection + instructions modal (DottedModal-based) |
+| **AgentInstructionModal** | `components/agents/AgentInstructionModal.tsx` | ChatGPT-style agent interface with sidebar, chat area, agent switching |
+
+### Agent Chat Components (NEW)
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| **AgentChatArea** | `components/agents/AgentChatArea.tsx` | Chat message display with progress indicators, result cards |
+| **AgentSidebar** | `components/agents/AgentSidebar.tsx` | Collapsible sidebar for session history and saved charts |
+
+**AgentChatArea Props:**
+- `messages: ChatMessage[]` - Chat messages to display
+- `isLoading: boolean` - Show typing indicator
+- `onSendMessage: (message: string) => void` - Send handler
+- `agentType?: AgentType` - Current agent for styling
+- `isAgentActive: boolean` - Whether agent is running
 
 ### Agent Types
 
@@ -291,6 +305,32 @@ Located in `lib/stores/agentStore.ts`:
 ```typescript
 import { selectIsModalOpen, selectSessions, selectIsLoadingSessions, selectActiveCount } from '@/lib/stores/agentStore'
 ```
+
+### Chat Store (Zustand) (NEW)
+
+Located in `lib/stores/chatStore.ts`:
+
+**State Interfaces:**
+
+| Interface | Purpose |
+|-----------|---------|
+| `ChatSession` | Session with id, agentType, courseId, messages, status |
+| `ChatMessage` | Message with role, content, progressUpdate, resultCard, chartConfig |
+| `DocumentReviewResult` | Approved/flagged document results |
+| `RankingResult` | APS ranking with intake thresholds |
+| `AnalyticsResult` | Chart data and insights |
+| `ChartConfig` | Recharts configuration (bar/line/pie/area) |
+| `SavedChart` | Persisted chart reference |
+
+**Store Actions:**
+
+| Action | Purpose |
+|--------|---------|
+| `createSession(institutionId, agentType, courseId)` | Start new chat session |
+| `addMessage(sessionId, message)` | Add message to session |
+| `updateSession(sessionId, updates)` | Update session status |
+| `loadSession(sessionId)` | Resume previous session |
+| `saveChart(sessionId, config, title)` | Save chart from analytics |
 
 ---
 
@@ -520,12 +560,23 @@ All pre-configured South African institutions in `lib/institutions/data/`:
 - `GET /api/application-choices/[choiceId]` - Get specific choice
 - `PATCH /api/application-choices/[choiceId]` - Update choice status
 
-### Agent Sessions (NEW)
+### Agent Sessions
 
 - `GET /api/institutions/[institutionId]/agent-sessions` - List recent agent sessions (limit 20)
 - `POST /api/institutions/[institutionId]/agent-sessions` - Create agent session (admin/reviewer only)
 
-### Notifications (NEW)
+### Agent Chat API Routes (NEW)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/agents/_shared/` | - | Shared utilities (response formatting, auth) |
+| `/api/agents/document-reviewer/chat` | POST | Document review with streaming progress |
+| `/api/agents/aps-ranking/chat` | POST | Rank applications with intake thresholds |
+| `/api/agents/reviewer-assistant/chat` | POST | Policy Q&A with citations |
+| `/api/agents/analytics/chat` | POST | Chart generation and insights |
+| `/api/agents/sessions/[sessionId]/messages` | GET | Load session chat history |
+
+### Notifications
 
 - `POST /api/notifications/whatsapp` - Send WhatsApp notification via Twilio
   - Types: `document_flagged`, `status_update`, `reminder`

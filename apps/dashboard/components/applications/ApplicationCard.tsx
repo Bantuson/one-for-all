@@ -1,9 +1,13 @@
 'use client'
 
 import { useCallback, useMemo } from 'react'
-import { User, Eye } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/Button'
+import { Eye } from 'lucide-react'
+import {
+  CodeCard,
+  CodeCardHeader,
+  CodeCardBody,
+  CodeCardFooter,
+} from '@/components/ui/CodeCard'
 import { ChoiceStatusBadge } from '@/components/applications/ChoiceStatusBadge'
 import {
   type ApplicationRow,
@@ -16,47 +20,38 @@ interface ApplicationCardProps {
 }
 
 /**
- * ApplicationCard - Displays an application summary in a card format.
+ * ApplicationCard - Displays an application summary in a clean card format.
  *
- * Follows the course card design pattern from SetupEditorMasterDetail.tsx
- * with a fixed height of 260px and three-section layout.
- *
- * Layout:
- * - Header: User icon + "Applicant" label + status badge (right)
- * - Body: Applicant name (with student number badge right-aligned), email,
- *         APS score and subjects info
- * - Footer: View details button
- *
- * Accessibility:
- * - Card is keyboard accessible via onClick handler
- * - Interactive elements have proper focus states
- * - Uses semantic structure with clear visual hierarchy
- * - Footer button uses stopPropagation to prevent double-triggering
- * - Screen reader announcements for status via ChoiceStatusBadge
+ * Simplified design with:
+ * - Header: Traffic lights + reference ID + status badge
+ * - Body: Name, email, APS + subjects chips
+ * - Footer: View button only
  */
 export function ApplicationCard({ application, onClick }: ApplicationCardProps) {
   const fullName = getApplicantFullName(application.personal_info)
-
-  // Determine student number: prefer institution student number, then platform
-  const studentNumber =
-    application.personal_info.student_number ||
-    application.applicant?.platform_student_number ||
-    null
-
   const email = application.personal_info.email || application.applicant?.email || null
   const choiceStatus = application.choice_status
 
   // Academic info
   const apsScore = application.academic_info?.aps_score
   const subjects = application.academic_info?.subjects
-
-  // Memoize subjects display to avoid recalculation on every render
-  const subjectsDisplay = useMemo(() => {
-    if (!subjects || subjects.length === 0) return null
-    return subjects.slice(0, 3).map(s => `${s.name} (${s.grade})`).join(', ')
-  }, [subjects])
-
   const subjectsCount = subjects?.length || 0
+
+  // Generate reference number (format: #OFA-2k26-####)
+  const refNumber = useMemo(() => {
+    const year = new Date().getFullYear().toString().slice(-2)
+    const idSuffix = application.id?.slice(-4) || '0000'
+    return `#OFA-2k${year}-${idSuffix}`
+  }, [application.id])
+
+  // Map status to traffic light status
+  const trafficLightStatus = useMemo(() => {
+    if (!choiceStatus) return 'neutral'
+    if (choiceStatus === 'accepted' || choiceStatus === 'conditionally_accepted') return 'active'
+    if (choiceStatus === 'pending' || choiceStatus === 'under_review' || choiceStatus === 'waitlisted') return 'warning'
+    if (choiceStatus === 'rejected' || choiceStatus === 'withdrawn') return 'error'
+    return 'neutral'
+  }, [choiceStatus])
 
   const handleCardClick = useCallback(() => {
     onClick()
@@ -84,81 +79,59 @@ export function ApplicationCard({ application, onClick }: ApplicationCardProps) 
     <div
       role="button"
       tabIndex={0}
-      className={cn(
-        'h-[260px] rounded-lg border border-border bg-card overflow-hidden',
-        'flex flex-col cursor-pointer',
-        'hover:border-primary/50 transition-all',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
-      )}
       onClick={handleCardClick}
       onKeyDown={handleKeyDown}
       aria-label={`View application from ${fullName}`}
+      className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-lg"
     >
-      {/* Header */}
-      <div className="px-3 py-2 border-b border-border bg-muted/30 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-2 font-mono text-sm">
-          <User className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          <span className="text-foreground text-xs">Applicant</span>
-        </div>
-        {choiceStatus && (
-          <ChoiceStatusBadge status={choiceStatus} size="sm" className="flex-shrink-0" />
-        )}
-      </div>
+      <CodeCard className="h-full flex flex-col min-h-[220px] cursor-pointer">
+        <CodeCardHeader
+          filename={refNumber}
+          filenameSize="xs"
+          status={trafficLightStatus}
+          rightContent={
+            choiceStatus && (
+              <ChoiceStatusBadge status={choiceStatus} size="sm" className="flex-shrink-0" />
+            )
+          }
+          className="py-2"
+        />
 
-      {/* Body */}
-      <div className="p-4 font-mono text-sm flex-1 overflow-y-auto">
-        <div className="flex flex-col h-full">
-          {/* Row 1: Applicant name with student number badge on right */}
-          <div className="flex items-center justify-between">
-            <span className="text-syntax-string line-clamp-1 text-xs font-medium">
-              {fullName}
-            </span>
-            {studentNumber && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground ml-2 flex-shrink-0">
-                #{studentNumber}
-              </span>
-            )}
+        <CodeCardBody className="flex-1 py-3">
+          {/* Name - prominent */}
+          <div className="text-sm font-medium text-foreground mb-0.5">
+            {fullName}
           </div>
 
-          {/* Row 2: Email */}
+          {/* Email - muted */}
           {email && (
-            <div className="min-w-0 mt-1">
-              <span className="text-[10px] text-muted-foreground truncate block">
-                {email}
-              </span>
+            <div className="text-xs text-muted-foreground mb-3 truncate">
+              {email}
             </div>
           )}
 
-          {/* Row 3 & 4: APS and Subjects */}
-          <div className="mt-2 pt-2 border-t border-border/50">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="text-syntax-number">
-                APS: {apsScore !== undefined && apsScore !== null ? apsScore : '\u2014'}
-              </span>
-              <span aria-hidden="true">&bull;</span>
-              <span>{subjectsCount} Subject{subjectsCount !== 1 ? 's' : ''}</span>
-            </div>
-            {subjectsDisplay && (
-              <div className="text-[10px] text-muted-foreground mt-1 line-clamp-1">
-                {subjectsDisplay}
-              </div>
-            )}
+          {/* APS + Subjects chips */}
+          <div className="flex flex-wrap gap-1.5">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-traffic-green/10 text-traffic-green">
+              APS: {apsScore !== undefined && apsScore !== null ? apsScore : '\u2014'}
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+              {subjectsCount} Subject{subjectsCount !== 1 ? 's' : ''}
+            </span>
           </div>
-        </div>
-      </div>
+        </CodeCardBody>
 
-      {/* Footer */}
-      <div className="px-3 py-1.5 border-t border-border bg-muted/30 flex-shrink-0 flex justify-end">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleFooterButtonClick}
-          aria-label="View application details"
-          className="h-7 w-7 p-0"
-        >
-          <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-        </Button>
-      </div>
+        <CodeCardFooter>
+          <div /> {/* Empty left side */}
+          <button
+            onClick={handleFooterButtonClick}
+            className="p-1.5 rounded-md hover:bg-muted transition-colors"
+            aria-label="View application details"
+          >
+            <Eye className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </CodeCardFooter>
+      </CodeCard>
     </div>
   )
 }

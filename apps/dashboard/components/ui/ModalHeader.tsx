@@ -16,7 +16,7 @@ export function ModalHeader({ title, onClose, className, extra }: ModalHeaderPro
     <div
       className={cn(
         'flex items-center justify-between',
-        'px-6 py-4 border-b border-border',
+        'px-4 py-2.5 border-b border-border',
         'bg-card',
         className
       )}

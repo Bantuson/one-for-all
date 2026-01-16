@@ -34,6 +34,7 @@ interface AgentChatAreaProps {
   agentType?: AgentType
   isAgentActive: boolean
   className?: string
+  hideInput?: boolean
 }
 
 // ============================================================================
@@ -400,6 +401,7 @@ export function AgentChatArea({
   agentType,
   isAgentActive,
   className,
+  hideInput = false,
 }: AgentChatAreaProps) {
   const [inputValue, setInputValue] = React.useState('')
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
@@ -437,7 +439,7 @@ export function AgentChatArea({
   return (
     <div className={cn('flex flex-col h-full', className)}>
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {messages.length === 0 ? (
           <EmptyState agentType={agentType} />
         ) : (
@@ -462,47 +464,49 @@ export function AgentChatArea({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="border-t border-border bg-card/50 p-4">
-        <div className="flex items-end gap-2">
-          <textarea
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              !isAgentActive
-                ? 'Select an agent and click Run Agent to start...'
-                : config?.placeholder || 'Type your message...'
-            }
-            disabled={isLoading || !isAgentActive}
-            rows={1}
-            className={cn(
-              'flex-1 px-3 py-2 rounded-lg resize-none',
-              'bg-muted/30 border border-border',
-              'text-sm font-mono text-foreground',
-              'placeholder:text-muted-foreground/50',
-              'focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
-            )}
-            style={{ minHeight: '40px', maxHeight: '120px' }}
-            aria-label="Chat message input"
-          />
-          <Button
-            size="icon"
-            onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isLoading || !isAgentActive}
-            className="h-10 w-10 flex-shrink-0"
-            aria-label="Send message"
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
+      {/* Input Area - conditionally rendered */}
+      {!hideInput && (
+        <div className="border-t border-border bg-card/50 p-4">
+          <div className="flex items-end gap-2">
+            <textarea
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                !isAgentActive
+                  ? 'Select an agent and click Run Agent to start...'
+                  : config?.placeholder || 'Type your message...'
+              }
+              disabled={isLoading || !isAgentActive}
+              rows={1}
+              className={cn(
+                'flex-1 px-3 py-2 rounded-lg resize-none',
+                'bg-muted/30 border border-border',
+                'text-sm font-mono text-foreground',
+                'placeholder:text-muted-foreground/50',
+                'focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50',
+                'disabled:opacity-50 disabled:cursor-not-allowed'
+              )}
+              style={{ minHeight: '40px', maxHeight: '120px' }}
+              aria-label="Chat message input"
+            />
+            <Button
+              size="icon"
+              onClick={handleSendMessage}
+              disabled={!inputValue.trim() || isLoading || !isAgentActive}
+              className="h-10 w-10 flex-shrink-0"
+              aria-label="Send message"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

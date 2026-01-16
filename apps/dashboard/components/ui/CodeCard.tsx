@@ -1,10 +1,9 @@
 'use client'
 
 import * as React from 'react'
-import { Pencil } from 'lucide-react'
+import { Pencil, Trash2, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
-  TrafficLights,
   TrafficLightsFilename,
   type TrafficLightStatus,
   ModuleBadge,
@@ -40,6 +39,7 @@ export function CodeCard({ children, className, overflow = 'hidden' }: CodeCardP
 // Card header with traffic lights and filename
 interface CodeCardHeaderProps {
   filename: string
+  filenameSize?: 'xs' | 'sm'
   status?: TrafficLightStatus
   badge?: 'module' | 'readonly' | React.ReactNode
   count?: number
@@ -49,6 +49,7 @@ interface CodeCardHeaderProps {
 
 export function CodeCardHeader({
   filename,
+  filenameSize,
   status = 'neutral',
   badge,
   count,
@@ -75,6 +76,7 @@ export function CodeCardHeader({
       <TrafficLightsFilename
         status={status}
         filename={filename}
+        filenameSize={filenameSize}
         badge={badgeElement}
         rightContent={rightElement}
       />
@@ -144,7 +146,7 @@ export function CodeCardBody({ children, className }: CodeCardBodyProps) {
 
 // Pre-built card variants
 
-// Course card with full structure
+// Course card with full structure (unified design)
 interface CourseCardProps {
   code: string
   name: string
@@ -158,6 +160,7 @@ interface CourseCardProps {
   requiredSubjects?: string[]
   onClick?: () => void
   onEdit?: () => void
+  onDelete?: () => void
   onViewApplications?: () => void
   className?: string
 }
@@ -169,83 +172,98 @@ export function CourseCard({
   description,
   status,
   applications = 0,
-  deadline,
   minimumAps,
   durationYears,
-  requiredSubjects,
   onClick,
   onEdit,
+  onDelete,
   onViewApplications,
   className,
 }: CourseCardProps) {
+  // Map status to badge variant
+  const statusBadgeVariant = status === 'active' ? 'active' : status === 'pending' ? 'warning' : status === 'rejected' ? 'error' : 'neutral'
+  const statusLabel = status === 'active' ? 'open' : status
+
   return (
-    <CodeCard className={cn(onClick && 'cursor-pointer', className)}>
+    <CodeCard className={cn(onClick && 'cursor-pointer', 'h-full flex flex-col min-h-[280px]', className)}>
       <CodeCardHeader
         filename={`${code.toLowerCase()}.course`}
-        status={status === 'active' ? 'active' : status === 'rejected' ? 'error' : 'neutral'}
-        count={applications}
+        status={statusBadgeVariant}
+        rightContent={
+          <span className={cn(
+            'text-xs px-1.5 py-0.5 rounded font-medium',
+            status === 'active' && 'bg-traffic-green/10 text-traffic-green',
+            status === 'pending' && 'bg-traffic-yellow/10 text-traffic-yellow',
+            status === 'rejected' && 'bg-traffic-red/10 text-traffic-red',
+            status === 'draft' && 'bg-muted text-muted-foreground'
+          )}>
+            {statusLabel}
+          </span>
+        }
       />
-      <CodeCardBody>
-        <div>
-          <span className="text-syntax-export">export</span>
-          <span className="text-syntax-string"> "{name}"</span>
+
+      <CodeCardBody className="flex-1">
+        {/* export course [Name] */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-traffic-red">export</span>
+          <span className="text-syntax-key">course</span>
+          <span className="px-2 py-0.5 rounded bg-foreground text-background text-xs font-medium">
+            {name}
+          </span>
         </div>
-        <div className="flex items-center gap-1">
-          <span>🎓</span>
-          <span className="text-syntax-from">from</span>
-          <span className="text-syntax-string">"{faculty}"</span>
+
+        {/* // Faculty */}
+        <div className="mb-3">
+          <span className="text-syntax-comment">// {faculty}</span>
         </div>
-        {/* Key metrics row with badges */}
-        {(minimumAps || durationYears) && (
-          <div className="flex flex-wrap gap-1.5 mt-2">
+
+        {/* ○ requirements : */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-1">
+            <span className="text-traffic-yellow">○</span>
+            <span className="text-traffic-yellow">requirements</span>
+            <span className="text-foreground">:</span>
+          </div>
+          <div className="ml-4 flex flex-wrap gap-1.5">
             {minimumAps && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-traffic-yellow/10 text-traffic-yellow">
                 APS: {minimumAps}
               </span>
             )}
             {durationYears && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 {durationYears}yr
               </span>
             )}
-          </div>
-        )}
-        {/* Required subjects */}
-        {requiredSubjects && requiredSubjects.length > 0 && (
-          <div className="mt-2">
-            <span className="text-[10px] text-muted-foreground">Subjects: </span>
-            <span className="text-[10px] text-amber-500">
-              {requiredSubjects.slice(0, 3).join(', ')}
-              {requiredSubjects.length > 3 && ` +${requiredSubjects.length - 3}`}
+            <span className={cn(
+              'text-[10px] px-1.5 py-0.5 rounded',
+              status === 'active' ? 'bg-traffic-green/10 text-traffic-green' : 'bg-muted text-muted-foreground'
+            )}>
+              {statusLabel}
             </span>
           </div>
-        )}
+        </div>
+
+        {/* Optional description */}
         {description && (
-          <>
-            <div className="text-syntax-comment">//</div>
-            <div className="text-syntax-comment">// {description}</div>
-          </>
+          <div className="mt-3 text-xs text-syntax-comment line-clamp-2">
+            // {description}
+          </div>
         )}
       </CodeCardBody>
+
       <CodeCardFooter>
+        {/* 📊 applications: # */}
         <div className="flex items-center gap-4">
-          <StatusBadge status={status} />
-          {applications > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-sm">
-              <span>📥</span>
-              <span className="text-muted-foreground">apps:</span>
-              <span className="font-mono text-primary">{applications}</span>
-            </span>
-          )}
-          {deadline && (
-            <span className="inline-flex items-center gap-1.5 text-sm">
-              <span>📅</span>
-              <span className="text-muted-foreground">closes:</span>
-              <span className="font-mono text-muted-foreground">{deadline}</span>
-            </span>
-          )}
+          <span className="inline-flex items-center gap-1.5 text-sm font-mono">
+            <span>📊</span>
+            <span className="text-muted-foreground">applications:</span>
+            <span className="text-traffic-green">{applications}</span>
+          </span>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 min-h-[32px]">
           {onEdit && (
             <button
               onClick={(e) => {
@@ -255,7 +273,19 @@ export function CourseCard({
               className="p-1.5 rounded-md hover:bg-muted transition-colors"
               aria-label="Edit course"
             >
-              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              <Pencil className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete()
+              }}
+              className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors"
+              aria-label="Delete course"
+            >
+              <Trash2 className="h-4 w-4 text-destructive" />
             </button>
           )}
           {onViewApplications && (
@@ -264,9 +294,10 @@ export function CourseCard({
                 e.stopPropagation()
                 onViewApplications()
               }}
-              className="text-sm font-mono text-primary hover:underline inline-flex items-center gap-1"
+              className="p-1.5 rounded-md hover:bg-muted transition-colors"
+              aria-label="View applications"
             >
-              <span className="opacity-70">$</span> view --applications &rarr;
+              <Eye className="h-4 w-4 text-muted-foreground" />
             </button>
           )}
         </div>

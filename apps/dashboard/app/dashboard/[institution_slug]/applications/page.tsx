@@ -276,8 +276,8 @@ export default function ApplicationsPage() {
         <MoveLeft className="h-[22px] w-[22px]" />
       </Link>
 
-      {/* Header - Agent button, total count badge, and status filter on the right */}
-      <div className="max-w-[85%] mx-auto mt-[20px] flex items-center justify-end gap-3">
+      {/* Header - Agent button, count, and status filter on the right */}
+      <div className="max-w-[85%] mx-auto mt-[20px] flex items-center justify-end gap-2 translate-y-[4px]">
         {/* Agent Sandbox Button */}
         <AgentActivityButton
           activeCount={activeCount}
@@ -285,9 +285,9 @@ export default function ApplicationsPage() {
           onClick={() => setIsAgentModalOpen(true)}
         />
 
-        {/* Total count badge */}
-        <span className="text-sm font-mono px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-          {filteredApplications.length} total
+        {/* Application count */}
+        <span className="text-sm font-mono text-traffic-green">
+          {filteredApplications.length}
         </span>
 
         {/* Status filter dropdown */}

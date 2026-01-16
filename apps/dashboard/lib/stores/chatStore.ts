@@ -172,7 +172,7 @@ const initialState: ChatState = {
   sessions: [],
   activeSessionId: null,
   savedCharts: [],
-  isSidebarCollapsed: false,
+  isSidebarCollapsed: true,
   isLoading: false,
   institutionId: null,
   courseId: null,
