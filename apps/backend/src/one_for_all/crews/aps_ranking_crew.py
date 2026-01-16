@@ -1,27 +1,49 @@
 """
 APS Ranking Crew for South African University Admissions
 
-This crew orchestrates the APS calculation and eligibility assessment workflow.
-It processes applications from agent_sessions.target_ids and records decisions
-to the agent_decisions table.
+This crew ranks applications by their existing APS scores (does NOT calculate APS).
+It processes applications from agent_sessions.target_ids, applies intake threshold
+logic, and records ranking recommendations to the agent_decisions table.
+
+KEY BEHAVIOR:
+- Does NOT calculate APS scores - reads existing APS from academic_info.aps_score
+- Requires intake_limit as input parameter
+- Generates ranking RECOMMENDATIONS (not final decisions)
+- Recommendations require human review
+
+Ranking Thresholds:
+- Top 80% of intake limit: auto_accept_recommended
+- Remaining 20% within intake: conditional_recommended
+- 50% beyond intake limit: waitlist_recommended
+- Beyond waitlist: rejection_flagged
+
+Output Format:
+{
+    "total_ranked": 150,
+    "intake_limit": 100,
+    "cutoff_aps": 35,
+    "rankings": {
+        "auto_accept_recommended": [...],
+        "conditional_recommended": [...],
+        "waitlist_recommended": [...],
+        "rejection_flagged": [...]
+    },
+    "decisions_recorded": True
+}
 """
 
 import json
 import logging
 import asyncio
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 from pathlib import Path
 
 import yaml
 from crewai import Crew, Process, Agent, Task
 
 from one_for_all.tools.supabase_client import get_supabase_client
-from one_for_all.tools.aps_calculator import (
-    calculate_aps,
-    get_subject_points,
-    validate_aps_score,
-    store_aps_calculation,
-)
+# Note: We do NOT import calculate_aps - agent should NOT calculate APS
 from one_for_all.tools.course_requirements import (
     get_course_requirements,
     check_subject_requirements,
@@ -33,28 +55,77 @@ from one_for_all.tools.course_requirements import (
 logger = logging.getLogger(__name__)
 
 
+def calculate_thresholds(intake_limit: int) -> Dict[str, int]:
+    """
+    Calculate ranking thresholds based on intake limit.
+
+    Args:
+        intake_limit: Maximum number of students to accept
+
+    Returns:
+        Dict with threshold boundaries:
+        - auto_accept_limit: Top 80% of intake (positions 1 to this value)
+        - conditional_limit: Intake limit (positions auto_accept_limit+1 to this value)
+        - waitlist_limit: 50% beyond intake (positions conditional_limit+1 to this value)
+        - Beyond waitlist_limit: rejection_flagged
+    """
+    auto_accept_count = int(intake_limit * 0.8)  # Top 80%
+    conditional_count = intake_limit - auto_accept_count  # Remaining 20%
+    waitlist_count = int(intake_limit * 0.5)  # 50% beyond intake
+
+    return {
+        "auto_accept_limit": auto_accept_count,  # Ranks 1-80 (for intake_limit=100)
+        "conditional_limit": intake_limit,  # Ranks 81-100
+        "waitlist_limit": intake_limit + waitlist_count,  # Ranks 101-150
+        # Beyond waitlist_limit: rejection_flagged
+    }
+
+
+def get_recommendation_for_rank(rank: int, thresholds: Dict[str, int]) -> str:
+    """
+    Determine the recommendation based on rank position.
+
+    Args:
+        rank: The applicant's rank position (1 = highest APS)
+        thresholds: The threshold boundaries from calculate_thresholds
+
+    Returns:
+        Recommendation status string
+    """
+    if rank <= thresholds["auto_accept_limit"]:
+        return "auto_accept_recommended"
+    elif rank <= thresholds["conditional_limit"]:
+        return "conditional_recommended"
+    elif rank <= thresholds["waitlist_limit"]:
+        return "waitlist_recommended"
+    else:
+        return "rejection_flagged"
+
+
 class APSRankingCrew:
     """
-    APS Ranking Crew for processing application APS calculations.
+    APS Ranking Crew for processing application rankings.
+
+    IMPORTANT: This crew does NOT calculate APS scores.
+    It reads existing APS from academic_info.aps_score and ranks applications.
 
     This crew:
     1. Fetches applications from agent_sessions.target_ids
-    2. Calculates APS scores for each application
-    3. Checks eligibility for selected courses
-    4. Records decisions to agent_decisions table
-    5. Updates session progress
+    2. Reads existing APS scores from academic_info.aps_score
+    3. Ranks applications by APS (descending)
+    4. Applies intake threshold logic
+    5. Records ranking RECOMMENDATIONS to agent_decisions table
+    6. Updates session progress
+
+    All ranking outputs are RECOMMENDATIONS that require human review.
 
     Usage:
-        crew = APSRankingCrew(session_id="uuid")
+        crew = APSRankingCrew(session_id="uuid", intake_limit=100)
         result = crew.run()
     """
 
-    # Tool registry for APS ranking agent
+    # Tool registry - Note: NO calculate_aps tool
     TOOL_REGISTRY = {
-        "calculate_aps": calculate_aps,
-        "get_subject_points": get_subject_points,
-        "validate_aps_score": validate_aps_score,
-        "store_aps_calculation": store_aps_calculation,
         "get_course_requirements": get_course_requirements,
         "check_subject_requirements": check_subject_requirements,
         "compare_to_cutoff": compare_to_cutoff,
@@ -62,14 +133,17 @@ class APSRankingCrew:
         "check_full_eligibility": check_full_eligibility,
     }
 
-    def __init__(self, session_id: str):
+    def __init__(self, session_id: str, intake_limit: Optional[int] = None):
         """
         Initialize the APS Ranking Crew.
 
         Args:
             session_id: The agent_session ID containing target application IDs
+            intake_limit: REQUIRED - Maximum number of students to accept for the course
+                         This determines ranking threshold boundaries
         """
         self.session_id = session_id
+        self.intake_limit = intake_limit
         self.supabase = get_supabase_client()
 
         # Load agent/task configs from YAML
@@ -91,95 +165,51 @@ class APSRankingCrew:
             return {}
 
     def _create_aps_agent(self) -> Agent:
-        """Create the APS ranking agent from YAML config."""
+        """Create the APS ranking agent from YAML config (without calculate_aps)."""
         config = self.agents_config.get("aps_ranking_agent", {})
 
-        # Get tools from config
+        # Get tools from config but EXCLUDE calculate_aps
         tool_names = config.get("tools", [])
+        # Filter out calculate_aps and related tools - agent should NOT calculate
+        excluded_tools = ["calculate_aps", "get_subject_points", "validate_aps_score", "store_aps_calculation"]
+        tool_names = [name for name in tool_names if name not in excluded_tools]
+
         tools = [self.TOOL_REGISTRY[name] for name in tool_names if name in self.TOOL_REGISTRY]
 
         return Agent(
             role=config.get("role", "APS Ranking Specialist"),
-            goal=config.get("goal", "Calculate APS scores and assess course eligibility"),
-            backstory=config.get("backstory", "You calculate SA APS scores and determine admission eligibility"),
+            goal="Rank applications by existing APS scores and apply intake threshold recommendations",
+            backstory="""You rank South African university applications by their existing APS scores.
+            You do NOT calculate APS - you read the pre-calculated APS from academic_info.aps_score.
+            You apply intake threshold logic to generate ranking RECOMMENDATIONS that require human review.
+            You understand that auto_accept_recommended, conditional_recommended, waitlist_recommended,
+            and rejection_flagged are RECOMMENDATIONS, not final decisions.""",
             llm=config.get("llm", "deepseek/deepseek-chat"),
             memory=config.get("memory", False),
             tools=tools,
         )
 
     def _create_aps_tasks(self) -> List[Task]:
-        """Create APS calculation tasks from YAML config."""
-        tasks = []
-
-        # Create calculation task
-        calc_config = self.tasks_config.get("aps_calculation_task", {})
-        if calc_config:
-            tasks.append(Task(
-                description=calc_config.get("description", "Calculate APS from academic results"),
-                expected_output=calc_config.get("expected_output", "JSON with APS score and breakdown"),
-                agent=self.agent,
-            ))
-
-        # Create eligibility task
-        elig_config = self.tasks_config.get("aps_eligibility_task", {})
-        if elig_config:
-            tasks.append(Task(
-                description=elig_config.get("description", "Check course eligibility based on APS"),
-                expected_output=elig_config.get("expected_output", "JSON with eligibility assessment"),
-                agent=self.agent,
-            ))
-
-        # Create ranking task
-        rank_config = self.tasks_config.get("aps_ranking_task", {})
-        if rank_config:
-            tasks.append(Task(
-                description=rank_config.get("description", "Rank applications by APS score"),
-                expected_output=rank_config.get("expected_output", "JSON with ranked applications"),
-                agent=self.agent,
-            ))
-
-        # If no tasks configured, create default tasks
-        if not tasks:
-            tasks = self._create_default_tasks()
-
-        return tasks
-
-    def _create_default_tasks(self) -> List[Task]:
-        """Create default tasks if YAML config is missing."""
+        """Create ranking tasks (without APS calculation)."""
+        # Single ranking task - no calculation needed
         return [
             Task(
                 description="""
-                Calculate the APS (Admission Point Score) for the provided application.
+                Rank applications by their existing APS scores (DO NOT calculate APS).
 
                 Steps:
-                1. Parse the academic_info JSON containing matric subjects and percentages
-                2. Use calculate_aps tool to compute the total APS score
-                3. Return the calculation breakdown
+                1. Read the APS score from each application's academic_info.aps_score
+                2. Sort applications by APS (highest first)
+                3. Assign rank positions (1 = highest APS)
+                4. Apply intake threshold recommendations
 
                 Your final answer MUST be a JSON with:
-                - total_aps: The calculated APS score
-                - breakdown: Subject-by-subject point allocation
-                - life_orientation: LO contribution (50% weighted)
+                - total_ranked: Number of applications ranked
+                - intake_limit: The intake limit used
+                - cutoff_aps: APS score at the intake limit position
+                - rankings: Object with recommendation categories
                 """,
-                expected_output="JSON with total_aps and calculation breakdown",
-                agent=self.agent,
-            ),
-            Task(
-                description="""
-                Check eligibility for the applicant's selected courses.
-
-                Steps:
-                1. For each course in the application, use check_full_eligibility tool
-                2. Compare the calculated APS to course minimum requirements
-                3. Verify subject-specific requirements are met
-                4. Determine overall eligibility status
-
-                Your final answer MUST be a JSON with:
-                - eligibility_results: Array of course eligibility assessments
-                - overall_status: "eligible", "partially_eligible", or "ineligible"
-                - recommendations: Suggested actions or alternative courses
-                """,
-                expected_output="JSON with eligibility_results and recommendations",
+                expected_output="JSON with ranked applications and threshold recommendations",
                 agent=self.agent,
             ),
         ]
@@ -192,30 +222,33 @@ class APSRankingCrew:
 
         result = await self.supabase.table("agent_sessions").select(
             "id, institution_id, agent_type, status, target_ids, "
-            "input_context, processed_items, total_items"
+            "input_context, processed_items, total_items, course_id"
         ).eq("id", self.session_id).single().execute()
 
         return result.data if result.data else None
 
     async def _fetch_applications(self, application_ids: List[str]) -> List[Dict[str, Any]]:
-        """Fetch applications by IDs."""
+        """Fetch applications by IDs including academic_info with APS."""
         if not self.supabase or not application_ids:
             return []
 
         result = await self.supabase.table("applications").select(
-            "id, applicant_id, institution_id, status, academic_info, course_id"
+            "id, applicant_id, institution_id, status, academic_info, course_id, "
+            "applicants(id, full_name, email)"
         ).in_("id", application_ids).execute()
 
         return result.data or []
 
-    async def _update_session_status(
+    async def _update_session_progress(
         self,
         status: str,
         processed: Optional[int] = None,
         total: Optional[int] = None,
+        current_item: Optional[str] = None,
+        output_summary: Optional[dict] = None,
         error: Optional[str] = None
     ):
-        """Update the agent session status."""
+        """Update the agent session status and progress."""
         if not self.supabase:
             return
 
@@ -224,120 +257,273 @@ class APSRankingCrew:
             update_data["processed_items"] = processed
         if total is not None:
             update_data["total_items"] = total
+        if current_item:
+            update_data["current_item"] = current_item
         if error:
             update_data["error_message"] = error
+        if output_summary:
+            update_data["output_summary"] = output_summary
 
         if status == "running":
-            update_data["started_at"] = "now()"
+            update_data["started_at"] = datetime.now().isoformat()
         elif status in ["completed", "failed"]:
-            update_data["completed_at"] = "now()"
+            update_data["completed_at"] = datetime.now().isoformat()
 
         await self.supabase.table("agent_sessions").update(
             update_data
         ).eq("id", self.session_id).execute()
 
-    async def _store_decision(
+    async def _store_ranking_decision(
         self,
         application_id: str,
-        session_id: str,
-        decision_type: str,
-        decision_value: Dict[str, Any],
-        reasoning: str,
-        confidence: float = 1.0
-    ):
-        """Store an agent decision in the database."""
+        rank_position: int,
+        aps_score: float,
+        recommendation: str,
+        course_id: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Store a ranking decision in the agent_decisions table.
+
+        Args:
+            application_id: UUID of the application
+            rank_position: The rank (1 = highest APS)
+            aps_score: The applicant's APS score
+            recommendation: The recommendation status
+
+        Returns:
+            UUID of the created decision record
+        """
         if not self.supabase:
             return None
 
         decision = {
-            "application_id": application_id,
-            "session_id": session_id,
-            "decision_type": decision_type,
-            "decision_value": decision_value,
-            "reasoning": reasoning,
-            "confidence_score": confidence,
+            "session_id": self.session_id,
+            "target_type": "application",
+            "target_id": application_id,
+            "decision_type": "ranking_assigned",
+            "decision_value": {
+                "rank_position": rank_position,
+                "aps_score": aps_score,
+                "recommendation": recommendation,
+                "course_id": course_id,
+                "intake_limit": self.intake_limit,
+            },
+            "reasoning": f"Ranked #{rank_position} with APS {aps_score}. Recommendation: {recommendation}",
+            "confidence_score": 1.0,  # Ranking is deterministic based on APS
         }
 
         result = await self.supabase.table("agent_decisions").insert(decision).execute()
-        return result.data[0] if result.data else None
+        return result.data[0]["id"] if result.data else None
 
-    async def _process_application(self, application: Dict[str, Any]) -> Dict[str, Any]:
-        """Process a single application for APS calculation."""
-        app_id = application.get("id")
+    def _extract_aps_score(self, application: Dict[str, Any]) -> Optional[float]:
+        """
+        Extract APS score from application's academic_info.
+
+        Args:
+            application: Application record with academic_info
+
+        Returns:
+            APS score as float, or None if not found
+        """
         academic_info = application.get("academic_info", {})
-        course_id = application.get("course_id")
 
-        # Ensure academic_info is a JSON string
-        if isinstance(academic_info, dict):
-            academic_info_str = json.dumps(academic_info)
-        else:
-            academic_info_str = str(academic_info)
+        # Handle case where academic_info might be a JSON string
+        if isinstance(academic_info, str):
+            try:
+                academic_info = json.loads(academic_info)
+            except json.JSONDecodeError:
+                return None
 
+        # Try multiple possible keys for APS score
+        aps_keys = ["aps_score", "total_aps", "aps", "total_aps_score"]
+        for key in aps_keys:
+            if key in academic_info and academic_info[key] is not None:
+                try:
+                    return float(academic_info[key])
+                except (ValueError, TypeError):
+                    continue
+
+        return None
+
+    async def _rank_applications(self, applications: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Rank applications by APS score (descending).
+
+        Args:
+            applications: List of application records
+
+        Returns:
+            List of ranked applications with rank position and recommendation
+        """
+        # Extract APS scores and filter out applications without APS
+        ranked_apps = []
+        for app in applications:
+            aps_score = self._extract_aps_score(app)
+            if aps_score is not None:
+                applicant = app.get("applicants", {}) or {}
+                ranked_apps.append({
+                    "application_id": app.get("id"),
+                    "applicant_name": applicant.get("full_name", "Unknown"),
+                    "aps_score": aps_score,
+                    "course_id": app.get("course_id"),
+                })
+
+        # Sort by APS descending
+        ranked_apps.sort(key=lambda x: x["aps_score"], reverse=True)
+
+        # Calculate thresholds
+        thresholds = calculate_thresholds(self.intake_limit)
+
+        # Assign ranks and recommendations
+        for i, app in enumerate(ranked_apps, start=1):
+            app["rank"] = i
+            app["recommendation"] = get_recommendation_for_rank(i, thresholds)
+
+        return ranked_apps
+
+    async def _async_run(self) -> Dict[str, Any]:
+        """Async implementation of the run method."""
         try:
-            # Calculate APS
-            aps_result_str = calculate_aps._run(academic_info_str)
-            aps_result = json.loads(aps_result_str)
-
-            if not aps_result.get("success"):
+            # Fetch session
+            session = await self._fetch_session()
+            if not session:
                 return {
-                    "application_id": app_id,
                     "success": False,
-                    "error": aps_result.get("error", "APS calculation failed")
+                    "error": f"Session not found: {self.session_id}"
                 }
 
-            total_aps = aps_result.get("total_aps")
+            # Get intake_limit from session input_context if not provided
+            if self.intake_limit is None:
+                input_context = session.get("input_context", {})
+                if isinstance(input_context, str):
+                    try:
+                        input_context = json.loads(input_context)
+                    except json.JSONDecodeError:
+                        input_context = {}
 
-            # Store APS calculation decision
-            await self._store_decision(
-                application_id=app_id,
-                session_id=self.session_id,
-                decision_type="aps_score_calculated",
-                decision_value={
-                    "total_aps": total_aps,
-                    "aps_with_decimal": aps_result.get("aps_with_decimal"),
-                    "best_six_total": aps_result.get("best_six_total"),
-                    "lo_contribution": aps_result.get("lo_contribution"),
-                    "subjects_counted": aps_result.get("subjects_counted"),
-                    "breakdown": aps_result.get("calculation_breakdown")
-                },
-                reasoning=f"Calculated APS score of {total_aps} from {aps_result.get('subjects_counted')} subjects",
-                confidence=1.0  # APS calculation is deterministic
-            )
+                self.intake_limit = input_context.get("intake_limit")
 
-            # If course_id provided, check eligibility
-            eligibility_result = None
-            if course_id:
-                elig_str = check_full_eligibility._run(academic_info_str, course_id)
-                eligibility_result = json.loads(elig_str)
+            if self.intake_limit is None or self.intake_limit <= 0:
+                return {
+                    "success": False,
+                    "error": "intake_limit is required and must be a positive integer. "
+                            "Please provide the course intake limit."
+                }
 
-                if eligibility_result.get("success"):
-                    await self._store_decision(
-                        application_id=app_id,
-                        session_id=self.session_id,
-                        decision_type="eligibility_checked",
-                        decision_value={
-                            "course_id": course_id,
-                            "is_eligible": eligibility_result.get("is_eligible"),
-                            "eligibility_status": eligibility_result.get("eligibility_status"),
-                            "aps_assessment": eligibility_result.get("aps_assessment"),
-                            "subject_assessment": eligibility_result.get("subject_assessment"),
-                        },
-                        reasoning=eligibility_result.get("recommendation", "Eligibility assessed"),
-                        confidence=0.95
-                    )
+            # Get target application IDs
+            target_ids = session.get("target_ids", [])
+            if not target_ids:
+                return {
+                    "success": False,
+                    "error": "No target application IDs in session"
+                }
 
-            return {
-                "application_id": app_id,
-                "success": True,
-                "total_aps": total_aps,
-                "aps_breakdown": aps_result.get("calculation_breakdown"),
-                "eligibility": eligibility_result
+            # Update session to running
+            await self._update_session_progress("running", processed=0, total=len(target_ids))
+
+            # Fetch applications
+            applications = await self._fetch_applications(target_ids)
+            if not applications:
+                await self._update_session_progress("failed", error="No applications found")
+                return {
+                    "success": False,
+                    "error": "No applications found for target IDs"
+                }
+
+            # Rank applications
+            ranked_apps = await self._rank_applications(applications)
+
+            if not ranked_apps:
+                await self._update_session_progress("failed", error="No applications with APS scores found")
+                return {
+                    "success": False,
+                    "error": "No applications have APS scores in academic_info.aps_score"
+                }
+
+            # Calculate thresholds for output
+            thresholds = calculate_thresholds(self.intake_limit)
+
+            # Group by recommendation
+            rankings = {
+                "auto_accept_recommended": [],
+                "conditional_recommended": [],
+                "waitlist_recommended": [],
+                "rejection_flagged": [],
             }
 
+            # Store decisions and group rankings
+            processed = 0
+            for app in ranked_apps:
+                # Update progress
+                await self._update_session_progress(
+                    "running",
+                    processed=processed,
+                    total=len(ranked_apps),
+                    current_item=f"Processing rank #{app['rank']}: {app['applicant_name']}"
+                )
+
+                # Store decision in agent_decisions table
+                await self._store_ranking_decision(
+                    application_id=app["application_id"],
+                    rank_position=app["rank"],
+                    aps_score=app["aps_score"],
+                    recommendation=app["recommendation"],
+                    course_id=app.get("course_id")
+                )
+
+                # Add to appropriate category
+                ranking_entry = {
+                    "rank": app["rank"],
+                    "applicant_name": app["applicant_name"],
+                    "aps": app["aps_score"],
+                }
+                rankings[app["recommendation"]].append(ranking_entry)
+
+                processed += 1
+
+            # Calculate cutoff APS (APS at intake_limit position)
+            cutoff_aps = None
+            if len(ranked_apps) >= self.intake_limit:
+                cutoff_aps = ranked_apps[self.intake_limit - 1]["aps_score"]
+            elif ranked_apps:
+                cutoff_aps = ranked_apps[-1]["aps_score"]
+
+            # Build result
+            result = {
+                "success": True,
+                "session_id": self.session_id,
+                "total_ranked": len(ranked_apps),
+                "intake_limit": self.intake_limit,
+                "cutoff_aps": cutoff_aps,
+                "thresholds": {
+                    "auto_accept_limit": thresholds["auto_accept_limit"],
+                    "conditional_limit": thresholds["conditional_limit"],
+                    "waitlist_limit": thresholds["waitlist_limit"],
+                },
+                "rankings": rankings,
+                "decisions_recorded": True,
+                "summary": {
+                    "auto_accept_recommended_count": len(rankings["auto_accept_recommended"]),
+                    "conditional_recommended_count": len(rankings["conditional_recommended"]),
+                    "waitlist_recommended_count": len(rankings["waitlist_recommended"]),
+                    "rejection_flagged_count": len(rankings["rejection_flagged"]),
+                }
+            }
+
+            # Update session to completed
+            await self._update_session_progress(
+                "completed",
+                processed=len(ranked_apps),
+                total=len(ranked_apps),
+                output_summary=result
+            )
+
+            return result
+
         except Exception as e:
-            logger.error(f"Error processing application {app_id}: {e}")
+            logger.error(f"APS Ranking Crew failed: {e}")
+            await self._update_session_progress("failed", error=str(e))
             return {
-                "application_id": app_id,
                 "success": False,
                 "error": str(e)
             }
@@ -356,95 +542,39 @@ class APSRankingCrew:
         Execute the APS ranking workflow.
 
         Returns:
-            Dict with processing results and statistics.
+            Dict with ranking results in the format:
+            {
+                "total_ranked": 150,
+                "intake_limit": 100,
+                "cutoff_aps": 35,
+                "rankings": {
+                    "auto_accept_recommended": [
+                        {"rank": 1, "applicant_name": "Thabo Mokoena", "aps": 45},
+                        {"rank": 2, "applicant_name": "Lerato Ndlovu", "aps": 43},
+                        ...
+                    ],
+                    "conditional_recommended": [...],
+                    "waitlist_recommended": [...],
+                    "rejection_flagged": [...]
+                },
+                "decisions_recorded": True
+            }
+
+        Note: All recommendations require human review before final decisions.
         """
         return asyncio.run(self._async_run())
 
-    async def _async_run(self) -> Dict[str, Any]:
-        """Async implementation of the run method."""
-        try:
-            # Fetch session
-            session = await self._fetch_session()
-            if not session:
-                return {
-                    "success": False,
-                    "error": f"Session not found: {self.session_id}"
-                }
 
-            # Get target application IDs
-            target_ids = session.get("target_ids", [])
-            if not target_ids:
-                return {
-                    "success": False,
-                    "error": "No target application IDs in session"
-                }
-
-            # Update session to running
-            await self._update_session_status("running", processed=0, total=len(target_ids))
-
-            # Fetch applications
-            applications = await self._fetch_applications(target_ids)
-            if not applications:
-                await self._update_session_status("failed", error="No applications found")
-                return {
-                    "success": False,
-                    "error": "No applications found for target IDs"
-                }
-
-            # Process each application
-            results = []
-            processed = 0
-
-            for app in applications:
-                result = await self._process_application(app)
-                results.append(result)
-                processed += 1
-
-                # Update progress
-                await self._update_session_status("running", processed=processed)
-
-            # Calculate summary
-            successful = [r for r in results if r.get("success")]
-            failed = [r for r in results if not r.get("success")]
-
-            # Sort by APS for ranking
-            successful.sort(key=lambda x: x.get("total_aps", 0), reverse=True)
-
-            # Add ranks
-            for i, result in enumerate(successful, 1):
-                result["rank"] = i
-
-            # Update session to completed
-            await self._update_session_status("completed", processed=len(results))
-
-            return {
-                "success": True,
-                "session_id": self.session_id,
-                "total_processed": len(results),
-                "successful": len(successful),
-                "failed": len(failed),
-                "ranked_results": successful,
-                "errors": [{"application_id": r["application_id"], "error": r.get("error")} for r in failed]
-            }
-
-        except Exception as e:
-            logger.error(f"APS Ranking Crew failed: {e}")
-            await self._update_session_status("failed", error=str(e))
-            return {
-                "success": False,
-                "error": str(e)
-            }
-
-
-async def run_aps_ranking(session_id: str) -> Dict[str, Any]:
+async def run_aps_ranking(session_id: str, intake_limit: Optional[int] = None) -> Dict[str, Any]:
     """
     Convenience function to run APS ranking for a session.
 
     Args:
         session_id: The agent_session ID
+        intake_limit: Maximum number of students to accept (required)
 
     Returns:
-        Dict with processing results
+        Dict with ranking results
     """
-    crew = APSRankingCrew(session_id)
+    crew = APSRankingCrew(session_id, intake_limit=intake_limit)
     return await crew._async_run()

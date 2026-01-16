@@ -12,6 +12,8 @@ import {
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ApplicationCard } from '@/components/applications/ApplicationCard'
 import { ApplicationDetailModal } from '@/components/modals/ApplicationDetailModal'
+import { AgentActivityButton, AgentInstructionModal } from '@/components/agents'
+import { useAgentStore } from '@/lib/stores/agentStore'
 import {
   type Application,
   type ApplicationRow,
@@ -20,6 +22,7 @@ import {
   transformApiResponseToApplicationRow,
 } from '@/lib/types/applications'
 import { cn } from '@/lib/utils'
+import type { AgentType } from '@/components/agents/AgentInstructionModal'
 
 // ============================================================================
 // Types
@@ -126,6 +129,13 @@ export default function ApplicationsPage() {
   // Modal state
   const [selectedApplication, setSelectedApplication] = React.useState<Application | null>(null)
 
+  // Agent modal state
+  const [isAgentModalOpen, setIsAgentModalOpen] = React.useState(false)
+
+  // Agent store
+  const { sessions, isLoadingSessions, fetchSessions, createSession } = useAgentStore()
+  const activeCount = sessions.filter((s) => s.status === 'running').length
+
   // Refs
   const statusDropdownRef = React.useRef<HTMLDivElement>(null)
 
@@ -168,6 +178,13 @@ export default function ApplicationsPage() {
       setIsLoading(false)
     }
   }, [institutionSlug])
+
+  // Fetch agent sessions when institution is loaded
+  React.useEffect(() => {
+    if (institutionId) {
+      fetchSessions(institutionId)
+    }
+  }, [institutionId, fetchSessions])
 
   // Fetch applications
   const fetchApplications = React.useCallback(async () => {
@@ -232,6 +249,16 @@ export default function ApplicationsPage() {
   const currentStatusLabel =
     STATUS_OPTIONS.find((opt) => opt.value === statusFilter)?.label || 'All Statuses'
 
+  // Handler for agent modal submit
+  const handleAgentSubmit = React.useCallback(
+    async (agentType: AgentType, instructions: string) => {
+      if (institutionId) {
+        await createSession(institutionId, agentType, instructions)
+      }
+    },
+    [institutionId, createSession]
+  )
+
   // Loading state
   if (isLoading) {
     return <ApplicationsPageSkeleton />
@@ -249,8 +276,15 @@ export default function ApplicationsPage() {
         <MoveLeft className="h-[22px] w-[22px]" />
       </Link>
 
-      {/* Header - Total count badge and status filter on the right */}
+      {/* Header - Agent button, total count badge, and status filter on the right */}
       <div className="max-w-[85%] mx-auto mt-[20px] flex items-center justify-end gap-3">
+        {/* Agent Sandbox Button */}
+        <AgentActivityButton
+          activeCount={activeCount}
+          isLoading={isLoadingSessions}
+          onClick={() => setIsAgentModalOpen(true)}
+        />
+
         {/* Total count badge */}
         <span className="text-sm font-mono px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
           {filteredApplications.length} total
@@ -345,6 +379,19 @@ export default function ApplicationsPage() {
         isOpen={!!selectedApplication}
         onClose={() => setSelectedApplication(null)}
       />
+
+      {/* Agent Instruction Modal */}
+      {institutionId && (
+        <AgentInstructionModal
+          isOpen={isAgentModalOpen}
+          onClose={() => setIsAgentModalOpen(false)}
+          institutionId={institutionId}
+          courseId={courseFilter || undefined}
+          recentSessions={sessions.slice(0, 5)}
+          isLoadingSessions={isLoadingSessions}
+          onSubmit={handleAgentSubmit}
+        />
+      )}
     </div>
   )
 }

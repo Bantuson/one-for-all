@@ -222,6 +222,9 @@ def __getattr__(name):
     if name == "add_application_document":
         from .application_tools import add_application_document
         return add_application_document
+    if name == "add_application_note":
+        from .application_tools import add_application_note
+        return add_application_note
 
     # RAG Tools (replaces supabase_rag_*)
     if name == "query_rag":
@@ -293,6 +296,7 @@ __all__ = [
     "list_applicant_applications",
     "update_application_status",
     "add_application_document",
+    "add_application_note",
     # RAG
     "query_rag",
     "store_rag_embedding",

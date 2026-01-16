@@ -1,3 +1,5 @@
 export { AgentActivityButton } from './AgentActivityButton'
 export { AgentInstructionModal } from './AgentInstructionModal'
+export { AgentSidebar } from './AgentSidebar'
+export { AgentChatArea } from './AgentChatArea'
 export { ReviewerChat } from './ReviewerChat'

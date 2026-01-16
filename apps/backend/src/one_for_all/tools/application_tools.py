@@ -212,3 +212,50 @@ def add_application_document(
         return f"ERROR: {result.get('detail', 'Unknown error')}"
 
     return str(result)
+
+
+@tool
+def add_application_note(
+    application_id: str,
+    note_text: str,
+    note_type: str = "general",
+    created_by: Optional[str] = None,
+) -> str:
+    """
+    Add a note to an application for internal tracking and communication.
+
+    This tool creates a note attached to an application, useful for recording
+    review decisions, flagged document reasons, or general observations.
+
+    Valid note types: general, review, document_flag, status_change, system
+
+    Args:
+        application_id: UUID of the application
+        note_text: The content of the note
+        note_type: Category of the note (default: "general")
+        created_by: UUID or identifier of the user/agent creating the note (optional)
+
+    Returns:
+        JSON string with created note data or error message
+
+    Example:
+        result = add_application_note(
+            application_id="123e4567-e89b-12d3-a456-426614174000",
+            note_text="ID document flagged - image is blurry, applicant notified via WhatsApp",
+            note_type="document_flag",
+            created_by="document_reviewer_agent"
+        )
+    """
+    data = {
+        "note_text": note_text,
+        "note_type": note_type,
+    }
+    if created_by:
+        data["created_by"] = created_by
+
+    result = api_post(f"/api/v1/applications/{application_id}/notes", data)
+
+    if result.get("error"):
+        return f"ERROR: {result.get('detail', 'Unknown error')}"
+
+    return str(result)
