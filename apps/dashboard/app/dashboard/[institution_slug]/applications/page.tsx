@@ -1,19 +1,29 @@
 'use client'
 
 import * as React from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
+import { useParams, useSearchParams, useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import {
   MoveLeft,
   FileText,
   ChevronDown,
   AlertCircle,
+  Loader2,
 } from 'lucide-react'
-import { Skeleton } from '@/components/ui/Skeleton'
 import { ApplicationCard } from '@/components/applications/ApplicationCard'
-import { ApplicationDetailModal } from '@/components/modals/ApplicationDetailModal'
-import { AgentActivityButton, AgentInstructionModal } from '@/components/agents'
+import { AgentActivityButton } from '@/components/agents'
 import { useAgentStore } from '@/lib/stores/agentStore'
+
+// Dynamic imports for heavy modals (reduces initial bundle size)
+const ApplicationDetailModal = dynamic(
+  () => import('@/components/modals/ApplicationDetailModal').then(m => m.ApplicationDetailModal),
+  { ssr: false }
+)
+
+const AgentInstructionModal = dynamic(
+  () => import('@/components/agents/AgentInstructionModal').then(m => m.AgentInstructionModal),
+  { ssr: false }
+)
 import {
   type Application,
   type ApplicationRow,
@@ -47,63 +57,6 @@ const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
 ]
 
 // ============================================================================
-// Applications Page Skeleton
-// ============================================================================
-
-function ApplicationsPageSkeleton() {
-  return (
-    <div className="relative">
-      {/* Back arrow placeholder */}
-      <div className="absolute left-5 top-[8px]">
-        <Skeleton className="h-6 w-6 rounded" />
-      </div>
-
-      {/* Header - badge and dropdown on the right */}
-      <div className="max-w-[85%] mx-auto mt-[20px] flex items-center justify-end gap-3">
-        <Skeleton className="h-6 w-20 rounded-full" />
-        <Skeleton className="h-5 w-24" />
-      </div>
-
-      {/* Card Grid - 8 card placeholders for 4-column grid */}
-      <div className="max-w-[85%] mx-auto mt-[34px]">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-            <div
-              key={i}
-              className="h-[260px] rounded-lg border border-border bg-card overflow-hidden flex flex-col"
-            >
-              {/* Card header skeleton */}
-              <div className="px-3 py-2 border-b border-border bg-muted/30 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-4 w-4" />
-                  <Skeleton className="h-4 w-24" />
-                </div>
-                <Skeleton className="h-5 w-16 rounded" />
-              </div>
-
-              {/* Card body skeleton */}
-              <div className="p-4 flex-1 space-y-3">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-3 w-40" />
-                <div className="mt-auto pt-4">
-                  <Skeleton className="h-4 w-28" />
-                </div>
-              </div>
-
-              {/* Card footer skeleton */}
-              <div className="px-3 py-1.5 border-t border-border bg-muted/30 flex justify-end">
-                <Skeleton className="h-7 w-7 rounded" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -135,6 +88,10 @@ export default function ApplicationsPage() {
   // Agent store
   const { sessions, isLoadingSessions, fetchSessions, createSession } = useAgentStore()
   const activeCount = sessions.filter((s) => s.status === 'running').length
+
+  // Navigation with pending state
+  const router = useRouter()
+  const [isNavigating, startNavigation] = React.useTransition()
 
   // Refs
   const statusDropdownRef = React.useRef<HTMLDivElement>(null)
@@ -259,22 +216,31 @@ export default function ApplicationsPage() {
     [institutionId, createSession]
   )
 
-  // Loading state
+  // Loading state - show spinner for data fetching (route loading.tsx handles navigation)
   if (isLoading) {
-    return <ApplicationsPageSkeleton />
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
     <div className="relative pb-8">
-      {/* Back arrow */}
-      <Link
-        href={`/dashboard/${institutionSlug}`}
-        className="absolute left-5 top-[8px] text-traffic-red hover:text-traffic-red/80 transition-colors"
+      {/* Back arrow with pending state */}
+      <button
+        onClick={() => startNavigation(() => router.push(`/dashboard/${institutionSlug}`))}
+        disabled={isNavigating}
+        className="absolute left-5 top-[8px] text-traffic-red hover:text-traffic-red/80 transition-colors disabled:opacity-50"
         title="Back to dashboard"
         aria-label="Back to dashboard"
       >
-        <MoveLeft className="h-[22px] w-[22px]" />
-      </Link>
+        {isNavigating ? (
+          <Loader2 className="h-[22px] w-[22px] animate-spin" />
+        ) : (
+          <MoveLeft className="h-[22px] w-[22px]" />
+        )}
+      </button>
 
       {/* Header - Agent button, count, and status filter on the right */}
       <div className="max-w-[85%] mx-auto mt-[20px] flex items-center justify-end gap-2 translate-y-[4px]">

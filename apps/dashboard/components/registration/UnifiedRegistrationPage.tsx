@@ -205,6 +205,7 @@ export function UnifiedRegistrationPage() {
       {/* Dashboard Header */}
       <DashboardHeader
         institution={{
+          id: 'placeholder-id',
           name: 'One For All',
           slug: 'registration',
         }}

@@ -46,6 +46,10 @@ from one_for_all.tools import (
     nsfas_status_tool,
 )
 
+# Import new tools for document validation and ranking
+from one_for_all.tools.document_validation_intake import validate_intake_documents, vision_analyze_document_intake
+from one_for_all.tools.ranking_flags import apply_ranking_flags, get_ranking_summary
+
 # Import mock tools if in test mode
 if TEST_MODE:
     from one_for_all.tools.mocks import (
@@ -100,6 +104,12 @@ if TEST_MODE:
         "application_status_tool": mock_status_tool,
         "nsfas_application_submission_tool": mock_nsfas_submission_tool,
         "nsfas_status_tool": mock_nsfas_status_tool,
+        # Document Validation Intake Tools
+        "validate_intake_documents": validate_intake_documents,
+        "vision_analyze_document_intake": vision_analyze_document_intake,
+        # Ranking Tools
+        "apply_ranking_flags": apply_ranking_flags,
+        "get_ranking_summary": get_ranking_summary,
     }
     log_test_mode_warning()
 else:
@@ -140,6 +150,12 @@ else:
         "application_status_tool": application_status_tool,
         "nsfas_application_submission_tool": nsfas_application_submission_tool,
         "nsfas_status_tool": nsfas_status_tool,
+        # Document Validation Intake Tools
+        "validate_intake_documents": validate_intake_documents,
+        "vision_analyze_document_intake": vision_analyze_document_intake,
+        # Ranking Tools
+        "apply_ranking_flags": apply_ranking_flags,
+        "get_ranking_summary": get_ranking_summary,
     }
 
 
@@ -229,6 +245,7 @@ class OneForAllCrew:
             self.tasks.get("collect_personal_info_task"),
             self.tasks.get("collect_academic_info_task"),
             self.tasks.get("collect_documents_task"),
+            self.tasks.get("document_validation_task"),
 
             # Multi-university flow
             self.tasks.get("program_selection_task"),

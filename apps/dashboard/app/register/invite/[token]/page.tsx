@@ -287,7 +287,7 @@ export default function InviteAcceptancePage() {
     return (
       <div className="flex flex-col flex-1 min-h-screen">
         <DashboardHeader
-          institution={{ name: 'One For All', slug: 'invite' }}
+          institution={{ id: 'placeholder-id', name: 'One For All', slug: 'invite' }}
         />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
@@ -306,7 +306,7 @@ export default function InviteAcceptancePage() {
     return (
       <div className="flex flex-col flex-1 min-h-screen">
         <DashboardHeader
-          institution={{ name: 'One For All', slug: 'invite' }}
+          institution={{ id: 'placeholder-id', name: 'One For All', slug: 'invite' }}
         />
         <div className="container mx-auto py-12 px-4">
           <div className="max-w-md mx-auto">
@@ -337,7 +337,7 @@ export default function InviteAcceptancePage() {
   return (
     <div className="flex flex-col flex-1 min-h-screen">
       <DashboardHeader
-        institution={{ name: 'One For All', slug: 'invite' }}
+        institution={{ id: 'placeholder-id', name: 'One For All', slug: 'invite' }}
       />
 
       <div className="container mx-auto py-8 px-4">

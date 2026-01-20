@@ -105,6 +105,9 @@ export interface StatusHistoryEntry {
 // Document review status
 export type DocumentReviewStatus = 'pending' | 'approved' | 'flagged' | 'rejected'
 
+// Document validation tier (auto-validation method)
+export type DocumentValidationTier = 'metadata' | 'ai_vision' | 'manual'
+
 // Application document interface (with review fields)
 export interface ApplicationDocument {
   id: string
@@ -123,6 +126,9 @@ export interface ApplicationDocument {
   flagged_at: string | null
   reviewed_by: string | null
   reviewed_at: string | null
+  // Agent validation fields
+  agent_validated: boolean
+  validation_tier: DocumentValidationTier | null
 }
 
 // Note type options

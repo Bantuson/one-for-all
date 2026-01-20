@@ -101,10 +101,8 @@ export interface ChatSession {
 }
 
 // Agent taglines displayed when agent starts
-export const AGENT_TAGLINES: Record<AgentType, string> = {
-  document_reviewer: "Document Reviewer at your service. I'll review all documents for applicants in this course.",
-  aps_ranking: "APS Ranking Agent at your service. What is the course intake limit?",
-  reviewer_assistant: "Review Assistant at your service. Ask me anything about applications, eligibility, or policies.",
+export const AGENT_TAGLINES: Partial<Record<AgentType, string>> = {
+  reviewer_assistant: "Review Assistant at your service. I can answer policy questions, check eligibility, and manage course rankings. What would you like help with?",
   analytics: "Analytics Agent at your service. What insights would you like me to generate?",
   notification_sender: "Notification Sender at your service. I can send bulk notifications to applicants.",
 }

@@ -2,8 +2,6 @@
 
 import * as React from 'react'
 import {
-  FileSearch,
-  Calculator,
   HelpCircle,
   BarChart3,
   Loader2,
@@ -25,8 +23,6 @@ import {
 // ============================================================================
 
 export type AgentType =
-  | 'document_reviewer'
-  | 'aps_ranking'
   | 'reviewer_assistant'
   | 'analytics'
   | 'notification_sender'
@@ -61,20 +57,6 @@ const AGENT_TYPES: Array<{
   icon: React.ComponentType<{ className?: string }>
   color: string
 }> = [
-  {
-    type: 'document_reviewer',
-    label: 'Document Reviewer',
-    description: 'Review and verify documents',
-    icon: FileSearch,
-    color: 'text-traffic-green',
-  },
-  {
-    type: 'aps_ranking',
-    label: 'APS Ranking',
-    description: 'Rank by admission points',
-    icon: Calculator,
-    color: 'text-blue-500',
-  },
   {
     type: 'reviewer_assistant',
     label: 'Review Assistant',
@@ -293,7 +275,7 @@ export function AgentInstructionModal({
       // Add the agent tagline as a system message
       addMessage(session.id, {
         role: 'assistant',
-        content: AGENT_TAGLINES[selectedAgent],
+        content: AGENT_TAGLINES[selectedAgent] || 'Agent at your service. How can I help you?',
       })
 
       // Call the onSubmit callback (for backend integration)
@@ -402,8 +384,8 @@ export function AgentInstructionModal({
         {/* Agent Switch Warning Overlay */}
         <AgentSwitchWarning
           isOpen={showSwitchWarning}
-          currentAgent={activeSession?.agentType || 'document_reviewer'}
-          newAgent={pendingAgentSwitch || 'document_reviewer'}
+          currentAgent={activeSession?.agentType || 'reviewer_assistant'}
+          newAgent={pendingAgentSwitch || 'reviewer_assistant'}
           onConfirm={handleConfirmSwitch}
           onCancel={handleCancelSwitch}
         />

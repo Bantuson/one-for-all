@@ -1,13 +1,46 @@
 'use client'
 
-import { Search, Settings, Users, Activity } from 'lucide-react'
+import { Search, Settings, Users, Activity, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState, useTransition } from 'react'
 import { SettingsDropdown } from './SettingsDropdown'
 import { CommandPalette } from './CommandPalette'
 import { TrafficLights } from '@/components/ui/TrafficLights'
 import { cn } from '@/lib/utils'
+
+// Navigation button with pending state for smooth transitions
+interface NavButtonProps {
+  href: string
+  icon: React.ReactNode
+  loadingIcon?: React.ReactNode
+  title: string
+  colorClass: string
+  hoverClass: string
+}
+
+function NavButton({ href, icon, loadingIcon, title, colorClass, hoverClass }: NavButtonProps) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={cn(
+        colorClass,
+        hoverClass,
+        'transition-colors',
+        isPending && 'opacity-50 cursor-wait'
+      )}
+      title={title}
+      onClick={() => startTransition(() => router.push(href))}
+      disabled={isPending}
+    >
+      {isPending ? (loadingIcon || <Loader2 className="h-5 w-5 animate-spin" />) : icon}
+    </Button>
+  )
+}
 
 interface DashboardHeaderProps {
   institution: {
@@ -71,31 +104,25 @@ export function DashboardHeader({ institution }: DashboardHeaderProps) {
           </div>
         </div>
 
-        {/* Right: Action Buttons - Traffic Light Colors */}
+        {/* Right: Action Buttons - Traffic Light Colors with pending states */}
         <div className="flex items-center gap-1 w-72 justify-end">
           {/* Usage/Activity - RED */}
-          <Link href={`/dashboard/${institution.slug}/usage`}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-traffic-red hover:text-traffic-red hover:bg-traffic-red/10 transition-colors"
-              title="Usage"
-            >
-              <Activity className="h-5 w-5" />
-            </Button>
-          </Link>
+          <NavButton
+            href={`/dashboard/${institution.slug}/usage`}
+            icon={<Activity className="h-5 w-5" />}
+            title="Usage"
+            colorClass="text-traffic-red"
+            hoverClass="hover:text-traffic-red hover:bg-traffic-red/10"
+          />
 
           {/* Team - YELLOW */}
-          <Link href={`/dashboard/${institution.slug}/team`}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-traffic-yellow hover:text-traffic-yellow hover:bg-traffic-yellow/10 transition-colors"
-              title="Team"
-            >
-              <Users className="h-5 w-5" />
-            </Button>
-          </Link>
+          <NavButton
+            href={`/dashboard/${institution.slug}/team`}
+            icon={<Users className="h-5 w-5" />}
+            title="Team"
+            colorClass="text-traffic-yellow"
+            hoverClass="hover:text-traffic-yellow hover:bg-traffic-yellow/10"
+          />
 
           {/* Settings Dropdown - GREEN */}
           <SettingsDropdown>

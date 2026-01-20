@@ -132,6 +132,22 @@ from .comparative_analysis import (
 )
 
 # =============================================================================
+# DOCUMENT VALIDATION INTAKE TOOLS (Tiered Validation)
+# =============================================================================
+from .document_validation_intake import (
+    validate_intake_documents,
+    vision_analyze_document_intake,
+)
+
+# =============================================================================
+# RANKING FLAG TOOLS (Reviewer Assistant)
+# =============================================================================
+from .ranking_flags import (
+    apply_ranking_flags,
+    get_ranking_summary,
+)
+
+# =============================================================================
 # ANALYTICS TOOLS
 # =============================================================================
 from .analytics_queries import (
@@ -369,6 +385,16 @@ __all__ = [
     "get_application_summary",
     "check_eligibility",
     "get_missing_documents",
+    # =========================================================================
+    # DOCUMENT VALIDATION INTAKE TOOLS (Tiered Validation)
+    # =========================================================================
+    "validate_intake_documents",
+    "vision_analyze_document_intake",
+    # =========================================================================
+    # RANKING FLAG TOOLS (Reviewer Assistant)
+    # =========================================================================
+    "apply_ranking_flags",
+    "get_ranking_summary",
     # =========================================================================
     # ANALYTICS TOOLS
     # =========================================================================

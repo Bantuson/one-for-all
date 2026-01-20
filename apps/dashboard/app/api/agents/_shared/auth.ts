@@ -5,8 +5,6 @@ import { auth } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export type AgentType =
-  | 'document_reviewer'
-  | 'aps_ranking'
   | 'reviewer_assistant'
   | 'analytics'
   | 'notification_sender'

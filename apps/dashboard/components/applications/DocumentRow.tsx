@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Eye, Check, Flag } from 'lucide-react'
+import { Eye, Check, Flag, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -94,7 +94,15 @@ export function DocumentRow({
       <div className="flex items-center gap-3">
         {/* Document type and name */}
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate">{document.document_type}</div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium truncate">{document.document_type}</span>
+            {document.agent_validated && (
+              <span className="text-xs text-traffic-green flex items-center gap-1">
+                <CheckCircle className="h-3 w-3" />
+                Agent Validated {document.validation_tier === 'ai_vision' && '(AI)'}
+              </span>
+            )}
+          </div>
           <div className="text-xs text-muted-foreground truncate">
             {document.file_name || 'Unnamed file'}
           </div>

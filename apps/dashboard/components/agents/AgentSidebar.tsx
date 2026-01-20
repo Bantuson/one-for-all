@@ -8,8 +8,6 @@ import {
   BarChart3,
   Clock,
   Trash2,
-  FileSearch,
-  Calculator,
   HelpCircle,
   Bot,
 } from 'lucide-react'
@@ -38,24 +36,18 @@ interface AgentSidebarProps {
 // ============================================================================
 
 const AGENT_ICONS: Record<AgentType, React.ComponentType<{ className?: string }>> = {
-  document_reviewer: FileSearch,
-  aps_ranking: Calculator,
   reviewer_assistant: HelpCircle,
   analytics: BarChart3,
   notification_sender: MessageSquare,
 }
 
 const AGENT_COLORS: Record<AgentType, string> = {
-  document_reviewer: 'text-traffic-green',
-  aps_ranking: 'text-blue-500',
   reviewer_assistant: 'text-yellow-500',
   analytics: 'text-purple-500',
   notification_sender: 'text-orange-500',
 }
 
 const AGENT_LABELS: Record<AgentType, string> = {
-  document_reviewer: 'Doc Review',
-  aps_ranking: 'APS Rank',
   reviewer_assistant: 'Assistant',
   analytics: 'Analytics',
   notification_sender: 'Notify',

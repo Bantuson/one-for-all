@@ -6,10 +6,6 @@ import {
   Loader2,
   Bot,
   User,
-  CheckCircle2,
-  AlertTriangle,
-  FileSearch,
-  Calculator,
   HelpCircle,
   BarChart3,
   MessageSquare,
@@ -18,8 +14,6 @@ import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import type {
   ChatMessage,
-  DocumentReviewResult,
-  RankingResult,
 } from '@/lib/stores/chatStore'
 import type { AgentType } from './AgentInstructionModal'
 
@@ -51,20 +45,6 @@ const AGENT_CONFIG: Record<
     placeholder: string
   }
 > = {
-  document_reviewer: {
-    icon: FileSearch,
-    color: 'text-traffic-green',
-    name: 'Document Reviewer',
-    welcomeText: 'I can review and verify uploaded documents for all applicants in this course.',
-    placeholder: 'Ask about document review, or click Run Agent to start...',
-  },
-  aps_ranking: {
-    icon: Calculator,
-    color: 'text-blue-500',
-    name: 'APS Ranking Agent',
-    welcomeText: 'I can rank applications by APS score and apply intake thresholds.',
-    placeholder: 'Enter the intake limit to start ranking...',
-  },
   reviewer_assistant: {
     icon: HelpCircle,
     color: 'text-yellow-500',
@@ -126,151 +106,6 @@ function ProgressIndicator({
   )
 }
 
-// ============================================================================
-// Document Review Result Card
-// ============================================================================
-
-function DocumentReviewResultCard({ result }: { result: DocumentReviewResult }) {
-  return (
-    <div className="space-y-4 text-sm">
-      <div className="flex items-center gap-2 font-mono font-bold">
-        <FileSearch className="h-4 w-4 text-traffic-green" />
-        Document Review Complete ({result.totalProcessed} applications)
-      </div>
-
-      {/* Approved section */}
-      {result.approved.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-traffic-green">
-            <CheckCircle2 className="h-4 w-4" />
-            <span className="font-medium">Approved ({result.approved.length} applicants)</span>
-          </div>
-          <ul className="ml-6 space-y-1 text-xs text-muted-foreground">
-            {result.approved.slice(0, 5).map((item, idx) => (
-              <li key={idx}>
-                {item.applicantName} - All {item.documentCount} documents verified
-              </li>
-            ))}
-            {result.approved.length > 5 && (
-              <li className="italic">...and {result.approved.length - 5} more</li>
-            )}
-          </ul>
-        </div>
-      )}
-
-      {/* Flagged section */}
-      {result.flagged.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-traffic-yellow">
-            <AlertTriangle className="h-4 w-4" />
-            <span className="font-medium">Flagged ({result.flagged.length} applicants)</span>
-          </div>
-          <ul className="ml-6 space-y-2 text-xs">
-            {result.flagged.slice(0, 5).map((item, idx) => (
-              <li key={idx} className="border-l-2 border-traffic-yellow pl-2">
-                <p className="font-medium">{item.applicantName}</p>
-                <p className="text-muted-foreground">
-                  {item.documentType}: {item.reason}
-                </p>
-                <p className="text-traffic-green text-[10px]">
-                  Actions: {item.actionsTaken.join(', ')}
-                </p>
-              </li>
-            ))}
-            {result.flagged.length > 5 && (
-              <li className="italic text-muted-foreground">
-                ...and {result.flagged.length - 5} more
-              </li>
-            )}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ============================================================================
-// Ranking Result Card
-// ============================================================================
-
-function RankingResultCard({ result }: { result: RankingResult }) {
-  return (
-    <div className="space-y-4 text-sm">
-      <div className="flex items-center gap-2 font-mono font-bold">
-        <Calculator className="h-4 w-4 text-blue-500" />
-        APS Rankings Generated ({result.totalRanked} applications)
-      </div>
-
-      <div className="text-xs text-muted-foreground">
-        Intake Limit: {result.intakeLimit} | Cutoff APS: {result.cutoffAps}
-      </div>
-
-      {/* Auto Accept */}
-      {result.autoAccept.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-traffic-green font-medium flex items-center gap-1">
-            <span className="text-lg">&#x1F7E2;</span>
-            Auto Accept Recommended ({result.autoAccept.length})
-          </p>
-          <ul className="ml-6 text-xs text-muted-foreground space-y-0.5">
-            {result.autoAccept.slice(0, 3).map((item) => (
-              <li key={item.rank}>
-                #{item.rank}. {item.applicantName} - APS: {item.apsScore}
-              </li>
-            ))}
-            {result.autoAccept.length > 3 && (
-              <li className="italic">...and {result.autoAccept.length - 3} more</li>
-            )}
-          </ul>
-        </div>
-      )}
-
-      {/* Conditional */}
-      {result.conditional.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-yellow-500 font-medium flex items-center gap-1">
-            <span className="text-lg">&#x1F7E1;</span>
-            Conditional Accept ({result.conditional.length})
-          </p>
-          <ul className="ml-6 text-xs text-muted-foreground space-y-0.5">
-            {result.conditional.slice(0, 3).map((item) => (
-              <li key={item.rank}>
-                #{item.rank}. {item.applicantName} - APS: {item.apsScore}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Waitlist */}
-      {result.waitlist.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-orange-500 font-medium flex items-center gap-1">
-            <span className="text-lg">&#x1F7E0;</span>
-            Waitlist Recommended ({result.waitlist.length})
-          </p>
-          <ul className="ml-6 text-xs text-muted-foreground space-y-0.5">
-            {result.waitlist.slice(0, 3).map((item) => (
-              <li key={item.rank}>
-                #{item.rank}. {item.applicantName} - APS: {item.apsScore}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Rejected */}
-      {result.rejected.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-traffic-red font-medium flex items-center gap-1">
-            <span className="text-lg">&#x1F534;</span>
-            Rejection Flagged ({result.rejected.length})
-          </p>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ============================================================================
 // Message Bubble Component
@@ -319,17 +154,8 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
           />
         )}
 
-        {/* Result cards */}
-        {message.resultCard?.type === 'document_review' && (
-          <DocumentReviewResultCard result={message.resultCard as DocumentReviewResult} />
-        )}
-
-        {message.resultCard?.type === 'aps_ranking' && (
-          <RankingResultCard result={message.resultCard as RankingResult} />
-        )}
-
         {/* Regular text content */}
-        {!message.progressUpdate && !message.resultCard && message.content && (
+        {!message.progressUpdate && message.content && (
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         )}
 

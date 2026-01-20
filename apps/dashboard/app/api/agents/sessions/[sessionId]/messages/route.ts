@@ -188,10 +188,6 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
  */
 function getStartMessage(agentType: string): string {
   switch (agentType) {
-    case 'document_reviewer':
-      return 'Starting document review analysis...'
-    case 'aps_ranking':
-      return 'Calculating APS scores and rankings...'
     case 'reviewer_assistant':
       return 'Searching knowledge base for relevant information...'
     case 'analytics':
@@ -220,23 +216,6 @@ function decisionToMessage(
   }
 
   switch (agentType) {
-    case 'document_reviewer':
-      if (decisionType === 'document_approved') {
-        content = `Document approved.${reasoning ? ` ${reasoning}` : ''}`
-      } else if (decisionType === 'document_flagged') {
-        content = `Document flagged: ${decisionValue?.flag_reason || 'Review required'}${reasoning ? `. ${reasoning}` : ''}`
-      }
-      break
-
-    case 'aps_ranking':
-      if (decisionType === 'aps_score_calculated') {
-        content = `APS Score: ${decisionValue?.total_aps} (Best 6: ${decisionValue?.best_six_total})`
-      } else if (decisionType === 'eligibility_checked') {
-        const eligible = decisionValue?.eligible ? 'Eligible' : 'Not eligible'
-        content = `${eligible}${decisionValue?.reason ? `: ${decisionValue.reason}` : ''}`
-      }
-      break
-
     case 'reviewer_assistant':
       if (decisionType === 'question_answer') {
         content = (decisionValue?.answer as string) || reasoning || 'Response generated'
@@ -279,20 +258,6 @@ function createOutputMessage(
   const metadata: ChatMessage['metadata'] = {}
 
   switch (agentType) {
-    case 'document_reviewer':
-      const docSummary = outputResult.summary as Record<string, unknown> | undefined
-      if (docSummary) {
-        content = `Review complete. ${docSummary.approved || 0} approved, ${docSummary.flagged || 0} flagged out of ${docSummary.total || 0} documents.`
-      }
-      break
-
-    case 'aps_ranking':
-      const rankingSummary = outputResult.statistics as Record<string, unknown> | undefined
-      if (rankingSummary) {
-        content = `Ranking complete. ${rankingSummary.count || 0} applications ranked. Average APS: ${rankingSummary.average || 'N/A'}, Range: ${rankingSummary.lowest || 'N/A'} - ${rankingSummary.highest || 'N/A'}`
-      }
-      break
-
     case 'reviewer_assistant':
       if (outputResult.answer) {
         content = outputResult.answer as string

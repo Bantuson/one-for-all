@@ -15,8 +15,6 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000'
 
 // Map agent types to backend endpoints
 const AGENT_ENDPOINTS: Record<string, string> = {
-  document_reviewer: '/api/v1/agents/document-review/execute',
-  aps_ranking: '/api/v1/agents/aps-ranking/execute',
   reviewer_assistant: '/api/v1/agents/reviewer-assistant/execute',
   analytics: '/api/v1/agents/analytics/execute',
 }
