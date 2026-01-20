@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import type { AgentType } from '@/components/agents/AgentInstructionModal'
+import { featureFlags } from '@/lib/config/featureFlags'
 
 // ============================================================================
 // Types
@@ -107,27 +108,79 @@ export const AGENT_TAGLINES: Partial<Record<AgentType, string>> = {
   notification_sender: "Notification Sender at your service. I can send bulk notifications to applicants.",
 }
 
-interface ChatState {
-  // Sessions
-  sessions: ChatSession[]
+// ============================================================================
+// State Types
+// ============================================================================
+
+/**
+ * UI-only state that remains in Zustand regardless of feature flag.
+ * This state is local to the client and doesn't need server synchronization.
+ */
+interface ChatUIState {
+  // Active session tracking (UI selection)
   activeSessionId: string | null
+
+  // Sidebar state
+  isSidebarCollapsed: boolean
+
+  // Current context for creating new sessions
+  institutionId: string | null
+  courseId: string | null
+
+  // Transient loading state
+  isLoading: boolean
+
+  // Expanded message IDs (for collapsible content)
+  expandedMessageIds: Set<string>
+
+  // Input draft state (to preserve typing across re-renders)
+  inputDraft: string
+}
+
+/**
+ * Server state that can be migrated to React Query.
+ * When USE_REACT_QUERY_STATE is enabled, this is managed by useChatSessions hook.
+ * When disabled, this remains in Zustand for backward compatibility.
+ */
+interface ChatServerState {
+  // Sessions data
+  sessions: ChatSession[]
 
   // Saved charts (from analytics)
   savedCharts: SavedChart[]
-
-  // UI state
-  isSidebarCollapsed: boolean
-  isLoading: boolean
-
-  // Current context
-  institutionId: string | null
-  courseId: string | null
 }
 
-interface ChatActions {
+type ChatState = ChatUIState & ChatServerState
+
+// ============================================================================
+// Action Types
+// ============================================================================
+
+interface ChatUIActions {
+  // Active session selection (UI only)
+  setActiveSession: (sessionId: string | null) => void
+
+  // Sidebar toggle (UI only)
+  toggleSidebar: () => void
+  setSidebarCollapsed: (collapsed: boolean) => void
+
+  // Context (UI only)
+  setContext: (institutionId: string | null, courseId?: string | null) => void
+
+  // Loading state (UI only)
+  setLoading: (loading: boolean) => void
+
+  // Message expansion (UI only)
+  toggleMessageExpanded: (messageId: string) => void
+  isMessageExpanded: (messageId: string) => boolean
+
+  // Input draft (UI only)
+  setInputDraft: (draft: string) => void
+}
+
+interface ChatServerActions {
   // Session management
   createSession: (agentType: AgentType, institutionId: string, courseId?: string) => ChatSession
-  setActiveSession: (sessionId: string | null) => void
   loadSessionHistory: (sessionId: string) => void
 
   // Message management
@@ -142,13 +195,6 @@ interface ChatActions {
   saveChart: (sessionId: string, config: ChartConfig, title: string) => void
   deleteChart: (chartId: string) => void
 
-  // UI actions
-  toggleSidebar: () => void
-  setSidebarCollapsed: (collapsed: boolean) => void
-
-  // Context
-  setContext: (institutionId: string | null, courseId?: string | null) => void
-
   // Session status
   setSessionStatus: (sessionId: string, status: ChatSession['status']) => void
 
@@ -160,20 +206,30 @@ interface ChatActions {
   reset: () => void
 }
 
-type ChatStore = ChatState & ChatActions
+type ChatStore = ChatState & ChatUIActions & ChatServerActions
 
 // ============================================================================
 // Initial State
 // ============================================================================
 
-const initialState: ChatState = {
-  sessions: [],
+const initialUIState: ChatUIState = {
   activeSessionId: null,
-  savedCharts: [],
   isSidebarCollapsed: true,
-  isLoading: false,
   institutionId: null,
   courseId: null,
+  isLoading: false,
+  expandedMessageIds: new Set(),
+  inputDraft: '',
+}
+
+const initialServerState: ChatServerState = {
+  sessions: [],
+  savedCharts: [],
+}
+
+const initialState: ChatState = {
+  ...initialUIState,
+  ...initialServerState,
 }
 
 // ============================================================================
@@ -201,8 +257,58 @@ export const useChatStore = create<ChatStore>()(
       (set, get) => ({
         ...initialState,
 
-        // Session management
+        // ---------------------------------------------------------------------
+        // UI Actions (always managed by Zustand)
+        // ---------------------------------------------------------------------
+
+        setActiveSession: (sessionId) => {
+          set({ activeSessionId: sessionId })
+        },
+
+        toggleSidebar: () => {
+          set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed }))
+        },
+
+        setSidebarCollapsed: (collapsed) => {
+          set({ isSidebarCollapsed: collapsed })
+        },
+
+        setContext: (institutionId, courseId) => {
+          set({ institutionId, courseId: courseId || null })
+        },
+
+        setLoading: (loading) => {
+          set({ isLoading: loading })
+        },
+
+        toggleMessageExpanded: (messageId) => {
+          set((state) => {
+            const expanded = new Set(state.expandedMessageIds)
+            if (expanded.has(messageId)) {
+              expanded.delete(messageId)
+            } else {
+              expanded.add(messageId)
+            }
+            return { expandedMessageIds: expanded }
+          })
+        },
+
+        isMessageExpanded: (messageId) => {
+          return get().expandedMessageIds.has(messageId)
+        },
+
+        setInputDraft: (draft) => {
+          set({ inputDraft: draft })
+        },
+
+        // ---------------------------------------------------------------------
+        // Server State Actions
+        // When USE_REACT_QUERY_STATE is true, these are compatibility wrappers.
+        // When false, these operate directly on Zustand state.
+        // ---------------------------------------------------------------------
+
         createSession: (agentType, institutionId, courseId) => {
+          // Always create locally for immediate UI response
           const newSession: ChatSession = {
             id: generateId(),
             agentType,
@@ -214,16 +320,18 @@ export const useChatStore = create<ChatStore>()(
             updatedAt: new Date().toISOString(),
           }
 
-          set((state) => ({
-            sessions: [newSession, ...state.sessions],
-            activeSessionId: newSession.id,
-          }))
+          // If React Query is managing server state, we only update activeSessionId
+          // The actual session will be managed by useChatSessions hook
+          if (featureFlags.USE_REACT_QUERY_STATE) {
+            set({ activeSessionId: newSession.id })
+          } else {
+            set((state) => ({
+              sessions: [newSession, ...state.sessions],
+              activeSessionId: newSession.id,
+            }))
+          }
 
           return newSession
-        },
-
-        setActiveSession: (sessionId) => {
-          set({ activeSessionId: sessionId })
         },
 
         loadSessionHistory: (sessionId) => {
@@ -233,8 +341,12 @@ export const useChatStore = create<ChatStore>()(
           }
         },
 
-        // Message management
         addMessage: (sessionId, message) => {
+          // Skip if React Query is managing server state
+          if (featureFlags.USE_REACT_QUERY_STATE) {
+            return
+          }
+
           const newMessage: ChatMessage = {
             ...message,
             id: generateId(),
@@ -255,6 +367,11 @@ export const useChatStore = create<ChatStore>()(
         },
 
         updateMessage: (sessionId, messageId, updates) => {
+          // Skip if React Query is managing server state
+          if (featureFlags.USE_REACT_QUERY_STATE) {
+            return
+          }
+
           set((state) => ({
             sessions: state.sessions.map(session =>
               session.id === sessionId
@@ -270,7 +387,6 @@ export const useChatStore = create<ChatStore>()(
           }))
         },
 
-        // Agent switching
         switchAgent: (newAgentType) => {
           const activeSession = get().getActiveSession()
 
@@ -296,13 +412,15 @@ export const useChatStore = create<ChatStore>()(
 
           // Mark current session as completed if it exists
           if (activeSession && activeSession.status === 'active') {
-            set((state) => ({
-              sessions: state.sessions.map(session =>
-                session.id === activeSession.id
-                  ? { ...session, status: 'completed' as const, updatedAt: new Date().toISOString() }
-                  : session
-              ),
-            }))
+            if (!featureFlags.USE_REACT_QUERY_STATE) {
+              set((state) => ({
+                sessions: state.sessions.map(session =>
+                  session.id === activeSession.id
+                    ? { ...session, status: 'completed' as const, updatedAt: new Date().toISOString() }
+                    : session
+                ),
+              }))
+            }
           }
 
           // Create new session with the new agent type
@@ -310,8 +428,12 @@ export const useChatStore = create<ChatStore>()(
           return get().createSession(newAgentType, institutionId!, courseId || undefined)
         },
 
-        // Chart management
         saveChart: (sessionId, config, title) => {
+          // Skip if React Query is managing server state
+          if (featureFlags.USE_REACT_QUERY_STATE) {
+            return
+          }
+
           const newChart: SavedChart = {
             id: generateId(),
             sessionId,
@@ -326,27 +448,22 @@ export const useChatStore = create<ChatStore>()(
         },
 
         deleteChart: (chartId) => {
+          // Skip if React Query is managing server state
+          if (featureFlags.USE_REACT_QUERY_STATE) {
+            return
+          }
+
           set((state) => ({
             savedCharts: state.savedCharts.filter(chart => chart.id !== chartId),
           }))
         },
 
-        // UI actions
-        toggleSidebar: () => {
-          set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed }))
-        },
-
-        setSidebarCollapsed: (collapsed) => {
-          set({ isSidebarCollapsed: collapsed })
-        },
-
-        // Context
-        setContext: (institutionId, courseId) => {
-          set({ institutionId, courseId: courseId || null })
-        },
-
-        // Session status
         setSessionStatus: (sessionId, status) => {
+          // Skip if React Query is managing server state
+          if (featureFlags.USE_REACT_QUERY_STATE) {
+            return
+          }
+
           set((state) => ({
             sessions: state.sessions.map(session =>
               session.id === sessionId
@@ -356,7 +473,6 @@ export const useChatStore = create<ChatStore>()(
           }))
         },
 
-        // Utilities
         getActiveSession: () => {
           const { sessions, activeSessionId } = get()
           return sessions.find(s => s.id === activeSessionId) || null
@@ -366,32 +482,42 @@ export const useChatStore = create<ChatStore>()(
           return get().sessions.filter(s => s.institutionId === institutionId)
         },
 
-        // Reset
         reset: () => set(initialState),
       }),
       {
         name: 'chat-store',
-        // Custom serialization to handle Date objects
+        // Custom serialization to handle Date objects and Sets
         partialize: (state) => ({
-          sessions: state.sessions.map(session => ({
-            ...session,
-            messages: session.messages.map(msg => ({
-              ...msg,
-              timestamp: msg.timestamp instanceof Date
-                ? msg.timestamp.toISOString()
-                : msg.timestamp,
-            })),
-          })),
-          savedCharts: state.savedCharts,
+          // Only persist server state when React Query is not managing it
+          ...(featureFlags.USE_REACT_QUERY_STATE
+            ? {}
+            : {
+                sessions: state.sessions.map(session => ({
+                  ...session,
+                  messages: session.messages.map(msg => ({
+                    ...msg,
+                    timestamp: msg.timestamp instanceof Date
+                      ? msg.timestamp.toISOString()
+                      : msg.timestamp,
+                  })),
+                })),
+                savedCharts: state.savedCharts,
+              }),
+          // Always persist UI state
           isSidebarCollapsed: state.isSidebarCollapsed,
+          activeSessionId: state.activeSessionId,
         }),
         // Rehydrate Date objects on load
         onRehydrateStorage: () => (state) => {
-          if (state) {
+          if (state && state.sessions) {
             state.sessions = state.sessions.map(session => ({
               ...session,
               messages: serializeMessages(session.messages),
             }))
+          }
+          // Reinitialize Sets (not serialized)
+          if (state) {
+            state.expandedMessageIds = new Set()
           }
         },
       }
@@ -414,3 +540,12 @@ export const selectSavedCharts = (state: ChatStore) => state.savedCharts
 export const selectIsSidebarCollapsed = (state: ChatStore) => state.isSidebarCollapsed
 
 export const selectIsLoading = (state: ChatStore) => state.isLoading
+
+export const selectActiveSessionId = (state: ChatStore) => state.activeSessionId
+
+export const selectContext = (state: ChatStore) => ({
+  institutionId: state.institutionId,
+  courseId: state.courseId,
+})
+
+export const selectInputDraft = (state: ChatStore) => state.inputDraft

@@ -3,39 +3,78 @@ import { devtools } from 'zustand/middleware'
 import { createBrowserClient } from '@supabase/ssr'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { AgentType, AgentSession } from '@/components/agents/AgentInstructionModal'
+import { featureFlags } from '@/lib/config/featureFlags'
 
 // ============================================================================
 // Types
 // ============================================================================
 
-interface AgentState {
+/**
+ * UI-only state that remains in Zustand regardless of feature flag.
+ * This state is local to the client and doesn't need server synchronization.
+ */
+interface AgentUIState {
   // Modal state
   isModalOpen: boolean
-
-  // Session state
-  sessions: AgentSession[]
-  isLoadingSessions: boolean
 
   // Current context
   institutionId: string | null
 
-  // Active session tracking
+  // Active session tracking (UI selection)
   activeSessionId: string | null
+
+  // Selected agent type for new sessions
+  selectedAgentType: AgentType | null
+
+  // Filter/sort preferences
+  statusFilter: AgentSession['status'] | 'all'
+  sortOrder: 'newest' | 'oldest'
+}
+
+/**
+ * Server state that can be migrated to React Query.
+ * When USE_REACT_QUERY_STATE is enabled, this is managed by useAgentSessions hook.
+ * When disabled, this remains in Zustand for backward compatibility.
+ */
+interface AgentServerState {
+  // Session data
+  sessions: AgentSession[]
+  isLoadingSessions: boolean
 
   // Error state
   error: string | null
 
-  // Realtime subscription
+  // Realtime subscription (only used when RQ is disabled)
   realtimeChannel: RealtimeChannel | null
 }
 
-interface AgentActions {
-  // Modal control
+type AgentState = AgentUIState & AgentServerState
+
+// ============================================================================
+// Action Types
+// ============================================================================
+
+interface AgentUIActions {
+  // Modal control (UI only)
   openModal: () => void
   closeModal: () => void
 
-  // Session management
+  // Context (UI only)
   setInstitutionId: (id: string | null) => void
+
+  // Active session selection (UI only)
+  setActiveSessionId: (sessionId: string | null) => void
+
+  // Agent type selection (UI only)
+  setSelectedAgentType: (agentType: AgentType | null) => void
+
+  // Filter/sort (UI only)
+  setStatusFilter: (filter: AgentSession['status'] | 'all') => void
+  setSortOrder: (order: 'newest' | 'oldest') => void
+}
+
+interface AgentServerActions {
+  // Session management
   fetchSessions: (institutionId: string) => Promise<void>
   createSession: (
     institutionId: string,
@@ -56,25 +95,41 @@ interface AgentActions {
   // Computed
   getActiveCount: () => number
   getRunningSessions: () => AgentSession[]
+  getFilteredSessions: () => AgentSession[]
 
   // Reset
   reset: () => void
+
+  // Error handling
+  setError: (error: string | null) => void
+  clearError: () => void
 }
 
-type AgentStore = AgentState & AgentActions
+type AgentStore = AgentState & AgentUIActions & AgentServerActions
 
 // ============================================================================
 // Initial State
 // ============================================================================
 
-const initialState: AgentState = {
+const initialUIState: AgentUIState = {
   isModalOpen: false,
-  sessions: [],
-  isLoadingSessions: false,
   institutionId: null,
   activeSessionId: null,
+  selectedAgentType: null,
+  statusFilter: 'all',
+  sortOrder: 'newest',
+}
+
+const initialServerState: AgentServerState = {
+  sessions: [],
+  isLoadingSessions: false,
   error: null,
   realtimeChannel: null,
+}
+
+const initialState: AgentState = {
+  ...initialUIState,
+  ...initialServerState,
 }
 
 // ============================================================================
@@ -86,14 +141,36 @@ export const useAgentStore = create<AgentStore>()(
     (set, get) => ({
       ...initialState,
 
-      // Modal control
+      // -----------------------------------------------------------------------
+      // UI Actions (always managed by Zustand)
+      // -----------------------------------------------------------------------
+
       openModal: () => set({ isModalOpen: true }),
+
       closeModal: () => set({ isModalOpen: false }),
 
-      // Session management
       setInstitutionId: (id) => set({ institutionId: id }),
 
+      setActiveSessionId: (sessionId) => set({ activeSessionId: sessionId }),
+
+      setSelectedAgentType: (agentType) => set({ selectedAgentType: agentType }),
+
+      setStatusFilter: (filter) => set({ statusFilter: filter }),
+
+      setSortOrder: (order) => set({ sortOrder: order }),
+
+      // -----------------------------------------------------------------------
+      // Server State Actions
+      // When USE_REACT_QUERY_STATE is true, these are compatibility wrappers.
+      // When false, these operate directly on Zustand state.
+      // -----------------------------------------------------------------------
+
       fetchSessions: async (institutionId: string) => {
+        // Skip if React Query is managing server state
+        if (featureFlags.USE_REACT_QUERY_STATE) {
+          return
+        }
+
         set({ isLoadingSessions: true, error: null })
 
         try {
@@ -135,6 +212,11 @@ export const useAgentStore = create<AgentStore>()(
       },
 
       createSession: async (institutionId, agentType, instructions) => {
+        // Skip if React Query is managing server state
+        if (featureFlags.USE_REACT_QUERY_STATE) {
+          return null
+        }
+
         set({ error: null })
 
         try {
@@ -180,6 +262,11 @@ export const useAgentStore = create<AgentStore>()(
       },
 
       updateSessionStatus: (sessionId, status) => {
+        // Skip if React Query is managing server state
+        if (featureFlags.USE_REACT_QUERY_STATE) {
+          return
+        }
+
         set((state) => ({
           sessions: state.sessions.map((s) =>
             s.id === sessionId ? { ...s, status } : s
@@ -188,6 +275,11 @@ export const useAgentStore = create<AgentStore>()(
       },
 
       updateSessionProgress: (sessionId, processed, total) => {
+        // Skip if React Query is managing server state
+        if (featureFlags.USE_REACT_QUERY_STATE) {
+          return
+        }
+
         set((state) => ({
           sessions: state.sessions.map((s) =>
             s.id === sessionId
@@ -197,21 +289,34 @@ export const useAgentStore = create<AgentStore>()(
         }))
       },
 
-      // Realtime updates
+      // Realtime updates (only used when RQ is disabled)
       addSession: (session) => {
+        if (featureFlags.USE_REACT_QUERY_STATE) {
+          return
+        }
+
         set((state) => ({
           sessions: [session, ...state.sessions.filter((s) => s.id !== session.id)],
         }))
       },
 
       removeSession: (sessionId) => {
+        if (featureFlags.USE_REACT_QUERY_STATE) {
+          return
+        }
+
         set((state) => ({
           sessions: state.sessions.filter((s) => s.id !== sessionId),
         }))
       },
 
-      // Realtime subscription
+      // Realtime subscription (only used when RQ is disabled)
       subscribeToRealtime: (institutionId: string) => {
+        // Skip if React Query is managing server state (RQ hook has its own subscription)
+        if (featureFlags.USE_REACT_QUERY_STATE) {
+          return
+        }
+
         // Unsubscribe from existing channel first
         const existingChannel = get().realtimeChannel
         if (existingChannel) {
@@ -297,7 +402,7 @@ export const useAgentStore = create<AgentStore>()(
         }
       },
 
-      // Computed
+      // Computed values
       getActiveCount: () => {
         return get().sessions.filter((s) => s.status === 'running').length
       },
@@ -306,8 +411,33 @@ export const useAgentStore = create<AgentStore>()(
         return get().sessions.filter((s) => s.status === 'running')
       },
 
+      getFilteredSessions: () => {
+        const { sessions, statusFilter, sortOrder } = get()
+
+        let filtered = sessions
+        if (statusFilter !== 'all') {
+          filtered = sessions.filter((s) => s.status === statusFilter)
+        }
+
+        // Sort by createdAt
+        return [...filtered].sort((a, b) => {
+          const dateA = new Date(a.createdAt).getTime()
+          const dateB = new Date(b.createdAt).getTime()
+          return sortOrder === 'newest' ? dateB - dateA : dateA - dateB
+        })
+      },
+
+      // Error handling
+      setError: (error) => set({ error }),
+
+      clearError: () => set({ error: null }),
+
       // Reset
-      reset: () => set(initialState),
+      reset: () => {
+        // Clean up realtime subscription before reset
+        get().unsubscribeFromRealtime()
+        set(initialState)
+      },
     }),
     { name: 'agent-store' }
   )
@@ -318,7 +448,41 @@ export const useAgentStore = create<AgentStore>()(
 // ============================================================================
 
 export const selectIsModalOpen = (state: AgentStore) => state.isModalOpen
+
 export const selectSessions = (state: AgentStore) => state.sessions
+
 export const selectIsLoadingSessions = (state: AgentStore) => state.isLoadingSessions
+
 export const selectActiveCount = (state: AgentStore) =>
   state.sessions.filter((s) => s.status === 'running').length
+
+export const selectActiveSessionId = (state: AgentStore) => state.activeSessionId
+
+export const selectSelectedAgentType = (state: AgentStore) => state.selectedAgentType
+
+export const selectError = (state: AgentStore) => state.error
+
+export const selectInstitutionId = (state: AgentStore) => state.institutionId
+
+export const selectStatusFilter = (state: AgentStore) => state.statusFilter
+
+export const selectSortOrder = (state: AgentStore) => state.sortOrder
+
+/**
+ * Selector for filtered and sorted sessions based on current filter/sort state.
+ * Use this for rendering session lists.
+ */
+export const selectFilteredSessions = (state: AgentStore) => {
+  const { sessions, statusFilter, sortOrder } = state
+
+  let filtered = sessions
+  if (statusFilter !== 'all') {
+    filtered = sessions.filter((s) => s.status === statusFilter)
+  }
+
+  return [...filtered].sort((a, b) => {
+    const dateA = new Date(a.createdAt).getTime()
+    const dateB = new Date(b.createdAt).getTime()
+    return sortOrder === 'newest' ? dateB - dateA : dateA - dateB
+  })
+}
