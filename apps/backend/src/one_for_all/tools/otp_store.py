@@ -2,32 +2,53 @@
 OTP Storage Utility
 
 Provides functions for generating, storing, and managing OTP codes in Supabase.
+
+SECURITY ENHANCEMENTS (Phase 1):
+- OTP generation now uses secrets module (CSPRNG) instead of random.randint
+- OTPs are hashed with bcrypt before database storage
+- Plaintext OTPs are never stored in the database
+
+References:
+- CWE-330: Use of Insufficiently Random Values
+- CWE-328: Use of Weak Hash
 """
 
-import random
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Tuple
 from .supabase_client import supabase
+
+# Import secure OTP functions from utils
+from one_for_all.utils.otp_crypto import (
+    generate_secure_otp,
+    hash_otp,
+    generate_and_hash_otp,
+)
 
 
 def generate_otp() -> str:
     """
-    Generate a 6-digit OTP code.
+    Generate a 6-digit OTP code using cryptographically secure randomness.
+
+    SECURITY: Uses secrets.choice() (CSPRNG) instead of random.randint()
+    which uses Mersenne Twister (predictable given sufficient output).
 
     Returns:
-        A string containing a 6-digit numeric code
+        A string containing a 6-digit cryptographically random numeric code
     """
-    return str(random.randint(100000, 999999))
+    return generate_secure_otp(length=6)
 
 
 def store_otp(identifier: str, channel: str, code: str) -> bool:
     """
     Store OTP in database with 10-minute expiry.
 
+    SECURITY: The OTP code is hashed with bcrypt before storage.
+    Plaintext OTPs are NEVER stored in the database.
+
     Args:
         identifier: Email address or phone number where OTP was sent
         channel: Delivery channel ('email', 'sms', or 'whatsapp')
-        code: The 6-digit OTP code
+        code: The 6-digit OTP code (plaintext - will be hashed before storage)
 
     Returns:
         True if storage successful, False otherwise
@@ -39,16 +60,20 @@ def store_otp(identifier: str, channel: str, code: str) -> bool:
     try:
         expires_at = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
 
+        # SECURITY: Hash the OTP before storing in database
+        # This prevents exposure of plaintext OTPs if database is compromised
+        hashed_code = hash_otp(code)
+
         result = supabase.table("otp_codes").insert({
             "identifier": identifier,
             "channel": channel,
-            "code": code,
+            "code": hashed_code,  # Store bcrypt hash, not plaintext
             "expires_at": expires_at,
             "attempts": 0
         }).execute()
 
         if result.data:
-            print(f"OTP stored successfully for {identifier} via {channel}")
+            print(f"OTP stored successfully (hashed) for {identifier} via {channel}")
             return True
         else:
             print(f"OTP store failed: No data returned")
