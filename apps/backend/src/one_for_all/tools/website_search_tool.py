@@ -2,11 +2,20 @@
 Website Search Tool
 
 CrewAI tool for searching and scraping university websites for course information.
+
+SECURITY: This tool implements SSRF protection to prevent access to internal
+services, cloud metadata endpoints, and other sensitive resources. Only
+allowlisted university domains are permitted.
 """
 
 import asyncio
 import aiohttp
+import logging
 from crewai.tools import tool
+
+from one_for_all.utils.ssrf_protection import validate_website_url
+
+logger = logging.getLogger(__name__)
 
 
 @tool
@@ -23,6 +32,12 @@ def website_search_tool(url: str, query: str = "") -> str:
     """
     async def async_fetch():
         try:
+            # SSRF Protection - validate URL before fetching
+            validation = validate_website_url(url)
+            if not validation:
+                logger.warning(f"SSRF blocked URL: {url} - {validation.reason}")
+                return f"ERROR: URL blocked for security reasons - {validation.reason}"
+
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }

@@ -25,6 +25,26 @@ from .otp_crypto import (
     generate_and_hash_otp,
     BCRYPT_WORK_FACTOR,
 )
+from .ssrf_protection import (
+    validate_url,
+    validate_website_url,
+    validate_image_url,
+    validate_redirect,
+    SSRFValidationResult,
+    ALLOWED_DOMAINS,
+)
+from .audit_logger import (
+    AuditEvent,
+    AuditEntry,
+    AuditLogger,
+    FailedAuthTracker,
+    audit_logger,
+    mask_pii,
+    mask_url_path,
+    mask_query_params,
+    PII_PATTERNS,
+    MASK_CHAR,
+)
 
 __all__ = [
     # Sanitization
@@ -48,4 +68,22 @@ __all__ = [
     "verify_otp_hash",
     "generate_and_hash_otp",
     "BCRYPT_WORK_FACTOR",
+    # SSRF protection
+    "validate_url",
+    "validate_website_url",
+    "validate_image_url",
+    "validate_redirect",
+    "SSRFValidationResult",
+    "ALLOWED_DOMAINS",
+    # Enhanced audit logging
+    "AuditEvent",
+    "AuditEntry",
+    "AuditLogger",
+    "FailedAuthTracker",
+    "audit_logger",
+    "mask_pii",
+    "mask_url_path",
+    "mask_query_params",
+    "PII_PATTERNS",
+    "MASK_CHAR",
 ]

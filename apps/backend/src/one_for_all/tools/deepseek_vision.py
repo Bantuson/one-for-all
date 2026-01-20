@@ -7,6 +7,10 @@ Used for uncertain cases that pass basic rule-based checks but need AI verificat
 Cost comparison:
 - GPT-4V: ~$0.05-0.10 per image
 - DeepSeek Vision: ~$0.01 per image (80% cost reduction)
+
+SECURITY: This module implements SSRF protection to prevent access to internal
+services, cloud metadata endpoints, and other sensitive resources when fetching
+document images.
 """
 
 import os
@@ -19,6 +23,8 @@ from pathlib import Path
 from typing import Literal, Optional, Dict, Any
 from crewai.tools import tool
 from dotenv import load_dotenv
+
+from one_for_all.utils.ssrf_protection import validate_image_url
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -136,7 +142,16 @@ async def _fetch_image_as_base64(url: str) -> Optional[str]:
 
     Returns:
         Base64-encoded image string or None if fetch fails
+
+    Security:
+        Validates URL against SSRF protection before fetching.
     """
+    # SSRF Protection - validate URL before fetching
+    validation = validate_image_url(url)
+    if not validation:
+        logger.warning(f"SSRF blocked image URL: {url} - {validation.reason}")
+        return None
+
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url)

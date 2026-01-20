@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from .config.cors import get_cors_config
 from .middleware import (
     AuditMiddleware,
     TenantIsolationMiddleware,
@@ -51,14 +52,8 @@ def create_app() -> FastAPI:
     # MIDDLEWARE (order matters: first added = last executed)
     # ==========================================================================
 
-    # Add CORS middleware (restrict in production)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://localhost:8000"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # Add CORS middleware (environment-aware configuration)
+    app.add_middleware(CORSMiddleware, **get_cors_config())
 
     # Add tenant isolation middleware (multi-tenant security)
     # This middleware:
