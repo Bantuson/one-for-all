@@ -16,6 +16,7 @@ from .nsfas import (
 )
 from .rag import RAGQuery, RAGQueryResponse, RAGStore, RAGStoreResponse
 from .session import SessionCreate, SessionExtend, SessionResponse
+from .tenant import TenantContext, ROLE_HIERARCHY, has_role_or_higher
 
 __all__ = [
     # Applicant
@@ -42,4 +43,8 @@ __all__ = [
     "RAGQueryResponse",
     "RAGStore",
     "RAGStoreResponse",
+    # Tenant
+    "TenantContext",
+    "ROLE_HIERARCHY",
+    "has_role_or_higher",
 ]

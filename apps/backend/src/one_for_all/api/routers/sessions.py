@@ -3,15 +3,21 @@ Sessions Router
 
 Session management for applicant OTP authentication.
 Sessions have a 24-hour TTL by default.
+
+SECURITY:
+- Session creation rate limited to 5/minute (prevent session flooding)
+- Session validation rate limited to 30/minute (allow frequent auth checks)
+- Session extension rate limited to 10/minute
 """
 
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from ..dependencies import ApiKeyVerified, SupabaseClient
+from ..middleware import limiter, RATE_LIMITS
 from ..schemas.session import (
     SessionCreate,
     SessionExtend,
@@ -35,7 +41,9 @@ def generate_session_token() -> str:
     response_model=SessionResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit(RATE_LIMITS["session_create"])
 async def create_session(
+    request: Request,  # Required by slowapi for rate limiting
     session: SessionCreate,
     supabase: SupabaseClient,
     _: ApiKeyVerified,
@@ -89,7 +97,9 @@ async def create_session(
 
 
 @router.get("/{token}", response_model=SessionValidation)
+@limiter.limit(RATE_LIMITS["session_validate"])
 async def validate_session(
+    request: Request,  # Required by slowapi for rate limiting
     token: str,
     supabase: SupabaseClient,
     _: ApiKeyVerified,
@@ -134,7 +144,9 @@ async def validate_session(
 
 
 @router.patch("/{token}/extend", response_model=SessionResponse)
+@limiter.limit(RATE_LIMITS["session_extend"])
 async def extend_session(
+    request: Request,  # Required by slowapi for rate limiting
     token: str,
     extend: SessionExtend,
     supabase: SupabaseClient,
@@ -196,7 +208,9 @@ async def extend_session(
 
 
 @router.delete("/{token}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(RATE_LIMITS["default"])
 async def invalidate_session(
+    request: Request,  # Required by slowapi for rate limiting
     token: str,
     supabase: SupabaseClient,
     _: ApiKeyVerified,

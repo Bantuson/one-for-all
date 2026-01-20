@@ -7,16 +7,29 @@ Each endpoint:
 2. Loads the session from database to get target_ids and context
 3. Executes the appropriate crew
 4. Returns the result (Bun runner updates the session status)
+
+SECURITY:
+- User inputs (question, query) are sanitized before agent processing
+- Prompt injection patterns are detected and filtered (CWE-94, LLM01)
+- Rate limited to 10/minute to prevent resource exhaustion (CWE-400)
+- Tenant isolation enforced via TenantRequired dependency (CWE-862)
+- Session ownership verified against tenant context (IDOR prevention)
 """
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Optional
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from ..dependencies import SupabaseClient
+from ..dependencies import SupabaseClient, TenantRequired
+from ..middleware import limiter, RATE_LIMITS
+from ..schemas.tenant import TenantContext
+
+# Import sanitization utilities for prompt injection prevention
+from one_for_all.utils.sanitization import sanitize_for_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +79,49 @@ async def _get_session(supabase: Any, session_id: str) -> dict | None:
         return None
 
 
+def _verify_session_ownership(
+    session: dict,
+    tenant_context: TenantContext
+) -> None:
+    """
+    Verify that the session belongs to the user's institution.
+
+    This prevents IDOR (Insecure Direct Object Reference) attacks where
+    a user could potentially access sessions from other institutions
+    by guessing session IDs.
+
+    Args:
+        session: The agent session data from database
+        tenant_context: The validated tenant context from middleware
+
+    Raises:
+        HTTPException: 403 if session doesn't belong to user's institution
+    """
+    session_institution_id = session.get("institution_id")
+
+    if not session_institution_id:
+        logger.warning(f"Session {session.get('id')} has no institution_id")
+        raise HTTPException(
+            status_code=403,
+            detail="Session has no associated institution",
+        )
+
+    # Compare UUIDs as strings (handle both UUID objects and strings)
+    session_inst_str = str(session_institution_id)
+    tenant_inst_str = str(tenant_context.institution_id)
+
+    if session_inst_str != tenant_inst_str:
+        logger.warning(
+            f"IDOR attempt: User {tenant_context.clerk_user_id} from institution "
+            f"{tenant_inst_str} attempted to access session from institution "
+            f"{session_inst_str}"
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Session does not belong to your institution",
+        )
+
+
 def _run_crew_sync(crew_run_func) -> dict:
     """
     Run a crew's synchronous run method.
@@ -83,8 +139,12 @@ def _run_crew_sync(crew_run_func) -> dict:
 
 
 @router.post("/reviewer-assistant/execute", response_model=ExecuteResponse)
+@limiter.limit(RATE_LIMITS["agent_execute"])
 async def execute_reviewer_assistant(
-    request: ExecuteRequest, supabase: SupabaseClient
+    request: Request,  # Required by slowapi for rate limiting
+    body: ExecuteRequest,
+    supabase: SupabaseClient,
+    tenant: TenantRequired,  # Tenant isolation enforcement
 ) -> ExecuteResponse:
     """
     Execute the Reviewer Assistant crew for a session.
@@ -100,18 +160,26 @@ async def execute_reviewer_assistant(
     - application_id: (optional) Specific application context
     - course_id: (optional) Specific course context
 
+    Security:
+    - Requires valid JWT and institution membership (TenantRequired)
+    - Verifies session belongs to user's institution (IDOR prevention)
+
     Args:
-        request: Contains the session_id to process
+        body: Contains the session_id to process
         supabase: Injected Supabase client
+        tenant: Validated tenant context from middleware
 
     Returns:
         ExecuteResponse with success status and answer/citations
     """
     try:
         # Verify session exists and is for reviewer assistant
-        session = await _get_session(supabase, request.session_id)
+        session = await _get_session(supabase, body.session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
+
+        # SECURITY: Verify session belongs to user's institution (IDOR prevention)
+        _verify_session_ownership(session, tenant)
 
         if session.get("agent_type") != "reviewer_assistant":
             raise HTTPException(
@@ -130,7 +198,10 @@ async def execute_reviewer_assistant(
                 detail="No question provided in session input_context",
             )
 
-        logger.info(f"Starting reviewer assistant for session {request.session_id}")
+        # SECURITY: Sanitize user input to prevent prompt injection (CWE-94, LLM01)
+        question = sanitize_for_prompt(question)
+
+        logger.info(f"Starting reviewer assistant for session {body.session_id}")
 
         # Import crew here to avoid circular imports
         from one_for_all.crews import ReviewerAssistantCrew
@@ -151,7 +222,7 @@ async def execute_reviewer_assistant(
 
         return ExecuteResponse(
             success=True,
-            session_id=request.session_id,
+            session_id=body.session_id,
             result=result,
         )
 
@@ -159,18 +230,22 @@ async def execute_reviewer_assistant(
         raise
     except Exception as e:
         logger.error(
-            f"Reviewer assistant failed for session {request.session_id}: {e}"
+            f"Reviewer assistant failed for session {body.session_id}: {e}"
         )
         return ExecuteResponse(
             success=False,
-            session_id=request.session_id,
+            session_id=body.session_id,
             error=str(e),
         )
 
 
 @router.post("/analytics/execute", response_model=ExecuteResponse)
+@limiter.limit(RATE_LIMITS["agent_execute"])
 async def execute_analytics(
-    request: ExecuteRequest, supabase: SupabaseClient
+    request: Request,  # Required by slowapi for rate limiting
+    body: ExecuteRequest,
+    supabase: SupabaseClient,
+    tenant: TenantRequired,  # Tenant isolation enforcement
 ) -> ExecuteResponse:
     """
     Execute the Analytics crew for a session.
@@ -187,18 +262,27 @@ async def execute_analytics(
     - save_result: (optional) Whether to save the chart
     - pin_chart: (optional) Whether to pin the chart to dashboard
 
+    Security:
+    - Requires valid JWT and institution membership (TenantRequired)
+    - Verifies session belongs to user's institution (IDOR prevention)
+    - Uses tenant's institution_id for query scoping
+
     Args:
-        request: Contains the session_id to process
+        body: Contains the session_id to process
         supabase: Injected Supabase client
+        tenant: Validated tenant context from middleware
 
     Returns:
         ExecuteResponse with success status and chart configuration
     """
     try:
         # Verify session exists and is for analytics
-        session = await _get_session(supabase, request.session_id)
+        session = await _get_session(supabase, body.session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
+
+        # SECURITY: Verify session belongs to user's institution (IDOR prevention)
+        _verify_session_ownership(session, tenant)
 
         if session.get("agent_type") != "analytics":
             raise HTTPException(
@@ -224,7 +308,10 @@ async def execute_analytics(
                 detail="No institution_id in session",
             )
 
-        logger.info(f"Starting analytics for session {request.session_id}")
+        # SECURITY: Sanitize user input to prevent prompt injection (CWE-94, LLM01)
+        query = sanitize_for_prompt(query)
+
+        logger.info(f"Starting analytics for session {body.session_id}")
 
         # Import crew here to avoid circular imports
         from one_for_all.crews import AnalyticsCrew
@@ -243,16 +330,16 @@ async def execute_analytics(
 
         return ExecuteResponse(
             success=result.get("success", False),
-            session_id=request.session_id,
+            session_id=body.session_id,
             result=result,
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Analytics failed for session {request.session_id}: {e}")
+        logger.error(f"Analytics failed for session {body.session_id}: {e}")
         return ExecuteResponse(
             success=False,
-            session_id=request.session_id,
+            session_id=body.session_id,
             error=str(e),
         )
