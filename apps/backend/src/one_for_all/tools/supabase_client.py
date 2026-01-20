@@ -1,9 +1,13 @@
 import os
+import logging
 import warnings
 from pathlib import Path
 from typing import Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
+
+# Security audit logger for service role access
+_security_logger = logging.getLogger("security.db_access")
 
 # Load environment from monorepo root (local dev) or use Render env vars (production)
 # Try multiple paths for different environments
@@ -22,6 +26,16 @@ for _env_path in _env_paths:
 # Use correct environment variable names matching .env.local
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+
+# SECURITY WARNING: Log service role key initialization
+# The service role key bypasses all Row-Level Security (RLS) policies.
+# See docs/SERVICE_ROLE_AUDIT.md for migration plan to scoped tokens.
+if SUPABASE_KEY and not os.getenv("ONEFORALL_TEST_MODE", "").lower() == "true":
+    _security_logger.warning(
+        "SECURITY_NOTICE: Supabase client initialized with SERVICE_ROLE_KEY. "
+        "This key bypasses all RLS policies. All database operations have "
+        "unrestricted access. See docs/SERVICE_ROLE_AUDIT.md for details."
+    )
 
 # Check if running in test mode
 TEST_MODE = os.getenv("ONEFORALL_TEST_MODE", "false").lower() == "true"
