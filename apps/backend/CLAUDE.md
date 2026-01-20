@@ -248,13 +248,119 @@ For comprehensive architectural details, see:
 
 **Before making database changes**, review `docs/architecture.md` Section 2 for the complete schema harmonization plan.
 
+## Migration Naming Convention
+
+All database migrations are stored in `supabase/migrations/` and must follow a consistent naming convention for maintainability.
+
+### Format
+
+```
+NNN_descriptive_name.sql
+```
+
+Where:
+- **NNN**: Sequential 3-digit number (001, 002, 003, ..., 030, 031, etc.)
+- **descriptive_name**: lowercase_snake_case describing the change
+
+### Examples
+
+✅ **Good:**
+- `028_notification_logs.sql` - Create notification tracking tables
+- `029_add_course_prerequisites.sql` - Add prerequisites to courses table
+- `030_fulltext_search.sql` - Add full-text search to rag_embeddings
+
+❌ **Bad:**
+- `notification_logs.sql` - Missing number prefix
+- `29_NotificationLogs.sql` - Wrong case, inconsistent number format
+- `028_fix_stuff.sql` - Too vague, no clear description
+
+### Guidelines
+
+1. **One Logical Change Per Migration**
+   - Each migration should represent a single, atomic schema change
+   - Avoid combining unrelated changes (e.g., "add users and courses tables")
+
+2. **Include Rollback Comments Where Applicable**
+   ```sql
+   -- Migration: 029_add_course_prerequisites
+   -- Rollback: DROP COLUMN prerequisites FROM courses;
+
+   ALTER TABLE public.courses
+     ADD COLUMN prerequisites UUID[] DEFAULT '{}';
+   ```
+
+3. **Use IF NOT EXISTS for Idempotency**
+   - Always use `IF NOT EXISTS` / `IF EXISTS` to allow safe re-runs
+   - Example: `CREATE TABLE IF NOT EXISTS`, `DROP TABLE IF EXISTS`
+
+4. **Document Purpose and Context**
+   - Include header comment with migration number, description, and date
+   - Add `COMMENT ON TABLE/COLUMN` for schema documentation
+
+   ```sql
+   -- Migration: 028_notification_logs
+   -- Description: Multi-channel notification tracking (WhatsApp, SMS, email)
+   -- Created: 2026-01-20
+   ```
+
+5. **Follow Existing Patterns**
+   - Review `supabase/SCHEMA_REFERENCE.md` for existing table structures
+   - Maintain consistency with existing naming conventions (snake_case, TIMESTAMPTZ, etc.)
+   - Use `gen_random_uuid()` or `uuid_generate_v4()` for primary keys
+
+6. **Include RLS Policies**
+   - Always enable RLS: `ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;`
+   - Add appropriate policies for multi-tenant isolation
+   - Include service role bypass: `CREATE POLICY "Service role full access" ...`
+
+7. **Add Indexes for Performance**
+   - Foreign keys should have indexes
+   - Frequently queried columns need indexes
+   - Use partial indexes for filtered queries
+   - Document index purpose with comments
+
+8. **Update SCHEMA_REFERENCE.md**
+   - Add new tables/columns to `supabase/SCHEMA_REFERENCE.md`
+   - Document new functions and materialized views
+   - Update Entity Relationship Summary if needed
+
+### Migration Workflow
+
+```bash
+# 1. Create new migration file with next sequential number
+touch supabase/migrations/031_my_new_feature.sql
+
+# 2. Write migration with proper header and idempotency
+# (See examples in existing migrations)
+
+# 3. Test migration locally
+supabase db reset  # Apply all migrations from scratch
+
+# 4. Update SCHEMA_REFERENCE.md with new schema elements
+
+# 5. Commit both migration and documentation
+git add supabase/migrations/031_my_new_feature.sql
+git add supabase/SCHEMA_REFERENCE.md
+git commit -m "feat(db): add my_new_feature schema"
+```
+
+### Schema Reference
+
+For complete schema documentation, see **`supabase/SCHEMA_REFERENCE.md`**, which includes:
+- Complete migration history
+- All table definitions with columns, indexes, and RLS policies
+- Materialized views and functions
+- Entity relationship summary
+- Indexing strategy and performance targets
+
 ## Important Notes
 
 ### Supabase Schema Changes
 If modifying database schema:
-1. Add migration to `supabase/migrations/`
-2. Update `supabase/ERD.md` diagram
-3. Ensure RLS policies align with tenant isolation requirements (for future multi-tenant)
+1. Add migration to `supabase/migrations/` following naming convention above
+2. Update `supabase/SCHEMA_REFERENCE.md` with new schema elements
+3. Update `supabase/ERD.md` diagram (if visual changes needed)
+4. Ensure RLS policies align with tenant isolation requirements (for future multi-tenant)
 
 ### Adding New Agents/Tasks
 1. Define in `config/agents.yaml` and `config/tasks.yaml`

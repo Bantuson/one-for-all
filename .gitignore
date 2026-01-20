@@ -19,3 +19,6 @@ Screenshot*.png
 *.jpg
 *.jpeg
 *.gif
+
+
+__pycache__
