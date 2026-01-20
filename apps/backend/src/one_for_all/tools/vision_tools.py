@@ -4,6 +4,13 @@ Vision Tools for Document Analysis
 CrewAI tools that use GPT-4V (GPT-4 Vision) to analyze uploaded documents
 for verification purposes. Supports South African document types including
 ID documents, matric certificates, academic transcripts, and proof of residence.
+
+TIERED VALIDATION SYSTEM:
+- Tier 1: Rule-based validation (free, ~80% of documents)
+- Tier 2: DeepSeek Vision ($0.01/call, ~15% of documents)
+- Tier 3: GPT-4V ($0.08/call, ~5% of documents - this file)
+
+Target: Reduce average cost from $0.08 to $0.02 per document (75% reduction)
 """
 
 import os
@@ -11,10 +18,15 @@ import json
 import base64
 import asyncio
 import httpx
+import logging
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal, Optional, Dict, Any
+from datetime import datetime
 from crewai.tools import tool
 from dotenv import load_dotenv
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Load environment from monorepo root
 _env_paths = [
@@ -31,6 +43,91 @@ for _env_path in _env_paths:
 # OpenAI API configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+
+# =============================================================================
+# TIERED VALIDATION FEATURE FLAGS
+# =============================================================================
+TIER1_VALIDATION_ENABLED = os.getenv("TIER1_VALIDATION_ENABLED", "true").lower() == "true"
+TIER2_PROVIDER = os.getenv("TIER2_PROVIDER", "deepseek")  # deepseek | openai
+VISION_CONFIDENCE_TIER1 = float(os.getenv("VISION_CONFIDENCE_TIER1", "0.85"))
+VISION_CONFIDENCE_TIER2 = float(os.getenv("VISION_CONFIDENCE_TIER2", "0.60"))
+TIERED_VALIDATION_ENABLED = os.getenv("TIERED_VALIDATION_ENABLED", "true").lower() == "true"
+
+# =============================================================================
+# TIER USAGE METRICS TRACKING
+# =============================================================================
+# In-memory metrics (for production, use Redis or database)
+_tier_metrics = {
+    "tier_1_count": 0,
+    "tier_2_count": 0,
+    "tier_3_count": 0,
+    "tier_1_cost": 0.0,
+    "tier_2_cost": 0.0,
+    "tier_3_cost": 0.0,
+    "total_documents": 0,
+    "session_start": datetime.utcnow().isoformat(),
+}
+
+# Cost per tier
+TIER_COSTS = {
+    "tier_1": 0.00,
+    "tier_2": 0.01,
+    "tier_3": 0.08,
+}
+
+
+def _update_tier_metrics(tier: str) -> None:
+    """Update tier usage metrics."""
+    global _tier_metrics
+    _tier_metrics["total_documents"] += 1
+
+    if tier == "tier_1":
+        _tier_metrics["tier_1_count"] += 1
+        _tier_metrics["tier_1_cost"] += TIER_COSTS["tier_1"]
+    elif tier == "tier_2":
+        _tier_metrics["tier_2_count"] += 1
+        _tier_metrics["tier_2_cost"] += TIER_COSTS["tier_2"]
+    elif tier == "tier_3":
+        _tier_metrics["tier_3_count"] += 1
+        _tier_metrics["tier_3_cost"] += TIER_COSTS["tier_3"]
+
+
+def get_tier_metrics() -> Dict[str, Any]:
+    """Get current tier usage metrics."""
+    total = _tier_metrics["total_documents"]
+    if total > 0:
+        return {
+            **_tier_metrics,
+            "tier_1_rate": round(_tier_metrics["tier_1_count"] / total * 100, 1),
+            "tier_2_rate": round(_tier_metrics["tier_2_count"] / total * 100, 1),
+            "tier_3_rate": round(_tier_metrics["tier_3_count"] / total * 100, 1),
+            "total_cost": round(
+                _tier_metrics["tier_1_cost"] +
+                _tier_metrics["tier_2_cost"] +
+                _tier_metrics["tier_3_cost"], 2
+            ),
+            "average_cost": round(
+                (_tier_metrics["tier_1_cost"] +
+                 _tier_metrics["tier_2_cost"] +
+                 _tier_metrics["tier_3_cost"]) / total, 4
+            ),
+        }
+    return _tier_metrics
+
+
+def reset_tier_metrics() -> None:
+    """Reset tier metrics (useful for testing)."""
+    global _tier_metrics
+    _tier_metrics = {
+        "tier_1_count": 0,
+        "tier_2_count": 0,
+        "tier_3_count": 0,
+        "tier_1_cost": 0.0,
+        "tier_2_cost": 0.0,
+        "tier_3_cost": 0.0,
+        "total_documents": 0,
+        "session_start": datetime.utcnow().isoformat(),
+    }
 
 # Document type configurations with specific analysis requirements
 DOCUMENT_ANALYSIS_CONFIG = {
@@ -706,3 +803,285 @@ Return a valid JSON object:
             })
 
     return asyncio.run(async_compare())
+
+
+# =============================================================================
+# TIERED DOCUMENT VALIDATION
+# =============================================================================
+
+@tool
+def tiered_analyze_document(
+    document_url: str,
+    document_type: str,
+    file_name: str = None,
+    bypass_tiers: bool = False
+) -> str:
+    """
+    Analyze a document using the tiered validation system for cost optimization.
+
+    This is the RECOMMENDED entry point for document analysis. It routes documents
+    through the tiered validation system to minimize costs while maintaining accuracy:
+
+    - Tier 1 (Rule-based, $0.00): File format, size, dimensions, magic bytes
+    - Tier 2 (DeepSeek Vision, $0.01): Uncertain cases from Tier 1
+    - Tier 3 (GPT-4V, $0.08): Critical failures or low-confidence cases
+
+    Args:
+        document_url: URL of the document image (from Supabase storage or direct URL)
+        document_type: Type of document being analyzed. Must be one of:
+                      - "id_document" (SA ID book, smart ID card, or passport)
+                      - "matric_certificate" (NSC certificate)
+                      - "academic_transcript" (Academic records)
+                      - "proof_of_residence" (Utility bill, bank statement)
+        file_name: Optional filename for pattern matching in Tier 1
+        bypass_tiers: If True, skip directly to GPT-4V (Tier 3) - use for debugging
+
+    Returns:
+        JSON string with analysis results including:
+        - tier_used: Which tier performed the analysis
+        - cost: Estimated cost of the analysis
+        - analysis: Detailed analysis results (format varies by tier)
+        - tier_metrics: Current session tier distribution
+
+    Example:
+        result = tiered_analyze_document(
+            document_url="https://storage.supabase.co/.../id_123.jpg",
+            document_type="id_document",
+            file_name="my_id_document.jpg"
+        )
+    """
+
+    async def async_tiered_analyze():
+        try:
+            # Input validation
+            valid_types = list(DOCUMENT_ANALYSIS_CONFIG.keys())
+            if document_type not in valid_types:
+                return json.dumps({
+                    "success": False,
+                    "error": f"Invalid document_type. Must be one of: {', '.join(valid_types)}",
+                    "analysis": None,
+                    "tier_used": None
+                })
+
+            if not document_url:
+                return json.dumps({
+                    "success": False,
+                    "error": "document_url is required",
+                    "analysis": None,
+                    "tier_used": None
+                })
+
+            # Bypass mode - go directly to GPT-4V
+            if bypass_tiers or not TIERED_VALIDATION_ENABLED:
+                logger.info(f"Bypassing tiers, using GPT-4V directly for {document_type}")
+                _update_tier_metrics("tier_3")
+
+                # Fetch image
+                if "supabase" in document_url.lower():
+                    image_data = await _fetch_image_as_base64(document_url)
+                    if not image_data:
+                        return json.dumps({
+                            "success": False,
+                            "error": f"Failed to fetch image from URL",
+                            "analysis": None,
+                            "tier_used": "tier_3"
+                        })
+                else:
+                    image_data = document_url
+
+                result = await _call_gpt4v_api(image_data, document_type)
+                return json.dumps({
+                    **result,
+                    "tier_used": "tier_3_gpt4v",
+                    "cost": TIER_COSTS["tier_3"],
+                    "tier_metrics": get_tier_metrics()
+                }, indent=2)
+
+            # =================================================================
+            # TIER 1: Rule-based validation
+            # =================================================================
+            if TIER1_VALIDATION_ENABLED:
+                try:
+                    from .document_validation_intake import tier1_validate_document, ValidationTier
+
+                    tier1_result = tier1_validate_document(
+                        file_url=document_url,
+                        document_type=document_type,
+                        file_name=file_name
+                    )
+
+                    logger.info(
+                        f"Tier 1 result: passed={tier1_result.passed}, "
+                        f"confidence={tier1_result.confidence:.2f}, "
+                        f"recommended={tier1_result.recommended_tier.value}"
+                    )
+
+                    # If Tier 1 fully validates the document
+                    if tier1_result.recommended_tier == ValidationTier.TIER_1_RULE_BASED:
+                        _update_tier_metrics("tier_1")
+                        return json.dumps({
+                            "success": True,
+                            "error": None,
+                            "tier_used": "tier_1_rule_based",
+                            "cost": TIER_COSTS["tier_1"],
+                            "analysis": {
+                                "confidence": tier1_result.confidence,
+                                "checks_performed": tier1_result.checks_performed,
+                                "issues": tier1_result.issues,
+                                "overall_assessment": "approved" if tier1_result.passed else "flagged",
+                            },
+                            "tier_metrics": get_tier_metrics()
+                        }, indent=2)
+
+                    # ==========================================================
+                    # TIER 2: DeepSeek Vision (for uncertain cases)
+                    # ==========================================================
+                    if tier1_result.recommended_tier == ValidationTier.TIER_2_DEEPSEEK:
+                        if TIER2_PROVIDER == "deepseek":
+                            try:
+                                from .deepseek_vision import analyze_document_tier2
+
+                                logger.info(f"Routing to Tier 2 (DeepSeek) for {document_type}")
+                                _update_tier_metrics("tier_2")
+
+                                tier2_result = await analyze_document_tier2(
+                                    document_url=document_url,
+                                    document_type=document_type
+                                )
+
+                                return json.dumps({
+                                    **tier2_result,
+                                    "tier_used": "tier_2_deepseek",
+                                    "cost": TIER_COSTS["tier_2"],
+                                    "tier1_confidence": tier1_result.confidence,
+                                    "tier_metrics": get_tier_metrics()
+                                }, indent=2)
+
+                            except ImportError:
+                                logger.warning("DeepSeek Vision not available, falling back to GPT-4V")
+                            except Exception as e:
+                                logger.error(f"Tier 2 failed: {str(e)}, falling back to GPT-4V")
+
+                    # ==========================================================
+                    # TIER 3: GPT-4V (fallback or critical cases)
+                    # ==========================================================
+                    logger.info(f"Routing to Tier 3 (GPT-4V) for {document_type}")
+
+                except ImportError:
+                    logger.warning("Tier 1 validation not available, using GPT-4V directly")
+                except Exception as e:
+                    logger.error(f"Tier routing failed: {str(e)}, falling back to GPT-4V")
+
+            # =================================================================
+            # TIER 3: GPT-4V (final fallback)
+            # =================================================================
+            _update_tier_metrics("tier_3")
+
+            # Fetch image
+            if "supabase" in document_url.lower():
+                image_data = await _fetch_image_as_base64(document_url)
+                if not image_data:
+                    return json.dumps({
+                        "success": False,
+                        "error": f"Failed to fetch image from URL",
+                        "analysis": None,
+                        "tier_used": "tier_3_gpt4v"
+                    })
+            else:
+                image_data = document_url
+
+            result = await _call_gpt4v_api(image_data, document_type)
+
+            return json.dumps({
+                **result,
+                "tier_used": "tier_3_gpt4v",
+                "cost": TIER_COSTS["tier_3"],
+                "tier_metrics": get_tier_metrics()
+            }, indent=2)
+
+        except Exception as e:
+            logger.error(f"Tiered analysis failed: {str(e)}")
+            return json.dumps({
+                "success": False,
+                "error": f"Tiered analysis failed: {str(e)}",
+                "analysis": None,
+                "tier_used": None
+            })
+
+    return asyncio.run(async_tiered_analyze())
+
+
+@tool
+def get_vision_tier_metrics() -> str:
+    """
+    Get current tier usage metrics for the vision validation system.
+
+    Returns statistics about how documents are being routed through the
+    tiered validation system, including costs and tier distribution.
+
+    Returns:
+        JSON string with:
+        - tier_1_count/rate: Documents validated by rule-based checks
+        - tier_2_count/rate: Documents validated by DeepSeek Vision
+        - tier_3_count/rate: Documents validated by GPT-4V
+        - total_cost: Total cost of all validations
+        - average_cost: Average cost per document
+        - session_start: When metrics collection started
+
+    Example:
+        metrics = get_vision_tier_metrics()
+    """
+    return json.dumps(get_tier_metrics(), indent=2)
+
+
+@tool
+def reset_vision_tier_metrics() -> str:
+    """
+    Reset tier usage metrics to zero.
+
+    Useful for starting a new measurement period or testing.
+
+    Returns:
+        JSON string confirming reset with new session start time.
+
+    Example:
+        result = reset_vision_tier_metrics()
+    """
+    reset_tier_metrics()
+    return json.dumps({
+        "success": True,
+        "message": "Tier metrics reset successfully",
+        "new_session_start": _tier_metrics["session_start"]
+    })
+
+
+@tool
+def get_tiered_validation_config() -> str:
+    """
+    Get current tiered validation configuration settings.
+
+    Returns the feature flags and thresholds controlling the tiered
+    validation system behavior.
+
+    Returns:
+        JSON string with:
+        - tier1_validation_enabled: Whether Tier 1 is active
+        - tier2_provider: Provider for Tier 2 (deepseek | openai)
+        - tiered_validation_enabled: Whether tiered system is active
+        - confidence_thresholds: Tier routing thresholds
+        - tier_costs: Cost per tier
+
+    Example:
+        config = get_tiered_validation_config()
+    """
+    return json.dumps({
+        "tier1_validation_enabled": TIER1_VALIDATION_ENABLED,
+        "tier2_provider": TIER2_PROVIDER,
+        "tiered_validation_enabled": TIERED_VALIDATION_ENABLED,
+        "confidence_thresholds": {
+            "tier_1": VISION_CONFIDENCE_TIER1,
+            "tier_2": VISION_CONFIDENCE_TIER2,
+        },
+        "tier_costs": TIER_COSTS,
+        "openai_configured": bool(OPENAI_API_KEY),
+    }, indent=2)

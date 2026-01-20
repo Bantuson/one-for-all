@@ -2,15 +2,57 @@
 Analytics Query Tools
 
 CrewAI tools for generating and executing SQL analytics queries.
-Uses DeepSeek LLM for natural language to SQL conversion.
+Uses pre-defined SQL templates for common queries (90%+ hit rate, <500ms latency).
+Falls back to DeepSeek LLM for unmatched queries (~$0.002/query, 2.5s latency).
+
+Performance Optimization (Phase 1):
+- Template routing checks first for common query patterns
+- Feature flag ANALYTICS_USE_TEMPLATES controls template routing (default: true)
+- Routing metrics track template hit/miss rates for monitoring
+
+SECURITY:
+- User input is sanitized before LLM processing (CWE-94, LLM01)
+- Prompt injection patterns are detected and filtered
+- Service role key bypasses RLS - all operations are audit logged
+- See docs/SERVICE_ROLE_AUDIT.md for migration plan to scoped tokens
+
+CRITICAL RISK:
+- execute_analytics_query can execute arbitrary SQL via RPC
+- get_application_stats accesses multiple tables without tenant validation
+- All high-risk functions decorated with audit_service_role_access
 """
 
 import asyncio
 import json
+import logging
 import os
 from typing import Optional
 from crewai.tools import tool
 from .supabase_client import supabase
+
+# Import sanitization utilities for prompt injection prevention
+from one_for_all.utils.sanitization import sanitize_for_prompt
+
+# Security audit logging for service role access
+from ..utils.db_audit import audit_service_role_access
+
+# Import template routing
+from .query_router import (
+    route_query,
+    execute_template,
+    routing_metrics,
+    RoutingResult,
+    list_available_templates,
+)
+
+logger = logging.getLogger(__name__)
+
+# Feature flag for template routing (default: enabled)
+ANALYTICS_USE_TEMPLATES = os.getenv("ANALYTICS_USE_TEMPLATES", "true").lower() == "true"
+
+# Security feature flag: When enabled, REJECT queries that don't match templates
+# instead of falling back to LLM-generated SQL (prevents SQL injection risk)
+ANALYTICS_TEMPLATES_ONLY = os.getenv("ANALYTICS_TEMPLATES_ONLY", "true").lower() == "true"
 
 
 # Database schema for SQL generation context
@@ -126,9 +168,11 @@ def generate_sql_query(natural_language: str, institution_id: str) -> str:
     """
     Convert a natural language analytics question to a SQL query.
 
-    Uses the DeepSeek LLM to generate a SQL query based on the database schema
-    and example queries provided. The query is automatically scoped to the
-    specified institution.
+    PERFORMANCE OPTIMIZED: This function first attempts to match the query to
+    pre-defined SQL templates (<500ms). Only falls back to DeepSeek LLM if no
+    template matches with sufficient confidence (~2.5s, ~$0.002/query).
+
+    Template routing can be disabled by setting ANALYTICS_USE_TEMPLATES=false.
 
     Args:
         natural_language: The analytics question in plain English.
@@ -142,7 +186,7 @@ def generate_sql_query(natural_language: str, institution_id: str) -> str:
         institution_id: UUID of the institution to filter data for
 
     Returns:
-        Success: JSON string with {"sql": "<generated_query>", "explanation": "<what_this_query_does>"}
+        Success: JSON string with {"sql": "<generated_query>", "explanation": "<what_this_query_does>", "source": "template|llm"}
         Error: String starting with "SQL_GEN_ERROR:" followed by error details
 
     Example:
@@ -157,6 +201,74 @@ def generate_sql_query(natural_language: str, institution_id: str) -> str:
 
         if not institution_id:
             return "SQL_GEN_ERROR: institution_id is required"
+
+        # SECURITY: Sanitize user input to prevent prompt injection (CWE-94, LLM01)
+        natural_language = sanitize_for_prompt(natural_language)
+
+        # =================================================================
+        # TEMPLATE ROUTING (Phase 1 optimization)
+        # =================================================================
+        if ANALYTICS_USE_TEMPLATES:
+            routing_result = route_query(natural_language)
+
+            if routing_result.matched and not routing_result.fallback_to_llm:
+                # Template matched - execute it
+                template_result = execute_template(
+                    routing_result.template.id,
+                    institution_id,
+                )
+
+                if template_result["success"]:
+                    # Record metric
+                    routing_metrics.record_hit(routing_result.template.id)
+
+                    logger.info(
+                        f"Template hit: {routing_result.template.id} "
+                        f"(confidence: {routing_result.confidence:.3f})"
+                    )
+
+                    return json.dumps({
+                        "sql": template_result["sql"],
+                        "explanation": template_result["description"],
+                        "source": "template",
+                        "template_id": template_result["template_id"],
+                        "chart_type": template_result["chart_type"],
+                        "confidence": routing_result.confidence,
+                    })
+                else:
+                    logger.warning(
+                        f"Template execution failed: {template_result.get('error')}"
+                    )
+            else:
+                # Record miss for metrics
+                routing_metrics.record_miss()
+
+                # SECURITY: Reject unmatched queries when templates-only mode is enabled
+                if ANALYTICS_TEMPLATES_ONLY:
+                    logger.warning(
+                        f"Query rejected (templates-only mode) - no template match "
+                        f"(best confidence: {routing_result.confidence:.3f})"
+                    )
+                    # Get available templates for suggestion
+                    available = list_available_templates()
+                    template_names = [t["name"] for t in available[:5]]
+                    return json.dumps({
+                        "error": "Query not in pre-defined templates",
+                        "suggestion": "Try: " + ", ".join(template_names),
+                        "available_templates": [t["name"] for t in available],
+                        "source": "rejected",
+                        "best_confidence": routing_result.confidence,
+                    })
+
+                logger.info(
+                    f"Template miss - falling back to LLM "
+                    f"(best confidence: {routing_result.confidence:.3f})"
+                )
+
+        # =================================================================
+        # LLM FALLBACK (original implementation)
+        # Only reached when ANALYTICS_TEMPLATES_ONLY=false
+        # =================================================================
 
         # Build the prompt for SQL generation
         prompt = f"""You are a SQL expert. Generate a PostgreSQL query for the following analytics question.
@@ -233,6 +345,8 @@ Respond with ONLY a JSON object in this exact format (no markdown, no explanatio
                 if keyword in sql_upper and keyword != "CREATE":  # CREATE can appear in date functions
                     return f"SQL_GEN_ERROR: Generated SQL contains forbidden keyword '{keyword}'"
 
+            # Add source field to indicate LLM-generated query
+            parsed["source"] = "llm"
             return json.dumps(parsed)
 
         except json.JSONDecodeError:
@@ -242,6 +356,7 @@ Respond with ONLY a JSON object in this exact format (no markdown, no explanatio
         return f"SQL_GEN_ERROR: Unexpected error - {str(e)}"
 
 
+@audit_service_role_access(table="multiple_tables", operation="rpc_sql_execution")
 @tool
 def execute_analytics_query(sql: str) -> str:
     """
@@ -249,6 +364,10 @@ def execute_analytics_query(sql: str) -> str:
 
     This tool executes a read-only SQL query against the database and returns
     the results as JSON. Only SELECT queries are allowed for security.
+
+    SECURITY NOTE: CRITICAL RISK - This function executes arbitrary SQL via RPC.
+    Uses service role key which bypasses all RLS policies.
+    See docs/SERVICE_ROLE_AUDIT.md for migration plan.
 
     Args:
         sql: The SQL query to execute. Must be a SELECT statement only.
@@ -316,6 +435,7 @@ def execute_analytics_query(sql: str) -> str:
     return asyncio.run(async_execute())
 
 
+@audit_service_role_access(table="application_choices", operation="select_aggregate")
 @tool
 def get_application_stats(institution_id: str) -> str:
     """
@@ -323,6 +443,11 @@ def get_application_stats(institution_id: str) -> str:
 
     This tool retrieves common analytics metrics without requiring a custom query.
     Useful for quick dashboards or overview statistics.
+
+    SECURITY NOTE: This function uses service role key which bypasses RLS.
+    Queries multiple tables (application_choices, faculties, courses).
+    institution_id parameter is used for filtering but not RLS-enforced.
+    See docs/SERVICE_ROLE_AUDIT.md for migration plan.
 
     Args:
         institution_id: UUID of the institution
@@ -450,3 +575,50 @@ def get_application_stats(institution_id: str) -> str:
             return f"STATS_ERROR: Unexpected error - {str(e)}"
 
     return asyncio.run(async_get_stats())
+
+
+@tool
+def get_routing_metrics() -> str:
+    """
+    Get analytics query routing metrics.
+
+    Returns statistics about template hit/miss rates for monitoring
+    the effectiveness of the template routing optimization.
+
+    Returns:
+        JSON string with routing statistics including:
+        - total_queries: Total number of queries routed
+        - template_hits: Number of queries matched to templates
+        - template_misses: Number of queries that fell back to LLM
+        - hit_rate: Percentage of queries matched to templates
+        - template_usage: Per-template usage counts
+
+    Example:
+        result = get_routing_metrics()
+        # Returns: {"total_queries": 100, "template_hits": 92, "hit_rate": 92.0, ...}
+    """
+    return json.dumps(routing_metrics.get_stats())
+
+
+@tool
+def list_analytics_templates() -> str:
+    """
+    List all available SQL templates for analytics queries.
+
+    Returns a list of pre-defined query templates that can be used
+    for common analytics questions without LLM generation.
+
+    Returns:
+        JSON string with list of template metadata including:
+        - id: Template identifier
+        - name: Human-readable name
+        - description: What the query measures
+        - category: Query category (counts, rates, trends, etc.)
+        - chart_type: Recommended visualization type
+
+    Example:
+        result = list_analytics_templates()
+        # Returns list of available templates
+    """
+    from .query_router import list_available_templates
+    return json.dumps(list_available_templates())

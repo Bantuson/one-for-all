@@ -3,26 +3,231 @@ Comparative Analysis Tools
 
 CrewAI tools for comparing applicants, generating summaries, and checking
 eligibility against course requirements.
+
+Performance Optimized: Uses materialized view for rankings with in-memory caching.
 """
 
 import asyncio
 import json
+import os
+import time
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from crewai.tools import tool
 
 from .supabase_client import supabase
 
+# =============================================================================
+# FEATURE FLAGS AND CONFIGURATION
+# =============================================================================
+
+# Feature flag: Use materialized view for rankings (vs N+1 queries)
+USE_MATERIALIZED_RANKINGS = os.getenv("USE_MATERIALIZED_RANKINGS", "true").lower() == "true"
+
+# Refresh interval: How old can the view be before triggering refresh (seconds)
+RANKINGS_REFRESH_INTERVAL = int(os.getenv("RANKINGS_REFRESH_INTERVAL", "900"))  # 15 minutes
+
+# Cache TTL: How long to cache view results in memory (seconds)
+RANKINGS_CACHE_TTL = int(os.getenv("RANKINGS_CACHE_TTL", "30"))
+
+# =============================================================================
+# IN-MEMORY CACHE FOR RANKINGS
+# =============================================================================
+
+
+class RankingsCache:
+    """
+    Simple in-memory cache for rankings data with TTL expiration.
+
+    Thread-safe for single-process async usage. For multi-process deployments,
+    consider Redis or similar distributed cache.
+    """
+
+    def __init__(self, ttl_seconds: int = 30):
+        self._cache: dict[str, dict[str, Any]] = {}
+        self._ttl = ttl_seconds
+
+    def get(self, key: str) -> Optional[dict[str, Any]]:
+        """Get cached value if not expired."""
+        if key not in self._cache:
+            return None
+
+        entry = self._cache[key]
+        if time.time() - entry["timestamp"] > self._ttl:
+            del self._cache[key]
+            return None
+
+        return entry["data"]
+
+    def set(self, key: str, data: dict[str, Any]) -> None:
+        """Store value with current timestamp."""
+        self._cache[key] = {
+            "data": data,
+            "timestamp": time.time(),
+        }
+
+    def invalidate(self, key: str) -> None:
+        """Remove specific key from cache."""
+        self._cache.pop(key, None)
+
+    def clear(self) -> None:
+        """Clear all cached data."""
+        self._cache.clear()
+
+
+# Global cache instance
+_rankings_cache = RankingsCache(ttl_seconds=RANKINGS_CACHE_TTL)
+
+
+# =============================================================================
+# HELPER FUNCTIONS FOR MATERIALIZED VIEW OPERATIONS
+# =============================================================================
+
+
+async def _check_and_refresh_rankings_if_stale() -> dict[str, Any]:
+    """
+    Check if rankings view is stale and trigger refresh if needed.
+
+    Returns status information about the refresh state.
+    """
+    try:
+        # Check staleness via RPC
+        result = await supabase.rpc("get_rankings_refresh_status").execute()
+
+        if not result.data or len(result.data) == 0:
+            # No status record, view may not have been refreshed yet
+            return {"is_stale": True, "staleness_seconds": None, "refresh_triggered": False}
+
+        status = result.data[0]
+        staleness_seconds = status.get("staleness_seconds", 0)
+        is_stale = status.get("is_stale", False)
+
+        # Trigger refresh if stale beyond threshold
+        if is_stale or staleness_seconds > RANKINGS_REFRESH_INTERVAL:
+            refresh_result = await supabase.rpc("execute_rankings_refresh").execute()
+            refresh_data = refresh_result.data[0] if refresh_result.data else {}
+            return {
+                "is_stale": is_stale,
+                "staleness_seconds": staleness_seconds,
+                "refresh_triggered": True,
+                "refresh_success": refresh_data.get("success", False),
+                "refresh_duration_ms": refresh_data.get("duration_ms", 0),
+                "refresh_message": refresh_data.get("message", ""),
+            }
+
+        return {
+            "is_stale": False,
+            "staleness_seconds": staleness_seconds,
+            "refresh_triggered": False,
+        }
+
+    except Exception as e:
+        # Log but don't fail - fallback to possibly stale data
+        return {"is_stale": None, "error": str(e), "refresh_triggered": False}
+
+
+async def _get_ranking_from_view(application_id: str, course_id: str) -> Optional[dict[str, Any]]:
+    """
+    Fetch ranking data from materialized view with single query.
+
+    Returns pre-computed ranking data including percentile and recommendation.
+    """
+    cache_key = f"ranking:{application_id}:{course_id}"
+
+    # Check cache first
+    cached = _rankings_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    # Query materialized view
+    result = (
+        await supabase.table("application_rankings")
+        .select(
+            "choice_id, application_id, course_id, course_name, "
+            "aps_score, course_min_aps, rank_position, recommendation, "
+            "intake_limit"
+        )
+        .eq("application_id", application_id)
+        .eq("course_id", course_id)
+        .limit(1)
+        .execute()
+    )
+
+    if not result.data or len(result.data) == 0:
+        return None
+
+    ranking = result.data[0]
+
+    # Cache the result
+    _rankings_cache.set(cache_key, ranking)
+
+    return ranking
+
+
+async def _get_course_statistics_from_view(course_id: str) -> dict[str, Any]:
+    """
+    Get aggregate statistics for a course from the rankings view.
+
+    Single query to get min/max/avg APS and total applicant count.
+    """
+    cache_key = f"course_stats:{course_id}"
+
+    # Check cache first
+    cached = _rankings_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    # Get all rankings for this course to compute statistics
+    result = (
+        await supabase.table("application_rankings")
+        .select("aps_score, rank_position, recommendation")
+        .eq("course_id", course_id)
+        .order("rank_position")
+        .execute()
+    )
+
+    rankings = result.data or []
+
+    if not rankings:
+        stats = {
+            "sample_size": 0,
+            "avg_aps": 0,
+            "min_aps": 0,
+            "max_aps": 0,
+        }
+    else:
+        aps_scores = [
+            r["aps_score"]
+            for r in rankings
+            if r.get("aps_score") is not None
+        ]
+        stats = {
+            "sample_size": len(rankings),
+            "avg_aps": round(sum(aps_scores) / len(aps_scores), 1) if aps_scores else 0,
+            "min_aps": min(aps_scores) if aps_scores else 0,
+            "max_aps": max(aps_scores) if aps_scores else 0,
+        }
+
+    # Cache the result
+    _rankings_cache.set(cache_key, stats)
+
+    return stats
+
+
+# =============================================================================
+# COMPARE APPLICANT TOOL
+# =============================================================================
+
 
 @tool
 def compare_applicant(application_id: str, course_id: str) -> str:
     """
-    Compare an applicant to similar accepted applicants for a course.
+    Compare an applicant to similar applicants for a course.
 
-    This tool analyzes how an applicant's profile compares to previously
-    accepted applicants for the same course, helping reviewers make
-    informed decisions.
+    This tool analyzes how an applicant's profile compares to other
+    applicants for the same course, using pre-computed rankings for
+    optimal performance.
 
     Args:
         application_id: UUID of the application to compare
@@ -31,9 +236,10 @@ def compare_applicant(application_id: str, course_id: str) -> str:
     Returns:
         JSON string with comparison data including:
         - applicant_profile: The applicant's key metrics
-        - accepted_average: Average metrics of accepted applicants
+        - comparison_data: Statistics from other applicants
         - percentile_ranking: Where this applicant falls
         - recommendation: Suggested action based on comparison
+        - performance_metrics: Query timing information
 
     Example:
         result = compare_applicant(
@@ -43,112 +249,235 @@ def compare_applicant(application_id: str, course_id: str) -> str:
     """
 
     async def async_compare():
+        start_time = time.time()
         try:
             if not application_id:
                 return "COMPARE_ERROR: application_id is required"
             if not course_id:
                 return "COMPARE_ERROR: course_id is required"
 
-            # Fetch the applicant's application
-            app_result = (
-                await supabase.table("applications")
-                .select(
-                    "id, academic_info, personal_info, status, "
-                    "applicant:applicants(id, email, full_name)"
-                )
-                .eq("id", application_id)
-                .single()
-                .execute()
-            )
+            # Track which path we use for metrics
+            used_materialized_view = False
+            refresh_status = {}
 
-            if not app_result.data:
-                return f"COMPARE_ERROR: Application {application_id} not found"
+            if USE_MATERIALIZED_RANKINGS:
+                # Check and refresh if stale
+                refresh_status = await _check_and_refresh_rankings_if_stale()
 
-            application = app_result.data
-            academic_info = application.get("academic_info", {})
-            applicant_aps = academic_info.get("total_aps", 0)
-            applicant_subjects = academic_info.get("subjects", [])
+                # Try materialized view lookup first
+                ranking = await _get_ranking_from_view(application_id, course_id)
 
-            # Fetch accepted applications for this course for comparison
-            # Using application_choices to find accepted applicants
-            accepted_result = (
-                await supabase.table("application_choices")
-                .select(
-                    "id, status, "
-                    "application:applications(id, academic_info)"
-                )
-                .eq("course_id", course_id)
-                .eq("status", "accepted")
-                .limit(50)
-                .execute()
-            )
+                if ranking is not None:
+                    used_materialized_view = True
 
-            accepted_apps = accepted_result.data or []
+                    # Get course statistics from view
+                    stats = await _get_course_statistics_from_view(course_id)
 
-            # Calculate statistics from accepted applicants
-            accepted_aps_scores = []
-            for choice in accepted_apps:
-                app_data = choice.get("application", {})
-                if app_data:
-                    acad = app_data.get("academic_info", {})
-                    aps = acad.get("total_aps", 0)
-                    if aps and isinstance(aps, (int, float)):
-                        accepted_aps_scores.append(aps)
+                    # Fetch applicant name (minimal query)
+                    app_result = (
+                        await supabase.table("applications")
+                        .select("applicant:applicants(full_name), status")
+                        .eq("id", application_id)
+                        .single()
+                        .execute()
+                    )
 
-            if accepted_aps_scores:
-                avg_aps = sum(accepted_aps_scores) / len(accepted_aps_scores)
-                min_aps = min(accepted_aps_scores)
-                max_aps = max(accepted_aps_scores)
+                    applicant_name = "Unknown"
+                    app_status = "unknown"
+                    if app_result.data:
+                        applicant = app_result.data.get("applicant", {})
+                        applicant_name = applicant.get("full_name", "Unknown") if applicant else "Unknown"
+                        app_status = app_result.data.get("status", "unknown")
 
-                # Calculate percentile
-                below_count = sum(1 for s in accepted_aps_scores if s < applicant_aps)
-                percentile = round((below_count / len(accepted_aps_scores)) * 100, 1)
-            else:
-                avg_aps = 0
-                min_aps = 0
-                max_aps = 0
-                percentile = 50  # Default to middle if no data
+                    # Calculate percentile from rank position
+                    total_applicants = stats["sample_size"]
+                    rank_position = ranking.get("rank_position", 1)
 
-            # Generate recommendation
-            if percentile >= 75:
-                recommendation = "STRONG_CANDIDATE"
-                recommendation_text = "Applicant's profile is above average compared to accepted students."
-            elif percentile >= 50:
-                recommendation = "GOOD_CANDIDATE"
-                recommendation_text = "Applicant's profile is comparable to accepted students."
-            elif percentile >= 25:
-                recommendation = "BORDERLINE"
-                recommendation_text = "Applicant's profile is below average. Consider reviewing carefully."
-            else:
-                recommendation = "UNLIKELY"
-                recommendation_text = "Applicant's profile is significantly below accepted students."
+                    if total_applicants > 0:
+                        # Percentile: what percentage of applicants are below this one
+                        percentile = round(
+                            ((total_applicants - rank_position) / total_applicants) * 100, 1
+                        )
+                    else:
+                        percentile = 50.0
 
-            return json.dumps({
-                "application_id": application_id,
-                "course_id": course_id,
-                "applicant_profile": {
-                    "name": application.get("applicant", {}).get("full_name", "Unknown"),
-                    "aps_score": applicant_aps,
-                    "subject_count": len(applicant_subjects),
-                    "current_status": application.get("status", "unknown"),
-                },
-                "comparison_data": {
-                    "sample_size": len(accepted_aps_scores),
-                    "accepted_average_aps": round(avg_aps, 1),
-                    "accepted_min_aps": min_aps,
-                    "accepted_max_aps": max_aps,
-                },
-                "percentile_ranking": percentile,
-                "recommendation": {
-                    "status": recommendation,
-                    "explanation": recommendation_text,
-                },
-            })
+                    # Map recommendation from view to tool format
+                    view_recommendation = ranking.get("recommendation", "manual_review")
+                    recommendation_map = {
+                        "auto_accept_recommended": ("STRONG_CANDIDATE", "Applicant ranks highly and is recommended for acceptance."),
+                        "conditional_recommended": ("GOOD_CANDIDATE", "Applicant meets requirements and is in competitive range."),
+                        "waitlist_recommended": ("BORDERLINE", "Applicant is below typical acceptance threshold. Consider waitlist."),
+                        "rejection_flagged": ("UNLIKELY", "Applicant ranks significantly below typical accepted students."),
+                        "manual_review": ("REVIEW_NEEDED", "Insufficient data for automated recommendation. Manual review required."),
+                    }
+                    rec_status, rec_text = recommendation_map.get(
+                        view_recommendation,
+                        ("REVIEW_NEEDED", "Manual review required.")
+                    )
+
+                    elapsed_ms = round((time.time() - start_time) * 1000, 2)
+
+                    return json.dumps({
+                        "application_id": application_id,
+                        "course_id": course_id,
+                        "applicant_profile": {
+                            "name": applicant_name,
+                            "aps_score": ranking.get("aps_score", 0),
+                            "rank_position": rank_position,
+                            "current_status": app_status,
+                        },
+                        "comparison_data": {
+                            "sample_size": total_applicants,
+                            "accepted_average_aps": stats["avg_aps"],
+                            "accepted_min_aps": stats["min_aps"],
+                            "accepted_max_aps": stats["max_aps"],
+                            "course_min_aps": ranking.get("course_min_aps"),
+                            "intake_limit": ranking.get("intake_limit"),
+                        },
+                        "percentile_ranking": percentile,
+                        "recommendation": {
+                            "status": rec_status,
+                            "explanation": rec_text,
+                            "view_recommendation": view_recommendation,
+                        },
+                        "performance_metrics": {
+                            "query_time_ms": elapsed_ms,
+                            "used_materialized_view": True,
+                            "cache_hit": _rankings_cache.get(f"ranking:{application_id}:{course_id}") is not None,
+                            "refresh_triggered": refresh_status.get("refresh_triggered", False),
+                            "view_staleness_seconds": refresh_status.get("staleness_seconds"),
+                        },
+                    })
+
+            # Fallback: Original N+1 query pattern
+            # Used when USE_MATERIALIZED_RANKINGS=false or view lookup fails
+            return await _compare_applicant_legacy(application_id, course_id, start_time)
 
         except Exception as e:
             return f"COMPARE_ERROR: {str(e)}"
 
     return asyncio.run(async_compare())
+
+
+async def _compare_applicant_legacy(
+    application_id: str,
+    course_id: str,
+    start_time: float
+) -> str:
+    """
+    Legacy comparison using N+1 query pattern.
+
+    Preserved for fallback when materialized view is unavailable or disabled.
+    """
+    # Fetch the applicant's application
+    app_result = (
+        await supabase.table("applications")
+        .select(
+            "id, academic_info, personal_info, status, "
+            "applicant:applicants(id, email, full_name)"
+        )
+        .eq("id", application_id)
+        .single()
+        .execute()
+    )
+
+    if not app_result.data:
+        return f"COMPARE_ERROR: Application {application_id} not found"
+
+    application = app_result.data
+    academic_info = application.get("academic_info", {})
+    applicant_aps = academic_info.get("total_aps", 0)
+    applicant_subjects = academic_info.get("subjects", [])
+
+    # Fetch accepted applications for this course for comparison
+    # Using application_choices to find accepted applicants
+    accepted_result = (
+        await supabase.table("application_choices")
+        .select(
+            "id, status, "
+            "application:applications(id, academic_info)"
+        )
+        .eq("course_id", course_id)
+        .eq("status", "accepted")
+        .limit(50)
+        .execute()
+    )
+
+    accepted_apps = accepted_result.data or []
+
+    # Calculate statistics from accepted applicants
+    accepted_aps_scores = []
+    for choice in accepted_apps:
+        app_data = choice.get("application", {})
+        if app_data:
+            acad = app_data.get("academic_info", {})
+            aps = acad.get("total_aps", 0)
+            if aps and isinstance(aps, (int, float)):
+                accepted_aps_scores.append(aps)
+
+    if accepted_aps_scores:
+        avg_aps = sum(accepted_aps_scores) / len(accepted_aps_scores)
+        min_aps = min(accepted_aps_scores)
+        max_aps = max(accepted_aps_scores)
+
+        # Calculate percentile
+        below_count = sum(1 for s in accepted_aps_scores if s < applicant_aps)
+        percentile = round((below_count / len(accepted_aps_scores)) * 100, 1)
+    else:
+        avg_aps = 0
+        min_aps = 0
+        max_aps = 0
+        percentile = 50  # Default to middle if no data
+
+    # Generate recommendation
+    if percentile >= 75:
+        recommendation = "STRONG_CANDIDATE"
+        recommendation_text = "Applicant's profile is above average compared to accepted students."
+    elif percentile >= 50:
+        recommendation = "GOOD_CANDIDATE"
+        recommendation_text = "Applicant's profile is comparable to accepted students."
+    elif percentile >= 25:
+        recommendation = "BORDERLINE"
+        recommendation_text = "Applicant's profile is below average. Consider reviewing carefully."
+    else:
+        recommendation = "UNLIKELY"
+        recommendation_text = "Applicant's profile is significantly below accepted students."
+
+    elapsed_ms = round((time.time() - start_time) * 1000, 2)
+
+    return json.dumps({
+        "application_id": application_id,
+        "course_id": course_id,
+        "applicant_profile": {
+            "name": application.get("applicant", {}).get("full_name", "Unknown"),
+            "aps_score": applicant_aps,
+            "subject_count": len(applicant_subjects),
+            "current_status": application.get("status", "unknown"),
+        },
+        "comparison_data": {
+            "sample_size": len(accepted_aps_scores),
+            "accepted_average_aps": round(avg_aps, 1),
+            "accepted_min_aps": min_aps,
+            "accepted_max_aps": max_aps,
+        },
+        "percentile_ranking": percentile,
+        "recommendation": {
+            "status": recommendation,
+            "explanation": recommendation_text,
+        },
+        "performance_metrics": {
+            "query_time_ms": elapsed_ms,
+            "used_materialized_view": False,
+            "cache_hit": False,
+            "refresh_triggered": False,
+            "view_staleness_seconds": None,
+        },
+    })
+
+
+# =============================================================================
+# APPLICATION SUMMARY TOOL
+# =============================================================================
 
 
 @tool
@@ -314,6 +643,11 @@ def get_application_summary(application_id: str) -> str:
             return f"SUMMARY_ERROR: {str(e)}"
 
     return asyncio.run(async_get_summary())
+
+
+# =============================================================================
+# ELIGIBILITY CHECK TOOL
+# =============================================================================
 
 
 @tool
@@ -495,6 +829,11 @@ def check_eligibility(application_id: str, course_id: str) -> str:
     return asyncio.run(async_check_eligibility())
 
 
+# =============================================================================
+# MISSING DOCUMENTS TOOL
+# =============================================================================
+
+
 @tool
 def get_missing_documents(application_id: str) -> str:
     """
@@ -614,3 +953,32 @@ def get_missing_documents(application_id: str) -> str:
             return f"DOCS_ERROR: {str(e)}"
 
     return asyncio.run(async_get_missing())
+
+
+# =============================================================================
+# CACHE MANAGEMENT UTILITIES
+# =============================================================================
+
+
+def invalidate_rankings_cache() -> None:
+    """
+    Invalidate all rankings cache entries.
+
+    Call this when you know the rankings data has changed significantly
+    and you want to force fresh queries.
+    """
+    _rankings_cache.clear()
+
+
+def get_rankings_cache_stats() -> dict[str, Any]:
+    """
+    Get statistics about the rankings cache.
+
+    Returns cache configuration and current state for monitoring.
+    """
+    return {
+        "ttl_seconds": RANKINGS_CACHE_TTL,
+        "use_materialized_rankings": USE_MATERIALIZED_RANKINGS,
+        "refresh_interval_seconds": RANKINGS_REFRESH_INTERVAL,
+        "cache_entries": len(_rankings_cache._cache),
+    }

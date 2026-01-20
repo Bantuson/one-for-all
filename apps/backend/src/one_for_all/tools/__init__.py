@@ -34,12 +34,26 @@ from .document_review_tools import (
 )
 
 # =============================================================================
-# VISION TOOLS (GPT-4V Document Analysis)
+# VISION TOOLS (GPT-4V Document Analysis + Tiered Validation)
 # =============================================================================
 from .vision_tools import (
     vision_analyze_document,
     vision_extract_document_text,
     vision_compare_documents,
+    # Tiered validation tools (recommended entry point)
+    tiered_analyze_document,
+    get_vision_tier_metrics,
+    reset_vision_tier_metrics,
+    get_tiered_validation_config,
+)
+
+# =============================================================================
+# DEEPSEEK VISION TOOLS (Tier 2 - Lower Cost Alternative)
+# =============================================================================
+from .deepseek_vision import (
+    deepseek_analyze_document,
+    deepseek_extract_text,
+    deepseek_validate_id_number,
 )
 
 # =============================================================================
@@ -55,12 +69,26 @@ from .otp_verification import (
     resend_otp_check,
 )
 
-# WhatsApp Tools
+# WhatsApp Tools (Legacy - prefer unified notification tools below)
 from .whatsapp_handler import (
     send_whatsapp_message,
     send_whatsapp_otp,
     log_whatsapp_interaction,
     send_whatsapp_template,
+)
+
+# =============================================================================
+# UNIFIED NOTIFICATION TOOLS (Preferred - WhatsApp primary, SMS/Email failover)
+# Cost-optimized routing: WhatsApp $0.005, SMS $0.04, Email $0.001
+# =============================================================================
+from .unified_notification import (
+    send_notification,
+    send_otp_notification,
+    send_application_update,
+    send_reminder,
+    send_batch_notifications,
+    get_notification_stats,
+    update_notification_preferences,
 )
 
 # =============================================================================
@@ -119,6 +147,16 @@ from .policy_rag import (
     search_policies,
     get_admission_criteria,
     search_similar_courses,
+    get_search_config,
+)
+
+# =============================================================================
+# POLICY KEYWORD SEARCH TOOLS (Fast Full-Text Search)
+# =============================================================================
+from .policy_keyword_search import (
+    keyword_search_policies,
+    analyze_search_query,
+    get_search_stats,
 )
 
 # =============================================================================
@@ -137,6 +175,8 @@ from .comparative_analysis import (
 from .document_validation_intake import (
     validate_intake_documents,
     vision_analyze_document_intake,
+    get_tier1_validation_result,
+    get_validation_tier_metrics,
 )
 
 # =============================================================================
@@ -154,6 +194,15 @@ from .analytics_queries import (
     generate_sql_query,
     execute_analytics_query,
     get_application_stats,
+    get_routing_metrics,
+    list_analytics_templates,
+)
+from .query_router import (
+    route_query,
+    execute_template,
+    list_available_templates,
+    get_suggested_templates,
+    routing_metrics,
 )
 from .chart_config import (
     generate_bar_chart,
@@ -289,11 +338,22 @@ __all__ = [
     "document_approve_tool",
     "get_application_documents",
     # =========================================================================
-    # VISION TOOLS (GPT-4V Document Analysis)
+    # VISION TOOLS (GPT-4V Document Analysis + Tiered Validation)
     # =========================================================================
     "vision_analyze_document",
     "vision_extract_document_text",
     "vision_compare_documents",
+    # Tiered validation tools (recommended)
+    "tiered_analyze_document",
+    "get_vision_tier_metrics",
+    "reset_vision_tier_metrics",
+    "get_tiered_validation_config",
+    # =========================================================================
+    # DEEPSEEK VISION TOOLS (Tier 2 - Lower Cost)
+    # =========================================================================
+    "deepseek_analyze_document",
+    "deepseek_extract_text",
+    "deepseek_validate_id_number",
     # =========================================================================
     # NEW API-BASED TOOLS (Preferred)
     # =========================================================================
@@ -332,11 +392,21 @@ __all__ = [
     "verify_otp",
     "check_otp_status",
     "resend_otp_check",
-    # WhatsApp
+    # WhatsApp (Legacy)
     "send_whatsapp_message",
     "send_whatsapp_otp",
     "log_whatsapp_interaction",
     "send_whatsapp_template",
+    # =========================================================================
+    # UNIFIED NOTIFICATION TOOLS (Preferred)
+    # =========================================================================
+    "send_notification",
+    "send_otp_notification",
+    "send_application_update",
+    "send_reminder",
+    "send_batch_notifications",
+    "get_notification_stats",
+    "update_notification_preferences",
     # =========================================================================
     # STUDENT NUMBER TOOLS
     # =========================================================================
@@ -378,6 +448,13 @@ __all__ = [
     "search_policies",
     "get_admission_criteria",
     "search_similar_courses",
+    "get_search_config",
+    # =========================================================================
+    # POLICY KEYWORD SEARCH TOOLS (Fast Full-Text Search)
+    # =========================================================================
+    "keyword_search_policies",
+    "analyze_search_query",
+    "get_search_stats",
     # =========================================================================
     # COMPARATIVE ANALYSIS TOOLS (Reviewer Assistant)
     # =========================================================================
@@ -390,6 +467,8 @@ __all__ = [
     # =========================================================================
     "validate_intake_documents",
     "vision_analyze_document_intake",
+    "get_tier1_validation_result",
+    "get_validation_tier_metrics",
     # =========================================================================
     # RANKING FLAG TOOLS (Reviewer Assistant)
     # =========================================================================
@@ -401,6 +480,15 @@ __all__ = [
     "generate_sql_query",
     "execute_analytics_query",
     "get_application_stats",
+    "get_routing_metrics",
+    "list_analytics_templates",
+    # Template Routing (Phase 1 Optimization)
+    "route_query",
+    "execute_template",
+    "list_available_templates",
+    "get_suggested_templates",
+    "routing_metrics",
+    # Chart Generation
     "generate_bar_chart",
     "generate_pie_chart",
     "generate_line_chart",
