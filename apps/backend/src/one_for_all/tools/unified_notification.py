@@ -29,6 +29,7 @@ from .notification_router import (
     is_valid_email,
 )
 from .otp_store import generate_otp, store_otp
+from ..utils.db_audit import audit_service_role_access
 
 # Import rate limiter for OTP protection
 from one_for_all.utils.rate_limit import tool_limiter, ToolRateLimits, check_tool_rate_limit
@@ -38,6 +39,7 @@ from one_for_all.utils.rate_limit import tool_limiter, ToolRateLimits, check_too
 # MAIN NOTIFICATION TOOL
 # =============================================================================
 
+@audit_service_role_access(table="notification_logs", operation="insert")
 @tool
 def send_notification(
     recipient: str,
@@ -121,6 +123,7 @@ def send_notification(
 # OTP NOTIFICATION TOOL
 # =============================================================================
 
+@audit_service_role_access(table="notification_logs", operation="insert")
 @tool
 def send_otp_notification(phone_number: str, email_fallback: str = "") -> str:
     """
@@ -200,6 +203,7 @@ def send_otp_notification(phone_number: str, email_fallback: str = "") -> str:
 # APPLICATION UPDATE NOTIFICATION TOOL
 # =============================================================================
 
+@audit_service_role_access(table="notification_logs", operation="insert")
 @tool
 def send_application_update(
     phone_number: str,
@@ -272,6 +276,7 @@ def send_application_update(
 # REMINDER NOTIFICATION TOOL
 # =============================================================================
 
+@audit_service_role_access(table="notification_logs", operation="insert")
 @tool
 def send_reminder(
     phone_number: str,
@@ -335,6 +340,7 @@ def send_reminder(
 # BATCH NOTIFICATION TOOL
 # =============================================================================
 
+@audit_service_role_access(table="notification_logs", operation="insert")
 @tool
 def send_batch_notifications(
     recipients_json: str,
@@ -415,6 +421,7 @@ def send_batch_notifications(
 # NOTIFICATION STATUS CHECK TOOL
 # =============================================================================
 
+@audit_service_role_access(table="notification_logs", operation="select")
 @tool
 def get_notification_stats(recipient: str = "", days: int = 7) -> str:
     """
@@ -487,6 +494,7 @@ def get_notification_stats(recipient: str = "", days: int = 7) -> str:
 # UPDATE USER NOTIFICATION PREFERENCES TOOL
 # =============================================================================
 
+@audit_service_role_access(table="notification_preferences", operation="upsert")
 @tool
 def update_notification_preferences(
     identifier: str,

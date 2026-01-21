@@ -10,8 +10,10 @@ from datetime import datetime
 from typing import Literal
 from crewai.tools import tool
 from .supabase_client import supabase
+from ..utils.db_audit import audit_service_role_access
 
 
+@audit_service_role_access(table="application_documents", operation="update")
 @tool
 def document_flag_tool(document_id: str, flag_reason: str, flagged_by: str) -> str:
     """
@@ -104,6 +106,7 @@ def document_flag_tool(document_id: str, flag_reason: str, flagged_by: str) -> s
     return asyncio.run(async_flag())
 
 
+@audit_service_role_access(table="application_documents", operation="update")
 @tool
 def document_approve_tool(document_id: str, reviewed_by: str) -> str:
     """
@@ -187,6 +190,7 @@ def document_approve_tool(document_id: str, reviewed_by: str) -> str:
     return asyncio.run(async_approve())
 
 
+@audit_service_role_access(table="application_documents", operation="select")
 @tool
 def get_application_documents(application_id: str) -> str:
     """

@@ -22,8 +22,10 @@ for _env_path in _env_paths:
         break
 
 from .supabase_client import get_supabase_client
+from ..utils.db_audit import audit_service_role_access
 
 
+@audit_service_role_access(table="ranking_flags", operation="select")
 @tool
 def apply_ranking_flags(course_id: str, intake_limit: int = None, thresholds: dict = None) -> str:
     """
@@ -163,6 +165,7 @@ def apply_ranking_flags(course_id: str, intake_limit: int = None, thresholds: di
     return asyncio.run(async_apply())
 
 
+@audit_service_role_access(table="ranking_flags", operation="select")
 @tool
 def get_ranking_summary(course_id: str) -> str:
     """

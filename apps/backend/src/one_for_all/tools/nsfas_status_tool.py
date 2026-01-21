@@ -2,9 +2,11 @@ import os
 import asyncio
 import aiohttp
 from crewai.tools import tool
+from ..utils.db_audit import audit_service_role_access
 
 BACKEND_URL = os.getenv("BACKEND_URL")
 
+@audit_service_role_access(table="nsfas_applications", operation="select")
 @tool
 def nsfas_status_tool(nsfas_application_id: str) -> str:
     """

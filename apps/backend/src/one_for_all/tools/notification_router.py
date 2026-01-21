@@ -23,6 +23,7 @@ from dataclasses import dataclass
 
 import aiohttp
 from dotenv import load_dotenv
+from ..utils.db_audit import audit_service_role_access
 
 # Load env from monorepo root
 _env_paths = [
@@ -623,6 +624,7 @@ async def send_via_email(email: str, subject: str, message: str) -> Notification
 # NOTIFICATION LOGGING
 # =============================================================================
 
+@audit_service_role_access(table="notification_logs", operation="insert")
 async def log_notification(
     recipient: str,
     notification_type: str,

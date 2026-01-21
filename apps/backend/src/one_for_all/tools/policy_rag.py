@@ -29,6 +29,7 @@ from .policy_keyword_search import (
     deduplicate_results,
     STOPWORDS,
 )
+from ..utils.db_audit import audit_service_role_access
 
 
 # =============================================================================
@@ -249,6 +250,7 @@ async def _hybrid_search(
 # MAIN SEARCH TOOL
 # =============================================================================
 
+@audit_service_role_access(table="rag_embeddings", operation="select")
 @tool
 def search_policies(
     query: str,
@@ -392,6 +394,7 @@ def search_policies(
 # COURSE CRITERIA TOOL
 # =============================================================================
 
+@audit_service_role_access(table="courses", operation="select")
 @tool
 def get_admission_criteria(course_id: str) -> str:
     """
@@ -471,6 +474,7 @@ def get_admission_criteria(course_id: str) -> str:
 # SIMILAR COURSES TOOL
 # =============================================================================
 
+@audit_service_role_access(table="courses", operation="select")
 @tool
 def search_similar_courses(
     course_id: str,
@@ -598,6 +602,7 @@ def search_similar_courses(
 # SEARCH CONFIGURATION TOOL
 # =============================================================================
 
+@audit_service_role_access(table="rag_embeddings", operation="select")
 @tool
 def get_search_config() -> str:
     """

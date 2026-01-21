@@ -1,7 +1,9 @@
 import asyncio
 from crewai.tools import tool
 from .supabase_client import supabase
+from ..utils.db_audit import audit_service_role_access
 
+@audit_service_role_access(table="rag_embeddings", operation="rpc")
 @tool
 def supabase_rag_query(query_embedding: list, k: int = 5) -> str:
     """

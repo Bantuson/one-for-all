@@ -51,3 +51,13 @@ class SessionValidation(BaseModel):
     valid: bool
     session: Optional[SessionResponse] = None
     message: str = Field(default="", description="Validation message")
+
+
+class SessionRotateResponse(BaseModel):
+    """Schema for session token rotation response (H4 security)."""
+
+    new_token: str = Field(..., description="The newly generated session token")
+    old_token: str = Field(..., description="The previous token (now stored as refresh_token)")
+    token_version: int = Field(..., description="Incremented token version number")
+    expires_at: datetime = Field(..., description="Session expiry (unchanged by rotation)")
+    message: str = Field(default="", description="Rotation status message")

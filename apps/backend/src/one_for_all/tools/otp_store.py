@@ -16,6 +16,7 @@ References:
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 from .supabase_client import supabase
+from ..utils.db_audit import audit_service_role_access
 
 # Import secure OTP functions from utils
 from one_for_all.utils.otp_crypto import (
@@ -38,6 +39,7 @@ def generate_otp() -> str:
     return generate_secure_otp(length=6)
 
 
+@audit_service_role_access(table="otp_codes", operation="insert")
 def store_otp(identifier: str, channel: str, code: str) -> bool:
     """
     Store OTP in database with 10-minute expiry.

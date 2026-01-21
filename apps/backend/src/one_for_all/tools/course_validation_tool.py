@@ -15,8 +15,10 @@ from typing import Optional
 from crewai.tools import tool
 
 from .supabase_client import supabase
+from ..utils.db_audit import audit_service_role_access
 
 
+@audit_service_role_access(table="courses", operation="select")
 @tool
 def validate_course_for_submission(course_id: str) -> str:
     """
@@ -69,6 +71,7 @@ def validate_course_for_submission(course_id: str) -> str:
     return asyncio.run(async_logic())
 
 
+@audit_service_role_access(table="courses", operation="select")
 @tool
 def get_course_application_dates(course_id: str) -> str:
     """
@@ -117,6 +120,7 @@ def get_course_application_dates(course_id: str) -> str:
     return asyncio.run(async_logic())
 
 
+@audit_service_role_access(table="courses", operation="select")
 @tool
 def validate_courses_batch(course_ids: str) -> str:
     """
@@ -211,6 +215,7 @@ def validate_courses_batch(course_ids: str) -> str:
     return asyncio.run(async_logic())
 
 
+@audit_service_role_access(table="courses", operation="select")
 @tool
 def list_open_courses(institution_id: Optional[str] = None) -> str:
     """

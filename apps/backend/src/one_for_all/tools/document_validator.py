@@ -3,10 +3,269 @@ Document Validator Tool
 
 CrewAI tool for validating document uploads before processing.
 Checks file size, format, and basic integrity using magic bytes.
+Enhanced with deep MIME type detection via python-magic and SHA-256 file hashing.
 """
 
-from typing import Dict, Any
+import hashlib
+from typing import Dict, Any, Optional
 from crewai.tools import tool
+
+# python-magic for deep MIME type detection
+try:
+    import magic
+    MAGIC_AVAILABLE = True
+except ImportError:
+    MAGIC_AVAILABLE = False
+
+
+def compute_file_hash(file_content: bytes) -> str:
+    """
+    Compute SHA-256 hash of file content.
+
+    Args:
+        file_content: Raw file bytes
+
+    Returns:
+        Hexadecimal string of SHA-256 hash
+    """
+    return hashlib.sha256(file_content).hexdigest()
+
+
+def detect_mime_type(file_content: bytes) -> Optional[str]:
+    """
+    Detect MIME type using python-magic deep inspection.
+
+    Args:
+        file_content: Raw file bytes
+
+    Returns:
+        Detected MIME type string, or None if detection fails
+    """
+    if not MAGIC_AVAILABLE:
+        return None
+
+    try:
+        detected_mime = magic.from_buffer(file_content, mime=True)
+        return detected_mime
+    except Exception:
+        return None
+
+
+# Mapping of allowed MIME types to extensions
+ALLOWED_MIME_TYPES = {
+    "application/pdf": ["pdf"],
+    "image/jpeg": ["jpg", "jpeg"],
+    "image/png": ["png"],
+}
+
+# Reverse mapping: extension to expected MIME types
+EXTENSION_TO_MIME = {
+    "pdf": ["application/pdf"],
+    "jpg": ["image/jpeg"],
+    "jpeg": ["image/jpeg"],
+    "png": ["image/png"],
+}
+
+
+@tool
+def validate_document_enhanced(
+    file_content: bytes,
+    file_name: str,
+    claimed_mime_type: Optional[str] = None,
+) -> str:
+    """
+    Enhanced document validation with deep MIME detection and file hashing.
+
+    Performs comprehensive security validation:
+    1. Checks file size is within 10MB limit
+    2. Validates file extension is allowed (pdf, jpg, jpeg, png)
+    3. Uses python-magic for deep MIME type detection (not trusting extension)
+    4. Computes SHA-256 hash for integrity verification
+    5. Compares detected MIME against claimed MIME and rejects if mismatch
+    6. Verifies file integrity using magic bytes (file signatures)
+
+    Args:
+        file_content: Raw file bytes to validate
+        file_name: Original file name with extension
+        claimed_mime_type: Optional MIME type claimed by uploader (for validation)
+
+    Returns:
+        JSON string with validation result:
+        {
+            "status": "VALID" | "INVALID",
+            "message": "Validation message",
+            "file_hash": "SHA-256 hash (if valid)",
+            "detected_mime_type": "Detected MIME type",
+            "claimed_mime_type": "Claimed MIME type (if provided)"
+        }
+
+    Example:
+        result = validate_document_enhanced(pdf_bytes, "cert.pdf", "application/pdf")
+        # Returns JSON with status, hash, and detected MIME type
+    """
+
+    result = {
+        "status": "INVALID",
+        "message": "",
+        "file_hash": None,
+        "detected_mime_type": None,
+        "claimed_mime_type": claimed_mime_type,
+    }
+
+    # ========================================================================
+    # 1. Check file content exists
+    # ========================================================================
+    if not file_content:
+        result["message"] = "File content is empty"
+        return str(result)
+
+    # ========================================================================
+    # 2. Check file size (max 10MB)
+    # ========================================================================
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB in bytes
+
+    file_size = len(file_content)
+    if file_size > MAX_FILE_SIZE:
+        size_mb = file_size / (1024 * 1024)
+        result["message"] = f"File exceeds 10MB limit (size: {size_mb:.2f}MB)"
+        return str(result)
+
+    if file_size == 0:
+        result["message"] = "File is empty (0 bytes)"
+        return str(result)
+
+    # ========================================================================
+    # 3. Validate file name and extension
+    # ========================================================================
+    ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png"]
+
+    if not file_name or "." not in file_name:
+        result["message"] = "File name must have an extension"
+        return str(result)
+
+    ext = file_name.split(".")[-1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        result["message"] = (
+            f"File type '.{ext}' not allowed. "
+            f"Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+        return str(result)
+
+    # Check for malicious filename patterns
+    if "\x00" in file_name:
+        result["message"] = "File name contains invalid characters (null bytes)"
+        return str(result)
+
+    if len(file_name) > 255:
+        result["message"] = "File name is too long (max 255 characters)"
+        return str(result)
+
+    if ".." in file_name or "/" in file_name or "\\" in file_name:
+        result["message"] = "File name contains invalid path characters"
+        return str(result)
+
+    # ========================================================================
+    # 4. Deep MIME type detection via python-magic
+    # ========================================================================
+    detected_mime = detect_mime_type(file_content)
+    result["detected_mime_type"] = detected_mime
+
+    if detected_mime:
+        # Verify detected MIME is in allowed list
+        if detected_mime not in ALLOWED_MIME_TYPES:
+            result["message"] = (
+                f"Detected MIME type '{detected_mime}' is not allowed. "
+                f"Allowed types: {', '.join(ALLOWED_MIME_TYPES.keys())}"
+            )
+            return str(result)
+
+        # Verify detected MIME matches claimed extension
+        expected_mimes = EXTENSION_TO_MIME.get(ext, [])
+        if detected_mime not in expected_mimes:
+            result["message"] = (
+                f"MIME type mismatch: file extension is '.{ext}' but content is '{detected_mime}'. "
+                "This may indicate file tampering."
+            )
+            return str(result)
+
+        # Verify detected MIME matches claimed MIME (if provided)
+        if claimed_mime_type and detected_mime != claimed_mime_type:
+            result["message"] = (
+                f"MIME type mismatch: claimed '{claimed_mime_type}' but detected '{detected_mime}'. "
+                "This may indicate file tampering."
+            )
+            return str(result)
+
+    # ========================================================================
+    # 5. Fallback: Validate using magic bytes (file signatures)
+    # ========================================================================
+    # This provides a backup validation when python-magic is not available
+
+    # PDF magic bytes: %PDF (hex: 25 50 44 46)
+    if ext == "pdf":
+        if not file_content.startswith(b"%PDF"):
+            result["message"] = (
+                "File is not a valid PDF. "
+                "File extension is .pdf but content does not match PDF format"
+            )
+            return str(result)
+
+        # Additional PDF validation: check for EOF marker
+        if b"%%EOF" not in file_content[-1024:]:  # Check last 1KB
+            result["message"] = (
+                "PDF file appears to be corrupted or incomplete "
+                "(missing EOF marker)"
+            )
+            return str(result)
+
+    # JPEG magic bytes: FF D8 FF (start) and FF D9 (end)
+    elif ext in ["jpg", "jpeg"]:
+        if not file_content.startswith(b"\xff\xd8\xff"):
+            result["message"] = (
+                "File is not a valid JPEG. "
+                "File extension is .jpg/.jpeg but content does not match JPEG format"
+            )
+            return str(result)
+
+        # Check for JPEG end marker
+        if not file_content.endswith(b"\xff\xd9"):
+            result["message"] = (
+                "JPEG file appears to be corrupted or incomplete "
+                "(missing end marker)"
+            )
+            return str(result)
+
+    # PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A
+    elif ext == "png":
+        png_signature = b"\x89PNG\r\n\x1a\n"
+        if not file_content.startswith(png_signature):
+            result["message"] = (
+                "File is not a valid PNG. "
+                "File extension is .png but content does not match PNG format"
+            )
+            return str(result)
+
+        # Check for PNG end chunk (IEND)
+        if b"IEND" not in file_content[-12:]:  # IEND should be in last 12 bytes
+            result["message"] = (
+                "PNG file appears to be corrupted or incomplete "
+                "(missing IEND chunk)"
+            )
+            return str(result)
+
+    # ========================================================================
+    # 6. Compute SHA-256 hash for integrity verification
+    # ========================================================================
+    file_hash = compute_file_hash(file_content)
+    result["file_hash"] = file_hash
+
+    # ========================================================================
+    # All checks passed
+    # ========================================================================
+    result["status"] = "VALID"
+    result["message"] = "Document validation passed"
+
+    return str(result)
 
 
 @tool

@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 EXEMPT_ROUTES: Set[str] = {
     "/health",
     "/healthz",
+    "/health/db",
     "/ready",
     "/docs",
     "/redoc",
@@ -62,6 +63,9 @@ SERVICE_ROUTES: Set[str] = {
     "/api/v1/applications",
     "/api/v1/nsfas",
     "/api/v1/rag",
+    # Legacy routes also use API key authentication
+    "/api/applications",
+    "/api/nsfas",
 }
 
 

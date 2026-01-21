@@ -1,0 +1,74 @@
+interactions:
+- request:
+    body: '{}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br, zstd
+      Accept-Profile:
+      - public
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '2'
+      Content-Profile:
+      - public
+      Content-Type:
+      - application/json
+      Cookie:
+      - __cf_bm=.2lkelx4mZ96WpWckObQyVsJ1eL0qtwWYpA.a_7Nyrc-1768978843-1.0.1.1-DSSQOXkEEYIUS13mxNJJYUHZ8jFOnWub7_icozsLCQsToNJOEK3NOcE8X9qJ.pPPchu1hH10b_o4V_.5iG5LpZ4SgR76rt5b6kCg64e9vVo
+      Host:
+      - tvprtcwtozzzwlxdzdeo.supabase.co
+      Prefer:
+      - return=representation
+      User-Agent:
+      - python-httpx/0.28.1
+      X-Client-Info:
+      - supabase-py/2.16.0
+      apiKey:
+      - ***REMOVED***
+    method: DELETE
+    uri: https://tvprtcwtozzzwlxdzdeo.supabase.co/rest/v1/applicant_sessions?applicant_id=like.TEST-%25
+  response:
+    body:
+      string: '{"code":"42883","details":null,"hint":"No operator matches the given
+        name and argument types. You might need to add explicit type casts.","message":"operator
+        does not exist: uuid ~~ unknown"}'
+    headers:
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      cf-ray:
+      - 9c14f27f7bab73a5-JNB
+      content-length:
+      - '191'
+      content-type:
+      - application/json; charset=utf-8
+      date:
+      - Wed, 21 Jan 2026 07:02:39 GMT
+      proxy-status:
+      - PostgREST; error=42883
+      sb-gateway-version:
+      - '1'
+      sb-project-ref:
+      - tvprtcwtozzzwlxdzdeo
+      sb-request-id:
+      - 019bdf5c-cbb8-7916-9ee8-916d233d388d
+      server:
+      - cloudflare
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      vary:
+      - Accept-Encoding
+      x-content-type-options:
+      - nosniff
+      x-envoy-attempt-count:
+      - '1'
+      x-envoy-upstream-service-time:
+      - '4'
+    status:
+      code: 404
+      message: null
+version: 1

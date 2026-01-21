@@ -23,6 +23,7 @@ dependencies = [
     "aiohttp>=3.9.0",
     # Security dependencies
     "bcrypt>=4.0.0",  # OTP hashing with constant-time verification
+    "python-magic>=0.4.27",  # Deep MIME type detection for document security
 ]
 
 [project.optional-dependencies]

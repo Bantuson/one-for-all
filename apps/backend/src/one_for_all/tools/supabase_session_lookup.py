@@ -2,7 +2,9 @@ import asyncio
 from datetime import datetime
 from crewai.tools import tool
 from .supabase_client import supabase
+from ..utils.db_audit import audit_service_role_access
 
+@audit_service_role_access(table="user_sessions", operation="select")
 @tool
 def supabase_session_lookup(user_id: str) -> str:
     """

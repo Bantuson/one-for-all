@@ -1,7 +1,9 @@
 import asyncio
 from crewai.tools import tool
 from .supabase_client import supabase
+from ..utils.db_audit import audit_service_role_access
 
+@audit_service_role_access(table="nsfas_documents", operation="insert")
 @tool
 def supabase_nsfas_documents_store(document_json: dict) -> str:
     """

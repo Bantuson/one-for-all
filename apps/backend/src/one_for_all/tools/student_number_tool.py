@@ -20,8 +20,10 @@ from crewai.tools import tool
 
 from .supabase_client import supabase
 from one_for_all.config.test_config import TEST_MODE
+from ..utils.db_audit import audit_service_role_access
 
 
+@audit_service_role_access(table="student_numbers", operation="select")
 @tool
 def generate_student_number(institution_id: str, applicant_id: str) -> str:
     """
@@ -108,6 +110,7 @@ def generate_student_number(institution_id: str, applicant_id: str) -> str:
     return asyncio.run(async_logic())
 
 
+@audit_service_role_access(table="student_numbers", operation="select")
 @tool
 def get_platform_student_number(applicant_id: str) -> str:
     """
@@ -150,6 +153,7 @@ def get_platform_student_number(applicant_id: str) -> str:
     return asyncio.run(async_logic())
 
 
+@audit_service_role_access(table="student_numbers", operation="select")
 @tool
 def get_institution_student_number(applicant_id: str, institution_code: str) -> str:
     """
@@ -238,6 +242,7 @@ def get_institution_student_number(applicant_id: str, institution_code: str) -> 
     return asyncio.run(async_logic())
 
 
+@audit_service_role_access(table="student_numbers", operation="select")
 @tool
 def get_applicant_student_numbers(applicant_id: str) -> str:
     """
@@ -315,6 +320,7 @@ def get_applicant_student_numbers(applicant_id: str) -> str:
     return asyncio.run(async_logic())
 
 
+@audit_service_role_access(table="student_numbers", operation="select")
 @tool
 def validate_student_number(institution_code: str, student_number: str) -> str:
     """
@@ -363,6 +369,7 @@ def validate_student_number(institution_code: str, student_number: str) -> str:
     return asyncio.run(async_logic())
 
 
+@audit_service_role_access(table="student_numbers", operation="select")
 @tool
 def assign_student_number_manually(
     applicant_id: str,

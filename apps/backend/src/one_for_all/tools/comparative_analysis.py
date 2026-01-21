@@ -17,6 +17,7 @@ from typing import Any, Optional
 from crewai.tools import tool
 
 from .supabase_client import supabase
+from ..utils.db_audit import audit_service_role_access
 
 # =============================================================================
 # FEATURE FLAGS AND CONFIGURATION
@@ -220,6 +221,7 @@ async def _get_course_statistics_from_view(course_id: str) -> dict[str, Any]:
 # =============================================================================
 
 
+@audit_service_role_access(table="applications", operation="select")
 @tool
 def compare_applicant(application_id: str, course_id: str) -> str:
     """
@@ -480,6 +482,7 @@ async def _compare_applicant_legacy(
 # =============================================================================
 
 
+@audit_service_role_access(table="applications", operation="select")
 @tool
 def get_application_summary(application_id: str) -> str:
     """
@@ -650,6 +653,7 @@ def get_application_summary(application_id: str) -> str:
 # =============================================================================
 
 
+@audit_service_role_access(table="applications", operation="select")
 @tool
 def check_eligibility(application_id: str, course_id: str) -> str:
     """
@@ -834,6 +838,7 @@ def check_eligibility(application_id: str, course_id: str) -> str:
 # =============================================================================
 
 
+@audit_service_role_access(table="application_documents", operation="select")
 @tool
 def get_missing_documents(application_id: str) -> str:
     """

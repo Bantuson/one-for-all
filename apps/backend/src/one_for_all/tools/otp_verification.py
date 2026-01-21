@@ -14,6 +14,7 @@ SECURITY:
 from datetime import datetime
 from crewai.tools import tool
 from .supabase_client import supabase
+from ..utils.db_audit import audit_service_role_access
 
 # Import rate limiter for brute force protection
 from one_for_all.utils.rate_limit import tool_limiter, ToolRateLimits, check_tool_rate_limit
@@ -22,6 +23,7 @@ from one_for_all.utils.rate_limit import tool_limiter, ToolRateLimits, check_too
 from one_for_all.utils.otp_crypto import verify_otp_hash
 
 
+@audit_service_role_access(table="otp_codes", operation="select")
 @tool
 def verify_otp(identifier: str, code: str) -> str:
     """
@@ -107,6 +109,7 @@ def verify_otp(identifier: str, code: str) -> str:
         return f"OTP_INVALID: Verification error - {str(e)}"
 
 
+@audit_service_role_access(table="otp_codes", operation="select")
 @tool
 def check_otp_status(identifier: str) -> str:
     """
@@ -144,6 +147,7 @@ def check_otp_status(identifier: str) -> str:
         return f"ERROR: Status check failed - {str(e)}"
 
 
+@audit_service_role_access(table="otp_codes", operation="select")
 @tool
 def resend_otp_check(identifier: str) -> str:
     """

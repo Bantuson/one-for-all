@@ -57,6 +57,18 @@ from .deepseek_vision import (
 )
 
 # =============================================================================
+# RAG VERIFICATION TOOLS (Security - Content Integrity & Source Validation)
+# =============================================================================
+from .rag_verification_tools import (
+    hash_and_store_rag_content,
+    verify_rag_source,
+    get_pending_rag_verification,
+    approve_rag_embedding,
+    reject_rag_embedding,
+    audit_rag_integrity,
+)
+
+# =============================================================================
 # OTP & MESSAGING TOOLS
 # =============================================================================
 from .sendgrid_otp_sender import sendgrid_otp_sender
@@ -354,6 +366,15 @@ __all__ = [
     "deepseek_analyze_document",
     "deepseek_extract_text",
     "deepseek_validate_id_number",
+    # =========================================================================
+    # RAG VERIFICATION TOOLS (Security - Content Integrity & Source Validation)
+    # =========================================================================
+    "hash_and_store_rag_content",
+    "verify_rag_source",
+    "get_pending_rag_verification",
+    "approve_rag_embedding",
+    "reject_rag_embedding",
+    "audit_rag_integrity",
     # =========================================================================
     # NEW API-BASED TOOLS (Preferred)
     # =========================================================================
