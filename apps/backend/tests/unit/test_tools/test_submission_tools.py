@@ -613,24 +613,38 @@ class TestGenerateStudentNumber:
 
         Expected behavior:
         - Calls Supabase RPC function
-        - Returns generated student number
-        - Prefixes with TEST- in test mode
+        - Returns success message (not the actual number - it's only revealed after acceptance)
+        - In test mode, additional calls are made to get institution code and update with TEST- prefix
         """
-        # Mock RPC response
-        mock_result = MagicMock()
-        mock_result.data = "u26012345"
-        mock_supabase.rpc.return_value.execute.return_value = mock_result
+        # Mock RPC response for generate_institution_student_number
+        mock_rpc_result = MagicMock()
+        mock_rpc_result.data = "u26012345"
+        mock_supabase.rpc.return_value.execute.return_value = mock_rpc_result
+
+        # Mock institution format lookup (for TEST- prefix in test mode)
+        mock_inst_result = MagicMock()
+        mock_inst_result.data = {"institution_code": "UP"}
+        mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.single.return_value.execute.return_value = mock_inst_result
+
+        # Mock current institution_student_numbers lookup (for fallback update)
+        mock_current = MagicMock()
+        mock_current.data = {"institution_student_numbers": {}}
+        mock_supabase.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_current
 
         # Mock update for TEST- prefix
-        mock_supabase.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock()
+        mock_update = MagicMock()
+        mock_update.data = [{"id": "test-applicant-uuid"}]
+        mock_supabase.table.return_value.update.return_value.eq.return_value.execute.return_value = mock_update
 
         result = generate_student_number.func(
             institution_id="test-inst-uuid",
             applicant_id="test-applicant-uuid"
         )
 
-        assert "TEST-" in result or "generated" in result.lower()
-        mock_supabase.rpc.assert_called_once()
+        # The function returns a success message, not the actual number
+        assert "SUCCESS" in result or "generated" in result.lower()
+        # Verify RPC was called (may be called more than once due to TEST_MODE logic)
+        assert mock_supabase.rpc.called
 
     @patch('one_for_all.tools.student_number_tool.supabase')
     @patch('one_for_all.tools.student_number_tool.TEST_MODE', False)
@@ -700,25 +714,57 @@ class TestGetApplicantStudentNumbers:
         Test successful retrieval of student numbers.
 
         Expected behavior:
-        - Returns all student numbers for applicant
-        - Includes primary student number
+        - Returns platform_student_number and visible institution_student_numbers
+        - Only institution numbers for accepted applications are shown
         """
-        mock_result = MagicMock()
-        mock_result.data = {
+        # Mock applicant_accounts query
+        mock_applicant_result = MagicMock()
+        mock_applicant_result.data = {
             "id": "test-applicant-uuid",
-            "student_numbers": {
+            "platform_student_number": "OFA-2k26-0001",
+            "institution_student_numbers": {
                 "UP": "u26012345",
                 "UCT": "SMTH26001"
-            },
-            "primary_student_number": "u26012345",
-            "student_number_generated_at": "2026-01-09T10:00:00Z"
+            }
         }
-        mock_supabase.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_result
+
+        # Mock applications query (to find app IDs)
+        mock_apps_result = MagicMock()
+        mock_apps_result.data = [{"id": "app-uuid-1"}]
+
+        # Mock application_choices query (to find accepted choices)
+        mock_choices_result = MagicMock()
+        mock_choices_result.data = [{"institution_id": "inst-up-uuid"}]
+
+        # Mock institution lookup (to get code)
+        mock_inst_result = MagicMock()
+        mock_inst_result.data = {"code": "UP"}
+
+        # Setup mock chain - the function makes multiple table calls
+        # First call: applicant_accounts with single()
+        # Second call: applications (no single)
+        # Third+ calls: application_choices and institutions
+
+        def table_side_effect(table_name):
+            mock_table = MagicMock()
+            if table_name == "applicant_accounts":
+                mock_table.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_applicant_result
+            elif table_name == "applications":
+                mock_table.select.return_value.eq.return_value.execute.return_value = mock_apps_result
+            elif table_name == "application_choices":
+                mock_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = mock_choices_result
+            elif table_name == "institutions":
+                mock_table.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_inst_result
+            return mock_table
+
+        mock_supabase.table.side_effect = table_side_effect
 
         result = get_applicant_student_numbers.func("test-applicant-uuid")
 
-        assert "u26012345" in result
-        assert "UP" in result or "student_numbers" in result
+        # Result should contain the platform student number
+        assert "OFA-2k26-0001" in result or "platform_student_number" in result
+        # Result should contain visible institution numbers (UP is accepted)
+        assert "UP" in result or "u26012345" in result
 
     @patch('one_for_all.tools.student_number_tool.supabase')
     def test_get_student_numbers_not_found(self, mock_supabase):
@@ -726,17 +772,30 @@ class TestGetApplicantStudentNumbers:
         Test handling when applicant has no student numbers.
 
         Expected behavior:
-        - Returns appropriate message
+        - Returns NO_STUDENT_NUMBERS message
         - Does not crash
         """
-        mock_result = MagicMock()
-        mock_result.data = {
+        # Mock applicant_accounts query with no student numbers
+        mock_applicant_result = MagicMock()
+        mock_applicant_result.data = {
             "id": "test-applicant-uuid",
-            "student_numbers": {},
-            "primary_student_number": None,
-            "student_number_generated_at": None
+            "platform_student_number": None,
+            "institution_student_numbers": {}
         }
-        mock_supabase.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_result
+
+        # Mock applications query - no applications
+        mock_apps_result = MagicMock()
+        mock_apps_result.data = []
+
+        def table_side_effect(table_name):
+            mock_table = MagicMock()
+            if table_name == "applicant_accounts":
+                mock_table.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_applicant_result
+            elif table_name == "applications":
+                mock_table.select.return_value.eq.return_value.execute.return_value = mock_apps_result
+            return mock_table
+
+        mock_supabase.table.side_effect = table_side_effect
 
         result = get_applicant_student_numbers.func("test-applicant-uuid")
 
@@ -834,13 +893,13 @@ class TestAssignStudentNumberManually:
 
         Expected behavior:
         - Updates applicant record
-        - Adds to student_numbers mapping
+        - Adds to institution_student_numbers mapping
         - Returns confirmation
         """
-        # Mock get current student numbers
+        # Mock get current institution_student_numbers
         mock_current = MagicMock()
         mock_current.data = {
-            "student_numbers": {}
+            "institution_student_numbers": {}
         }
 
         # Mock update
@@ -853,25 +912,24 @@ class TestAssignStudentNumberManually:
         result = assign_student_number_manually.func(
             applicant_id="test-applicant-uuid",
             institution_code="UP",
-            student_number="u26012345",
-            set_as_primary=False
+            student_number="u26012345"
         )
 
         assert "u26012345" in result
         assert "assigned" in result.lower()
 
     @patch('one_for_all.tools.student_number_tool.supabase')
-    def test_assign_student_number_as_primary(self, mock_supabase):
+    def test_assign_student_number_with_existing(self, mock_supabase):
         """
-        Test assignment as primary student number.
+        Test assignment when applicant already has another institution's number.
 
         Expected behavior:
-        - Sets primary_student_number field
-        - Indicates primary status in response
+        - Adds new number to existing institution_student_numbers
+        - Returns confirmation with the assigned number
         """
         mock_current = MagicMock()
         mock_current.data = {
-            "student_numbers": {"UCT": "SMTH26001"}
+            "institution_student_numbers": {"UCT": "SMTH26001"}
         }
 
         mock_update = MagicMock()
@@ -883,12 +941,11 @@ class TestAssignStudentNumberManually:
         result = assign_student_number_manually.func(
             applicant_id="test-applicant-uuid",
             institution_code="UP",
-            student_number="u26012345",
-            set_as_primary=True
+            student_number="u26012345"
         )
 
-        assert "primary" in result.lower()
         assert "u26012345" in result
+        assert "assigned" in result.lower() or "SUCCESS" in result
 
     @patch('one_for_all.tools.student_number_tool.supabase')
     def test_assign_student_number_applicant_not_found(self, mock_supabase):
@@ -906,8 +963,7 @@ class TestAssignStudentNumberManually:
         result = assign_student_number_manually.func(
             applicant_id="nonexistent-uuid",
             institution_code="UP",
-            student_number="u26012345",
-            set_as_primary=False
+            student_number="u26012345"
         )
 
         assert "ERROR" in result

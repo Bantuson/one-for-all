@@ -10,10 +10,12 @@ Tests the Supabase database interaction tools:
 - supabase_application_store - application storage
 
 All tests use mocks to avoid actual database calls.
+
+Coverage target: 80%+ for all modules.
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch, MagicMock, AsyncMock
 import sys
 from pathlib import Path
@@ -353,6 +355,8 @@ class TestSupabaseSessionCreate:
         Expected behavior:
         - Insert includes user_id, session_token, expires_at
         - expires_at is ~24 hours from now
+        - token_version is initialized to 1
+        - last_activity_at is set
         """
         # Arrange
         mock_table = MagicMock()
@@ -377,10 +381,18 @@ class TestSupabaseSessionCreate:
         assert inserted_data["user_id"] == "TEST-USER-001"
         assert "session_token" in inserted_data
         assert "expires_at" in inserted_data
+        assert inserted_data["token_version"] == 1
+        assert "last_activity_at" in inserted_data
 
-        # Verify expiry is approximately 24 hours from now
-        expires_at = datetime.fromisoformat(inserted_data["expires_at"])
-        expected_expiry = datetime.utcnow() + timedelta(hours=24)
+        # Verify expiry is approximately 24 hours from now (timezone-aware)
+        # Handle both timezone-aware and naive datetime strings
+        expires_at_str = inserted_data["expires_at"]
+        if expires_at_str.endswith('+00:00') or expires_at_str.endswith('Z'):
+            expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
+        else:
+            expires_at = datetime.fromisoformat(expires_at_str).replace(tzinfo=timezone.utc)
+
+        expected_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
         time_diff = abs((expires_at - expected_expiry).total_seconds())
         assert time_diff < 60, "Expiry should be ~24 hours from now"
 
@@ -1097,3 +1109,813 @@ class TestSupabaseToolsEdgeCases:
         # Assert
         assert result.startswith("VALID_SESSION::")
         assert "TEST-TOKEN-NAIVE" in result
+
+
+# =============================================================================
+# Coverage Enhancement Tests - Session Create
+# =============================================================================
+
+class TestSupabaseSessionCreateCoverage:
+    """Additional tests for supabase_session_create coverage."""
+
+    @patch('one_for_all.tools.supabase_session_create.supabase')
+    def test_session_create_with_ip_address(self, mock_supabase):
+        """
+        Test session creation with IP address for hijacking detection (H4).
+
+        Expected behavior:
+        - ip_address is stored in both ip_address and created_ip_address fields
+        """
+        # Arrange
+        mock_table = MagicMock()
+        inserted_data = None
+
+        def capture_insert(data):
+            nonlocal inserted_data
+            inserted_data = data
+            return mock_table
+
+        mock_table.insert = capture_insert
+        mock_table.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "session-1"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_session_create.func(
+            "TEST-USER-001",
+            ip_address="192.168.1.100"
+        )
+
+        # Assert
+        assert result.startswith("SESSION_CREATED::")
+        assert inserted_data["ip_address"] == "192.168.1.100"
+        assert inserted_data["created_ip_address"] == "192.168.1.100"
+
+    @patch('one_for_all.tools.supabase_session_create.supabase')
+    def test_session_create_with_user_agent(self, mock_supabase):
+        """
+        Test session creation with user agent for fingerprinting (H4).
+
+        Expected behavior:
+        - user_agent is stored in session data
+        """
+        # Arrange
+        mock_table = MagicMock()
+        inserted_data = None
+
+        def capture_insert(data):
+            nonlocal inserted_data
+            inserted_data = data
+            return mock_table
+
+        mock_table.insert = capture_insert
+        mock_table.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "session-1"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"
+
+        # Act
+        result = supabase_session_create.func(
+            "TEST-USER-001",
+            user_agent=user_agent
+        )
+
+        # Assert
+        assert result.startswith("SESSION_CREATED::")
+        assert inserted_data["user_agent"] == user_agent
+
+    @patch('one_for_all.tools.supabase_session_create.supabase')
+    def test_session_create_with_long_user_agent_truncates(self, mock_supabase):
+        """
+        Test session creation truncates user agent > 512 chars.
+
+        Expected behavior:
+        - user_agent longer than 512 chars is truncated to 512
+        """
+        # Arrange
+        mock_table = MagicMock()
+        inserted_data = None
+
+        def capture_insert(data):
+            nonlocal inserted_data
+            inserted_data = data
+            return mock_table
+
+        mock_table.insert = capture_insert
+        mock_table.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "session-1"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Create a user agent string > 512 characters
+        long_user_agent = "A" * 600
+
+        # Act
+        result = supabase_session_create.func(
+            "TEST-USER-001",
+            user_agent=long_user_agent
+        )
+
+        # Assert
+        assert result.startswith("SESSION_CREATED::")
+        assert len(inserted_data["user_agent"]) == 512
+        assert inserted_data["user_agent"] == "A" * 512
+
+    @patch('one_for_all.tools.supabase_session_create.supabase')
+    def test_session_create_with_exactly_512_char_user_agent(self, mock_supabase):
+        """
+        Test session creation with exactly 512 char user agent (edge case).
+
+        Expected behavior:
+        - user_agent of exactly 512 chars is stored as-is
+        """
+        # Arrange
+        mock_table = MagicMock()
+        inserted_data = None
+
+        def capture_insert(data):
+            nonlocal inserted_data
+            inserted_data = data
+            return mock_table
+
+        mock_table.insert = capture_insert
+        mock_table.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "session-1"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Create a user agent string of exactly 512 characters
+        exact_user_agent = "B" * 512
+
+        # Act
+        result = supabase_session_create.func(
+            "TEST-USER-001",
+            user_agent=exact_user_agent
+        )
+
+        # Assert
+        assert result.startswith("SESSION_CREATED::")
+        assert len(inserted_data["user_agent"]) == 512
+        assert inserted_data["user_agent"] == exact_user_agent
+
+    @patch('one_for_all.tools.supabase_session_create.supabase')
+    def test_session_create_with_all_optional_params(self, mock_supabase):
+        """
+        Test session creation with all optional parameters.
+
+        Expected behavior:
+        - Both ip_address and user_agent are stored
+        """
+        # Arrange
+        mock_table = MagicMock()
+        inserted_data = None
+
+        def capture_insert(data):
+            nonlocal inserted_data
+            inserted_data = data
+            return mock_table
+
+        mock_table.insert = capture_insert
+        mock_table.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "session-1"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_session_create.func(
+            "TEST-USER-001",
+            ip_address="10.0.0.1",
+            user_agent="TestAgent/1.0"
+        )
+
+        # Assert
+        assert result.startswith("SESSION_CREATED::")
+        assert inserted_data["ip_address"] == "10.0.0.1"
+        assert inserted_data["created_ip_address"] == "10.0.0.1"
+        assert inserted_data["user_agent"] == "TestAgent/1.0"
+
+    @patch('one_for_all.tools.supabase_session_create.supabase')
+    def test_session_create_exception_handling(self, mock_supabase):
+        """
+        Test session creation exception handling.
+
+        Expected behavior:
+        - Propagates exception when database operation fails
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute = AsyncMock(
+            side_effect=Exception("Database connection error")
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act & Assert
+        with pytest.raises(Exception) as exc_info:
+            supabase_session_create.func("TEST-USER-001")
+
+        assert "Database connection error" in str(exc_info.value)
+
+    @patch('one_for_all.tools.supabase_session_create.supabase')
+    def test_session_create_without_optional_params(self, mock_supabase):
+        """
+        Test session creation without optional parameters (base case).
+
+        Expected behavior:
+        - Session created without ip_address or user_agent fields
+        """
+        # Arrange
+        mock_table = MagicMock()
+        inserted_data = None
+
+        def capture_insert(data):
+            nonlocal inserted_data
+            inserted_data = data
+            return mock_table
+
+        mock_table.insert = capture_insert
+        mock_table.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "session-1"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_session_create.func("TEST-USER-001")
+
+        # Assert
+        assert result.startswith("SESSION_CREATED::")
+        assert "ip_address" not in inserted_data
+        assert "user_agent" not in inserted_data
+
+
+# =============================================================================
+# Coverage Enhancement Tests - Session Lookup
+# =============================================================================
+
+class TestSupabaseSessionLookupCoverage:
+    """Additional tests for supabase_session_lookup coverage."""
+
+    @patch('one_for_all.tools.supabase_session_lookup.supabase')
+    def test_session_lookup_exception_handling(self, mock_supabase):
+        """
+        Test session lookup exception handling.
+
+        Expected behavior:
+        - Propagates exception when database operation fails
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute = AsyncMock(
+            side_effect=Exception("Database query error")
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act & Assert
+        with pytest.raises(Exception) as exc_info:
+            supabase_session_lookup.func("TEST-USER-001")
+
+        assert "Database query error" in str(exc_info.value)
+
+    @patch('one_for_all.tools.supabase_session_lookup.supabase')
+    def test_session_lookup_with_none_data(self, mock_supabase):
+        """
+        Test session lookup when result.data is None (not empty list).
+
+        Expected behavior:
+        - Returns "NO_SESSION" when data is None
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=None)
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_session_lookup.func("TEST-USER-001")
+
+        # Assert
+        assert result == "NO_SESSION"
+
+    @patch('one_for_all.tools.supabase_session_lookup.supabase')
+    def test_session_lookup_with_exactly_now_expiry(self, mock_supabase):
+        """
+        Test session lookup with expiry exactly at current time.
+
+        Expected behavior:
+        - Session expired if expires_at <= now (expired = not >)
+        """
+        # Arrange - expires_at is exactly now (should be expired)
+        now = datetime.utcnow()
+        mock_session = {
+            "session_token": "TEST-TOKEN-EXACT-NOW",
+            "expires_at": now.isoformat()
+        }
+
+        mock_table = MagicMock()
+        mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[mock_session])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_session_lookup.func("TEST-USER-001")
+
+        # Assert - equal to now is considered expired (not strictly greater)
+        assert result == "EXPIRED_SESSION"
+
+    @patch('one_for_all.tools.supabase_session_lookup.supabase')
+    def test_session_lookup_with_far_future_expiry(self, mock_supabase):
+        """
+        Test session lookup with expiry far in the future.
+
+        Expected behavior:
+        - Valid session even with very long expiry
+        """
+        # Arrange - expires_at is 1 year from now
+        far_future = (datetime.utcnow() + timedelta(days=365)).isoformat()
+        mock_session = {
+            "session_token": "TEST-TOKEN-FAR-FUTURE",
+            "expires_at": far_future
+        }
+
+        mock_table = MagicMock()
+        mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[mock_session])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_session_lookup.func("TEST-USER-001")
+
+        # Assert
+        assert result.startswith("VALID_SESSION::")
+        assert "TEST-TOKEN-FAR-FUTURE" in result
+
+
+# =============================================================================
+# Coverage Enhancement Tests - Session Extend
+# =============================================================================
+
+class TestSupabaseSessionExtendCoverage:
+    """Additional tests for supabase_session_extend coverage."""
+
+    @patch('one_for_all.tools.supabase_session_extend.supabase')
+    def test_session_extend_exception_handling(self, mock_supabase):
+        """
+        Test session extend exception handling.
+
+        Expected behavior:
+        - Propagates exception when database operation fails
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.update.return_value.eq.return_value.execute = AsyncMock(
+            side_effect=Exception("Database update error")
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act & Assert
+        with pytest.raises(Exception) as exc_info:
+            supabase_session_extend.func("TEST-TOKEN-123")
+
+        assert "Database update error" in str(exc_info.value)
+
+    @patch('one_for_all.tools.supabase_session_extend.supabase')
+    def test_session_extend_with_empty_token(self, mock_supabase):
+        """
+        Test session extend with empty token string.
+
+        Expected behavior:
+        - Still attempts update (no input validation in current impl)
+        - Returns SESSION_EXTENDED
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.update.return_value.eq.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_session_extend.func("")
+
+        # Assert
+        assert result == "SESSION_EXTENDED"
+
+    @patch('one_for_all.tools.supabase_session_extend.supabase')
+    def test_session_extend_verifies_new_expiry_time(self, mock_supabase):
+        """
+        Test that session extend sets correct new expiry time.
+
+        Expected behavior:
+        - New expiry is ~24 hours from now
+        """
+        # Arrange
+        mock_table = MagicMock()
+        update_data = None
+
+        def capture_update(data):
+            nonlocal update_data
+            update_data = data
+            return mock_table
+
+        mock_table.update = capture_update
+        mock_table.eq.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "session-1"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        supabase_session_extend.func("TEST-TOKEN-VERIFY")
+
+        # Assert
+        assert update_data is not None
+        assert "expires_at" in update_data
+
+        # Parse the new expiry and verify it's approximately 24 hours from now
+        new_expiry_str = update_data["expires_at"]
+        new_expiry = datetime.fromisoformat(new_expiry_str)
+        expected_expiry = datetime.utcnow() + timedelta(hours=24)
+        time_diff = abs((new_expiry - expected_expiry).total_seconds())
+        assert time_diff < 60, "New expiry should be ~24 hours from now"
+
+
+# =============================================================================
+# Coverage Enhancement Tests - User Store
+# =============================================================================
+
+class TestSupabaseUserStoreCoverage:
+    """Additional tests for supabase_user_store coverage."""
+
+    @patch('one_for_all.tools.supabase_user_store.supabase')
+    def test_user_store_with_none_data_in_result(self, mock_supabase):
+        """
+        Test user store when result.data is None.
+
+        Expected behavior:
+        - Returns string representation of None
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=None)
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_user_store.func({"email": "test@example.com"})
+
+        # Assert
+        assert result == "None"
+
+    @patch('one_for_all.tools.supabase_user_store.supabase')
+    def test_user_store_with_empty_dict(self, mock_supabase):
+        """
+        Test user store with empty dictionary.
+
+        Expected behavior:
+        - Attempts insert with empty dict
+        - Returns result data as string
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "TEST-EMPTY-001"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_user_store.func({})
+
+        # Assert
+        assert "TEST-EMPTY-001" in result
+
+    @patch('one_for_all.tools.supabase_user_store.supabase')
+    def test_user_store_with_unicode_characters(self, mock_supabase):
+        """
+        Test user store with unicode characters.
+
+        Expected behavior:
+        - Handles unicode names correctly
+        """
+        # Arrange
+        unicode_user = {
+            "id": "TEST-UNICODE-001",
+            "full_name": "Thabo Mbeki",  # Nguni name
+            "email": "test+unicode@example.com"
+        }
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[unicode_user])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_user_store.func(unicode_user)
+
+        # Assert
+        assert "TEST-UNICODE-001" in result
+
+    @patch('one_for_all.tools.supabase_user_store.supabase')
+    def test_user_store_with_nested_dict(self, mock_supabase):
+        """
+        Test user store with nested dictionary (e.g., metadata).
+
+        Expected behavior:
+        - Handles nested structures correctly
+        """
+        # Arrange
+        nested_user = {
+            "id": "TEST-NESTED-001",
+            "email": "nested@example.com",
+            "metadata": {
+                "preferences": {"language": "en", "theme": "dark"},
+                "flags": ["verified", "premium"]
+            }
+        }
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[nested_user])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_user_store.func(nested_user)
+
+        # Assert
+        assert "TEST-NESTED-001" in result
+
+
+# =============================================================================
+# Coverage Enhancement Tests - User Lookup
+# =============================================================================
+
+class TestSupabaseUserLookupCoverage:
+    """Additional tests for supabase_user_lookup coverage."""
+
+    @patch('one_for_all.tools.supabase_user_lookup.supabase')
+    def test_user_lookup_exception_handling(self, mock_supabase):
+        """
+        Test user lookup exception handling.
+
+        Expected behavior:
+        - Propagates exception when database operation fails
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.select.return_value.or_.return_value.execute = AsyncMock(
+            side_effect=Exception("Database connection lost")
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act & Assert
+        with pytest.raises(Exception) as exc_info:
+            supabase_user_lookup.func("test@example.com")
+
+        assert "Database connection lost" in str(exc_info.value)
+
+    @patch('one_for_all.tools.supabase_user_lookup.supabase')
+    def test_user_lookup_returns_first_match_only(self, mock_supabase):
+        """
+        Test user lookup returns only first match when multiple exist.
+
+        Expected behavior:
+        - Returns str(result.data[0]) - only first match
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.select.return_value.or_.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[
+                {"id": "TEST-FIRST-001", "email": "test@example.com"},
+                {"id": "TEST-SECOND-002", "email": "test@example.com"}  # Duplicate
+            ])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_user_lookup.func("test@example.com")
+
+        # Assert - should only contain first match
+        assert "TEST-FIRST-001" in result
+        assert "TEST-SECOND-002" not in result
+
+    @patch('one_for_all.tools.supabase_user_lookup.supabase')
+    def test_user_lookup_with_phone_number_format(self, mock_supabase):
+        """
+        Test user lookup with phone number (South African format).
+
+        Expected behavior:
+        - Handles +27 phone numbers in search
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.select.return_value.or_.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "TEST-PHONE-001", "phone": "+27821234567"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_user_lookup.func("+27821234567")
+
+        # Assert
+        assert "TEST-PHONE-001" in result
+
+    @patch('one_for_all.tools.supabase_user_lookup.supabase')
+    def test_user_lookup_with_empty_string(self, mock_supabase):
+        """
+        Test user lookup with empty string.
+
+        Expected behavior:
+        - Returns USER_NOT_FOUND for empty query
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.select.return_value.or_.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_user_lookup.func("")
+
+        # Assert
+        assert result == "USER_NOT_FOUND"
+
+
+# =============================================================================
+# Coverage Enhancement Tests - Application Store
+# =============================================================================
+
+class TestSupabaseApplicationStoreCoverage:
+    """Additional tests for supabase_application_store coverage."""
+
+    @patch('one_for_all.tools.supabase_application_store.supabase')
+    def test_application_store_with_none_data_in_result(self, mock_supabase):
+        """
+        Test application store when result.data is None.
+
+        Expected behavior:
+        - Returns string representation of None
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=None)
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_application_store.func({"user_id": "TEST-USER-001"})
+
+        # Assert
+        assert result == "None"
+
+    @patch('one_for_all.tools.supabase_application_store.supabase')
+    def test_application_store_with_nsfas_data(self, mock_supabase):
+        """
+        Test application store with NSFAS application data.
+
+        Expected behavior:
+        - Handles NSFAS-specific fields correctly
+        """
+        # Arrange
+        nsfas_app = {
+            "id": "TEST-NSFAS-001",
+            "user_id": "TEST-USER-001",
+            "type": "nsfas",
+            "household_income": "R150000",
+            "sassa_recipient": True,
+            "status": "pending"
+        }
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[nsfas_app])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_application_store.func(nsfas_app)
+
+        # Assert
+        assert "TEST-NSFAS-001" in result
+
+    @patch('one_for_all.tools.supabase_application_store.supabase')
+    def test_application_store_with_empty_dict(self, mock_supabase):
+        """
+        Test application store with empty dictionary.
+
+        Expected behavior:
+        - Attempts insert with empty dict
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "TEST-EMPTY-APP-001"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_application_store.func({})
+
+        # Assert
+        assert "TEST-EMPTY-APP-001" in result
+
+    @patch('one_for_all.tools.supabase_application_store.supabase')
+    def test_application_store_with_matric_results(self, mock_supabase):
+        """
+        Test application store with matric results (complex nested data).
+
+        Expected behavior:
+        - Handles nested matric results correctly
+        """
+        # Arrange
+        app_with_matric = {
+            "id": "TEST-MATRIC-APP-001",
+            "user_id": "TEST-USER-001",
+            "matric_results": {
+                "Mathematics": {"level": "HL", "mark": 80, "aps": 7},
+                "English": {"level": "HL", "mark": 75, "aps": 6},
+                "Physical Sciences": {"level": "HL", "mark": 78, "aps": 6}
+            },
+            "total_aps": 40
+        }
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[app_with_matric])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_application_store.func(app_with_matric)
+
+        # Assert
+        assert "TEST-MATRIC-APP-001" in result
+
+
+# =============================================================================
+# Decorator Tests - Audit Service Role Access
+# =============================================================================
+
+class TestAuditDecoratorBehavior:
+    """Test audit decorator doesn't break tool functionality."""
+
+    @patch('one_for_all.tools.supabase_user_store.supabase')
+    def test_user_store_audit_decorator_passes_through(self, mock_supabase):
+        """
+        Test that audit decorator on user_store passes through correctly.
+
+        Expected behavior:
+        - Decorator doesn't interfere with function execution
+        - Function still returns expected result
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "TEST-AUDIT-001"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_user_store.func({"email": "audit@example.com"})
+
+        # Assert
+        assert "TEST-AUDIT-001" in result
+
+    @patch('one_for_all.tools.supabase_user_lookup.supabase')
+    def test_user_lookup_audit_decorator_passes_through(self, mock_supabase):
+        """
+        Test that audit decorator on user_lookup passes through correctly.
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.select.return_value.or_.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "TEST-AUDIT-002", "email": "audit@example.com"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_user_lookup.func("audit@example.com")
+
+        # Assert
+        assert "TEST-AUDIT-002" in result
+
+    @patch('one_for_all.tools.supabase_application_store.supabase')
+    def test_application_store_audit_decorator_passes_through(self, mock_supabase):
+        """
+        Test that audit decorator on application_store passes through correctly.
+        """
+        # Arrange
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute = AsyncMock(
+            return_value=MagicMock(data=[{"id": "TEST-AUDIT-APP-001"}])
+        )
+        mock_supabase.table.return_value = mock_table
+
+        # Act
+        result = supabase_application_store.func({"user_id": "TEST-USER"})
+
+        # Assert
+        assert "TEST-AUDIT-APP-001" in result
