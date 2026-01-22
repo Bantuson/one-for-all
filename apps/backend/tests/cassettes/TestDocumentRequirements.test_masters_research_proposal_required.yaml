@@ -17,7 +17,7 @@ interactions:
       Content-Type:
       - application/json
       Cookie:
-      - __cf_bm=.2lkelx4mZ96WpWckObQyVsJ1eL0qtwWYpA.a_7Nyrc-1768978843-1.0.1.1-DSSQOXkEEYIUS13mxNJJYUHZ8jFOnWub7_icozsLCQsToNJOEK3NOcE8X9qJ.pPPchu1hH10b_o4V_.5iG5LpZ4SgR76rt5b6kCg64e9vVo
+      - __cf_bm=IpydaYGMN5BsX3inoRvWeuierMGQLLfpXvmr3O0sD8w-1769026282-1.0.1.1-YnyCFHUgEo9hpaTiLKpdHGvuRzlYWvuLMkOcNLxKwk5GYGQSgz1Kn5qANMcTlCye38XJ9eVIzWGf1Eo.aYGcK90cD.EGGCvmwWg6H1yQUGQ
       Host:
       - tvprtcwtozzzwlxdzdeo.supabase.co
       Prefer:
@@ -41,13 +41,13 @@ interactions:
       cf-cache-status:
       - DYNAMIC
       cf-ray:
-      - 9c14f28449f773a5-JNB
+      - 9c19785b3b7d1380-JNB
       content-length:
       - '191'
       content-type:
       - application/json; charset=utf-8
       date:
-      - Wed, 21 Jan 2026 07:02:40 GMT
+      - Wed, 21 Jan 2026 20:13:05 GMT
       proxy-status:
       - PostgREST; error=42883
       sb-gateway-version:
@@ -55,7 +55,7 @@ interactions:
       sb-project-ref:
       - tvprtcwtozzzwlxdzdeo
       sb-request-id:
-      - 019bdf5c-ceb8-704b-bde9-da5d958f7c0e
+      - 019be230-750d-768e-baa3-c2270a56b2ee
       server:
       - cloudflare
       strict-transport-security:
@@ -67,7 +67,7 @@ interactions:
       x-envoy-attempt-count:
       - '1'
       x-envoy-upstream-service-time:
-      - '2'
+      - '1'
     status:
       code: 404
       message: null

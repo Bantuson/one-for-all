@@ -18,6 +18,7 @@ from typing import Dict, Any
 
 @pytest.mark.vcr()
 @pytest.mark.integration
+@pytest.mark.llm_required
 class TestNsfasFlow:
     """Test NSFAS-specific logic and workflows."""
 
@@ -238,6 +239,7 @@ class TestNsfasFlow:
 
 @pytest.mark.vcr()
 @pytest.mark.integration
+@pytest.mark.llm_required
 class TestNsfasDataReuse:
     """Test that NSFAS reuses data from university application."""
 
@@ -312,6 +314,7 @@ class TestNsfasDataReuse:
 
 @pytest.mark.vcr()
 @pytest.mark.integration
+@pytest.mark.llm_required
 class TestNsfasSubmissionFlow:
     """Test NSFAS submission and status tracking."""
 

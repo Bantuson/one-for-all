@@ -12,6 +12,7 @@ This module provides common test fixtures including:
 
 import pytest
 import os
+import re
 from pathlib import Path
 from typing import Dict, Any
 
@@ -20,6 +21,118 @@ from typing import Dict, Any
 # =============================================================================
 # Disable telemetry by default for privacy
 os.environ.setdefault("DEEPEVAL_TELEMETRY_ENABLED", "false")
+
+
+# =============================================================================
+# LLM-Dependent Test Skip Logic
+# =============================================================================
+# Tests marked with @pytest.mark.llm_required need either:
+# 1. A valid DEEPSEEK_API_KEY for live API calls
+# 2. Pre-recorded VCR cassettes with LLM responses
+#
+# Without these, tests are skipped to avoid timeouts.
+
+def has_valid_deepseek_key() -> bool:
+    """Check if a valid DeepSeek API key is available."""
+    key = os.environ.get("DEEPSEEK_API_KEY", "")
+    return bool(key) and not key.startswith("sk-test")
+
+
+def get_cassette_path(test_name: str, cassette_dir: Path) -> Path:
+    """Get the expected cassette path for a test."""
+    # VCR creates cassettes with the format: TestClass.test_method.yaml
+    return cassette_dir / f"{test_name}.yaml"
+
+
+def cassette_has_llm_response(cassette_path: Path) -> bool:
+    """Check if a cassette file has actual LLM API responses (not just cleanup calls)."""
+    if not cassette_path.exists():
+        return False
+    try:
+        import yaml
+        with open(cassette_path) as f:
+            cassette = yaml.safe_load(f)
+        # Check if any interaction is an LLM API call (DeepSeek)
+        if cassette and "interactions" in cassette:
+            for interaction in cassette["interactions"]:
+                request = interaction.get("request", {})
+                uri = request.get("uri", "")
+                if "deepseek" in uri.lower() or "openai" in uri.lower():
+                    return True
+        return False
+    except Exception:
+        return False
+
+
+@pytest.fixture(autouse=True)
+def skip_llm_tests_without_cassettes(request):
+    """
+    Skip tests marked with llm_required if no LLM access is available.
+
+    This fixture runs before each test and skips tests that:
+    1. Are marked with @pytest.mark.llm_required
+    2. Don't have a valid DeepSeek API key
+    3. Don't have a pre-recorded VCR cassette with LLM responses
+
+    This prevents test timeouts when running without API keys or cassettes.
+    """
+    # Only check tests marked with llm_required
+    marker = request.node.get_closest_marker("llm_required")
+    if marker is None:
+        return
+
+    # If we have a valid API key, allow the test to run (will record cassette)
+    if has_valid_deepseek_key():
+        return
+
+    # No API key - check if cassette exists with LLM responses
+    cassette_dir = Path(__file__).parent / "cassettes"
+
+    # Get test class and method name for cassette lookup
+    test_class = request.node.parent.name if request.node.parent else ""
+    test_name = request.node.name
+    full_test_name = f"{test_class}.{test_name}" if test_class else test_name
+
+    cassette_path = get_cassette_path(full_test_name, cassette_dir)
+
+    if not cassette_has_llm_response(cassette_path):
+        pytest.skip(
+            f"Skipping {test_name}: No DEEPSEEK_API_KEY and no valid VCR cassette. "
+            f"To record cassettes, run with a valid API key: "
+            f"DEEPSEEK_API_KEY=sk-xxx pytest -k '{test_name}' --vcr-record=all"
+        )
+
+
+# =============================================================================
+# VCR Request Filtering Functions
+# =============================================================================
+
+def filter_request_timestamps(request):
+    """
+    Remove timestamps from request body for deterministic matching.
+
+    This function normalizes timestamp values in request bodies to ensure
+    cassettes match consistently across test runs regardless of when the
+    test was executed. This is critical for Phase 2 VCR integration tests.
+
+    Filters:
+    - ISO 8601 timestamps (e.g., 2024-01-15T10:30:00)
+    - Unix timestamp values in JSON (e.g., "timestamp": 1705312200)
+
+    Args:
+        request: VCR request object containing headers and body
+
+    Returns:
+        Modified request object with timestamps normalized
+    """
+    if request.body:
+        body = request.body.decode('utf-8') if isinstance(request.body, bytes) else request.body
+        # Replace ISO 8601 timestamps with placeholder
+        body = re.sub(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}', 'TIMESTAMP', body)
+        # Replace Unix timestamps in JSON with placeholder
+        body = re.sub(r'"timestamp":\s*\d+', '"timestamp": 0', body)
+        request.body = body.encode('utf-8') if isinstance(request.body, bytes) else body
+    return request
 
 
 # =============================================================================
@@ -37,6 +150,8 @@ def vcr_config():
     - Filters out API keys from recordings (security)
     - Records once, replays forever (deterministic CI)
     - Matches on method, scheme, host, port, path (ignores body for LLM calls)
+    - Filters timestamps for deterministic cassette matching (Phase 2)
+    - Ignores local hosts to avoid recording localhost requests
 
     Usage:
         @pytest.mark.vcr()
@@ -53,10 +168,12 @@ def vcr_config():
             "api-key",
             "bearer",
         ],
-        # Filter sensitive query params
+        # Filter sensitive query params (enhanced for Phase 2)
         "filter_query_parameters": [
             "api_key",
             "access_token",
+            "apikey",
+            "key",
         ],
         # Record mode: "once" = record if cassette missing, replay if exists
         "record_mode": "once",
@@ -68,6 +185,10 @@ def vcr_config():
         "decode_compressed_response": True,
         # Allow recording if no cassette exists
         "record_on_exception": False,
+        # Phase 2: Filter timestamps from request bodies for deterministic matching
+        "before_record_request": filter_request_timestamps,
+        # Phase 2: Ignore local development hosts (no recording needed)
+        "ignore_hosts": ["localhost", "127.0.0.1"],
     }
 
 

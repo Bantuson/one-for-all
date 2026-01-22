@@ -23,6 +23,7 @@ from typing import Dict, Any
 
 @pytest.mark.vcr()
 @pytest.mark.integration
+@pytest.mark.llm_required
 class TestUndergraduateApplicationFlow:
     """Test complete undergraduate application workflow."""
 
@@ -302,6 +303,7 @@ class TestUndergraduateApplicationFlow:
 
 @pytest.mark.vcr()
 @pytest.mark.integration
+@pytest.mark.llm_required
 class TestUndergraduateEdgeCases:
     """Test edge cases and boundary conditions for undergraduate flow."""
 
