@@ -7,3 +7,7 @@
 .venv
 claude.md
 docs
+# VCR Cassettes (may contain sensitive data like API keys, tokens, and PII)
+tests/cassettes/*.yaml
+tests/cassettes/**/*.yaml
+tests/cassettes/trajectories/**/*.yaml
