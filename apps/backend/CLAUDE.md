@@ -90,19 +90,23 @@ The system uses **declarative YAML-based agent/task configuration** with sequent
 
 1. **Agent Definitions** (`src/one_for_all/config/agents.yaml`):
    - `identity_auth_agent` - OTP verification, session management
-   - `application_intake_agent` - Personal/academic data collection
+   - `application_intake_agent` - Personal/academic data collection via WhatsApp
    - `rag_specialist_agent` - Vector-first university information retrieval
    - `submission_agent` - Multi-university application submission
    - `nsfas_agent` - NSFAS-specific funding application
+   - `document_reviewer_agent` - Vision-based document review and validation
+   - `reviewer_assistant_agent` - Q&A assistant for human reviewers
+   - `analytics_agent` - Dashboard metrics and reporting
 
 2. **Task Definitions** (`src/one_for_all/config/tasks.yaml`):
-   - 13 sequential tasks from account creation → NSFAS status check
+   - 14 tasks in main workflow from account creation → NSFAS status check
+   - 23 total tasks defined (including analytics and review workflows)
    - Each task specifies description, expected_output, and assigned agent
 
 3. **Crew Orchestration** (`src/one_for_all/crew.py`):
    - `OneForAllCrew` class loads YAML configs and builds `Crew` object
    - Uses `Process.sequential` execution
-   - Agents have access to 19+ custom Supabase/SendGrid/Twilio tools
+   - Agents have access to 162 custom tools organized into 15+ categories
 
 ### Database Architecture (Supabase PostgreSQL)
 
@@ -134,14 +138,22 @@ def tool_name(param: str) -> str:
     return asyncio.run(async_logic())
 ```
 
-**Tool Categories:**
+**Tool Categories (162 tools across 15+ categories):**
 - **Supabase Storage Tools**: `supabase_user_store`, `supabase_application_store`, `supabase_nsfas_store`, etc.
-- **Supabase Lookup Tools**: `supabase_user_lookup`, `supabase_session_lookup`
-- **Session Tools**: `supabase_session_create`, `supabase_session_extend`
+- **Supabase Lookup Tools**: `supabase_user_lookup`, `supabase_session_lookup`, etc.
+- **Session Tools**: `supabase_session_create`, `supabase_session_extend`, etc.
 - **OTP Tools**: `sendgrid_otp_sender`, `sms_otp_sender`
-- **RAG Tools**: `supabase_rag_store`, `supabase_rag_query`, `website_search_tool`
-- **Submission Tools**: `application_submission_tool`, `nsfas_application_submission_tool`
-- **Status Tools**: `application_status_tool`, `nsfas_status_tool`
+- **RAG Tools**: `supabase_rag_store`, `supabase_rag_query`, `website_search_tool`, etc.
+- **Submission Tools**: `application_submission_tool`, `nsfas_application_submission_tool`, etc.
+- **Status Tools**: `application_status_tool`, `nsfas_status_tool`, etc.
+- **Document Review Tools**: Vision-based document analysis and validation tools
+- **Analytics Tools**: Metrics calculation, chart generation, dashboard data tools
+- **Communication Tools**: WhatsApp, SMS, and email notification tools
+- **Validation Tools**: Form validation, data integrity checking tools
+- **University-Specific Tools**: Institution-specific API integration tools
+- **NSFAS Tools**: NSFAS-specific submission and status tracking tools
+- **Memory Tools**: Long-term applicant data persistence and retrieval tools
+- **Workflow Tools**: Task orchestration and state management tools
 
 ### RAG Workflow (Hybrid Vector-First Search)
 

@@ -13,7 +13,7 @@ export default async function SetupPage({
   // Check authentication
   const { userId } = await auth()
   if (!userId) {
-    redirect('/sign-in')
+    redirect('/register')
   }
 
   // Use service client to fetch institution and campuses

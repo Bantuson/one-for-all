@@ -79,11 +79,11 @@ class TestToolConfiguration:
         from one_for_all.tools import (
             sendgrid_otp_sender,
             sms_otp_sender,
-            student_number_tool,
+            generate_student_number,
         )
         assert sendgrid_otp_sender is not None
         assert sms_otp_sender is not None
-        assert student_number_tool is not None
+        assert generate_student_number is not None
 
     def test_supabase_client_configured(self):
         """Verify Supabase client is configured."""
@@ -96,10 +96,10 @@ class TestToolConfiguration:
         from one_for_all.tools import (
             sendgrid_otp_sender,
             sms_otp_sender,
-            student_number_tool,
+            generate_student_number,
         )
 
-        tools = [sendgrid_otp_sender, sms_otp_sender, student_number_tool]
+        tools = [sendgrid_otp_sender, sms_otp_sender, generate_student_number]
         for tool in tools:
             assert tool.__doc__ or hasattr(tool, 'description'), \
                 f"Tool {tool.__name__} should have docstring for agent understanding"

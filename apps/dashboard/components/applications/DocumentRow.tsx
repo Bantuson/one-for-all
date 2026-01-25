@@ -89,7 +89,7 @@ export function DocumentRow({
   }
 
   return (
-    <div className="flex flex-col gap-2 py-3 border-b border-border last:border-b-0">
+    <div data-testid="document-row" className="flex flex-col gap-2 py-3 border-b border-border last:border-b-0">
       {/* Main row */}
       <div className="flex items-center gap-3">
         {/* Document type and name */}

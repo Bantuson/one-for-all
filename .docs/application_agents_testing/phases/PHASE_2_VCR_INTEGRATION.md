@@ -2,48 +2,79 @@
 
 ## Overview
 
-**Goal:** Establish comprehensive VCR cassette coverage for all 14 workflow tasks with deterministic LLM response replay.
+**Goal:** Establish comprehensive VCR cassette coverage for the main application workflow with deterministic LLM response replay.
 
 **Estimated Effort:** 3-4 days
 
 **Dependencies:** Phase 1 (Unit Tests) should be substantially complete
 
+**Task Scope:**
+- **Main Application Workflow:** 14 sequential tasks (account creation → NSFAS status check)
+- **Auxiliary Workflows:** 9 additional tasks defined in `tasks.yaml` (document review, analytics, reviewer assistant)
+- **Unused Tasks:** 1 task (`application_compilation_task`) defined but not integrated into any crew flow
+
 **Success Criteria:**
-- VCR cassettes recorded for all 14 tasks
+- VCR cassettes recorded for all 14 main workflow tasks
 - Tool call sequences verified in tests
 - Session state persistence validated
 - Tests run in < 5 minutes (cassette replay)
 - All integration tests pass in CI without real API calls
+- Documentation plan for auxiliary workflow testing (Phase 2B)
 
 ---
 
 ## Implementation Checklist
 
-### VCR Cassette Recording
+### Phase 2A: Main Workflow VCR Cassettes (14 Tasks)
 
 - [ ] **Authentication Tasks (2 cassettes)**
-  - [ ] `TestAccountCreation.yaml` - Account creation flow
-  - [ ] `TestOTPVerification.yaml` - OTP send/verify cycle
+  - [ ] `TestAccountCreation.yaml` - Account creation flow (`account_creation_task`)
+  - [ ] `TestOTPVerification.yaml` - OTP send/verify cycle (`otp_verification_task`)
 
 - [ ] **Data Collection Tasks (5 cassettes)**
-  - [ ] `TestPersonalInfoCollection.yaml` - Personal info gathering
-  - [ ] `TestAcademicInfoCollection.yaml` - Academic data (APS, matric)
-  - [ ] `TestDocumentCollection.yaml` - Document upload status
-  - [ ] `TestDocumentValidation.yaml` - Vision-based validation
-  - [ ] `TestProgramSelection.yaml` - Course choice selection
+  - [ ] `TestPersonalInfoCollection.yaml` - Personal info gathering (`collect_personal_info_task`)
+  - [ ] `TestAcademicInfoCollection.yaml` - Academic data (APS, matric) (`collect_academic_info_task`)
+  - [ ] `TestDocumentCollection.yaml` - Document upload status (`collect_documents_task`)
+  - [ ] `TestDocumentValidation.yaml` - Vision-based validation (`document_validation_task`)
+  - [ ] `TestProgramSelection.yaml` - Course choice selection (`program_selection_task`)
 
 - [ ] **Eligibility Tasks (1 cassette)**
-  - [ ] `TestRAGResearch.yaml` - Vector search + web fallback
+  - [ ] `TestRAGResearch.yaml` - Vector search + web fallback (`rag_research_task`)
 
 - [ ] **Submission Tasks (3 cassettes)**
-  - [ ] `TestApplicationCompilation.yaml` - Payload assembly
-  - [ ] `TestApplicationSubmission.yaml` - University API calls
-  - [ ] `TestStatusCheck.yaml` - Status polling
+  - [ ] `TestApplicationSubmission.yaml` - University API calls (`application_submission_task`)
+  - [ ] `TestUniversityStatusCheck.yaml` - Status polling (`university_status_check_task`)
+  - [ ] ~~`TestApplicationCompilation.yaml`~~ - **NOTE:** `application_compilation_task` is defined in `tasks.yaml` but NOT used in any crew flow. Consider removal or integration.
 
 - [ ] **NSFAS Tasks (3 cassettes)**
-  - [ ] `TestNSFASDecision.yaml` - Eligibility check
-  - [ ] `TestNSFASCollection.yaml` - Funding data collection
-  - [ ] `TestNSFASSubmission.yaml` - NSFAS API call
+  - [ ] `TestNSFASDecision.yaml` - Eligibility check (`ask_if_apply_for_nsfas_task`)
+  - [ ] `TestNSFASCollection.yaml` - Funding data collection (`nsfas_collection_task`)
+  - [ ] `TestNSFASSubmission.yaml` - NSFAS API call (`nsfas_submission_task`)
+  - [ ] `TestNSFASStatusCheck.yaml` - NSFAS status polling (`nsfas_status_check_task`)
+
+### Phase 2B: Auxiliary Workflow Coverage (9 Additional Tasks)
+
+**Document Review Workflow:**
+- [ ] `TestDocumentReviewStart.yaml` - Initiate document review process
+- [ ] `TestDocumentReviewCompletion.yaml` - Complete review and provide feedback
+- [ ] `TestDocumentResubmission.yaml` - Handle document resubmission after rejection
+
+**Analytics Workflow:**
+- [ ] `TestAnalyticsDataCollection.yaml` - Gather application metrics
+- [ ] `TestAnalyticsReporting.yaml` - Generate analytics reports
+
+**Reviewer Assistant Workflow:**
+- [ ] `TestReviewerAssistantQuery.yaml` - Answer reviewer queries
+- [ ] `TestReviewerAssistantDecision.yaml` - Assist in decision-making
+
+**Other Auxiliary Tasks:**
+- [ ] Map remaining 2 auxiliary tasks from `tasks.yaml`
+- [ ] Document crew flows that utilize these tasks (if any)
+
+**Cleanup:**
+- [ ] Investigate `application_compilation_task` usage
+  - [ ] If unused: Remove from `tasks.yaml`
+  - [ ] If needed: Integrate into submission workflow and add cassette
 
 ### Tool Call Verification
 
@@ -410,11 +441,65 @@ tests/integration/test_session_state.py::TestSessionState::test_session_isolatio
 
 ### Success Criteria Checklist
 
-- [ ] All 14 tasks have cassette coverage
-- [ ] Tool call sequences verified
+**Phase 2A (Main Workflow):**
+- [ ] All 14 main workflow tasks have cassette coverage
+- [ ] Tool call sequences verified for primary flow
 - [ ] Session state tests pass
 - [ ] Tests complete in < 5 minutes
 - [ ] CI passes without real API calls (--vcr-record=none)
+
+**Phase 2B (Auxiliary Workflows):**
+- [ ] All 9 auxiliary tasks mapped to crew flows
+- [ ] Cassette plan documented for auxiliary workflows
+- [ ] Decision made on `application_compilation_task` (remove or integrate)
+- [ ] If integrated workflows exist, cassettes recorded
+
+**Task Inventory Validation:**
+- [ ] Confirm all 23 tasks in `tasks.yaml` are accounted for
+- [ ] Document which tasks are active vs. auxiliary vs. unused
+- [ ] Update `crew.py` if any task definitions are stale
+
+---
+
+## Task Accounting Reference
+
+### Main Application Workflow (14 Tasks in Sequence)
+
+From `apps/backend/src/one_for_all/crew.py`:
+
+1. `account_creation_task`
+2. `otp_verification_task`
+3. `collect_personal_info_task`
+4. `collect_academic_info_task`
+5. `collect_documents_task`
+6. `document_validation_task`
+7. `program_selection_task`
+8. `rag_research_task`
+9. `application_submission_task`
+10. `university_status_check_task`
+11. `ask_if_apply_for_nsfas_task`
+12. `nsfas_collection_task`
+13. `nsfas_submission_task`
+14. `nsfas_status_check_task`
+
+### Auxiliary Tasks (9+ Tasks, Non-Sequential)
+
+These tasks are defined in `apps/backend/config/tasks.yaml` but are NOT part of the main application flow. They support:
+- Document review workflows (3-4 tasks)
+- Analytics and reporting (2-3 tasks)
+- Reviewer assistant functionality (2-3 tasks)
+- Application compilation (1 task - **unused/orphaned**)
+
+**Action Required:** Audit `tasks.yaml` to:
+1. List all 9 auxiliary task names explicitly
+2. Identify which crew classes use these tasks (e.g., `DocumentReviewCrew`, `AnalyticsCrew`)
+3. Determine if `application_compilation_task` should be removed or integrated into `submission_agent`
+
+### Orphaned Task
+
+- `application_compilation_task` - Defined in `tasks.yaml` but not referenced in any crew's task list. This task may have been intended for use before `application_submission_task` but was never integrated. Recommend either:
+  - Remove from `tasks.yaml` if functionality is covered by existing tasks
+  - Integrate into submission workflow if payload assembly needs to be explicit
 
 ---
 

@@ -53,7 +53,7 @@ export default async function InstitutionDashboardPage({
   // Check authentication
   const { userId } = await auth()
   if (!userId) {
-    redirect('/sign-in')
+    redirect('/register')
   }
 
   // Use service client to fetch data

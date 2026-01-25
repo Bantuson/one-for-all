@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Goal:** Test complete application workflows end-to-end, validating all business logic paths through the 5-agent pipeline.
+**Goal:** Test complete application workflows end-to-end, validating all business logic paths through the 8-agent pipeline.
 
 **Estimated Effort:** 4-5 days
 
@@ -19,18 +19,65 @@
 
 ---
 
+## Agent Pipeline & Task Flow
+
+### 8 Agents in the Pipeline
+
+1. **identity_auth_agent** - Identity verification and authentication
+2. **application_intake_agent** - Data collection and validation
+3. **rag_specialist_agent** - Course information retrieval and eligibility checking
+4. **submission_agent** - Application submission to universities
+5. **nsfas_agent** - NSFAS funding application processing
+6. **document_reviewer_agent** - Document validation and flagging
+7. **reviewer_assistant_agent** - Document review support
+8. **analytics_agent** - Application analytics and reporting
+
+### 14-Task Sequential Workflow
+
+**Core Application Flow (Tasks 1-10)** - All users execute these tasks:
+- Tasks 1-3: Identity authentication and session management
+- Tasks 4-6: Data intake, document validation, course selection
+- Tasks 7-9: Eligibility checking via RAG, course matching
+- Task 10: Application submission to universities
+
+**Conditional NSFAS Flow (Tasks 11-14)** - Executed based on eligibility:
+- Task 11: `ask_if_apply_for_nsfas_task` (branch point)
+  - Returns "yes" → Proceed to Tasks 12-14
+  - Returns "no" → Skip Tasks 12-14, workflow ends
+- Tasks 12-14: NSFAS application creation, document submission, confirmation
+
+### Workflow Trajectories
+
+**Undergraduate (NSFAS Eligible):**
+- Executes all 14 tasks (Tasks 1-14)
+- Task 11 returns "yes" → NSFAS flow executes
+
+**Undergraduate (NSFAS Ineligible):**
+- Executes Tasks 1-11 only
+- Task 11 returns "no" → Tasks 12-14 skipped
+
+**Postgraduate:**
+- Executes Tasks 1-11 only (same 14-task flow, different data/context)
+- Task 11 returns "no" or "skip" → Tasks 12-14 skipped
+- No task count difference, only conditional execution
+
+---
+
 ## Implementation Checklist
 
 ### Core Trajectories
 
-- [ ] **Undergraduate Flow** (15 tasks)
-  - [ ] Auth → Intake → RAG → Submission → NSFAS
+- [ ] **Undergraduate Flow** (14 tasks total, 10 core + 4 NSFAS conditional)
+  - [ ] Tasks 1-10: Core application flow (Auth → Intake → RAG → Submission)
+  - [ ] Task 11: NSFAS eligibility check (conditional branch point)
+  - [ ] Tasks 12-14: NSFAS application tasks (executed if Task 11 = yes)
   - [ ] APS >= requirement → First choice accepted
   - [ ] NSFAS eligible → Funding application created
 
-- [ ] **Postgraduate Flow** (11 tasks)
-  - [ ] Auth → Intake → RAG → Submission
-  - [ ] NSFAS skipped entirely
+- [ ] **Postgraduate Flow** (14 tasks, same as undergraduate)
+  - [ ] Tasks 1-10: Core application flow (Auth → Intake → RAG → Submission)
+  - [ ] Task 11: NSFAS eligibility check returns "no" or "skip" for postgraduate
+  - [ ] Tasks 12-14: NSFAS tasks skipped (postgraduate not eligible)
   - [ ] Research proposal handling (Masters/PhD)
 
 - [ ] **Eligibility Promotion Flow**
@@ -47,9 +94,12 @@
 ### Edge Cases
 
 - [ ] **NSFAS Conditional Paths**
-  - [ ] `nsfas_eligible=false` → Skip NSFAS tasks
-  - [ ] Postgraduate → Skip NSFAS (regardless of eligibility)
-  - [ ] Income threshold exceeded → Skip NSFAS
+  - [ ] Task 11 (`ask_if_apply_for_nsfas_task`) is the conditional branch point
+  - [ ] If Task 11 = "yes" → Execute Tasks 12-14 (NSFAS flow)
+  - [ ] If Task 11 = "no" → Skip Tasks 12-14, workflow ends at Task 11
+  - [ ] `nsfas_eligible=false` → Task 11 returns "no"
+  - [ ] Postgraduate → Task 11 returns "no" or "skip" (not eligible)
+  - [ ] Income threshold exceeded → Task 11 returns "no"
 
 - [ ] **Course Selection Scenarios**
   - [ ] Single university, single course
@@ -180,29 +230,29 @@ class TestUndergraduateApplicationFlow:
     def test_complete_flow_eligible_student(
         self, test_crew, eligible_undergraduate_profile
     ):
-        """Full undergraduate flow: Auth → Intake → RAG → Submit → NSFAS."""
+        """Full undergraduate flow: All 14 tasks (Tasks 1-14 with NSFAS)."""
         result = test_crew.crew().kickoff(inputs=eligible_undergraduate_profile)
 
         # Verify all phases completed
         result_str = str(result).lower()
 
-        # 1. Authentication completed
+        # Tasks 1-3: Authentication completed
         assert any(x in result_str for x in ["session", "verified", "authenticated"]), \
             "Authentication should complete"
 
-        # 2. Data intake completed
+        # Tasks 4-6: Data intake completed
         assert any(x in result_str for x in ["personal", "academic", "collected"]), \
             "Data intake should complete"
 
-        # 3. Eligibility checked
+        # Tasks 7-9: Eligibility checked
         assert any(x in result_str for x in ["eligible", "aps", "requirements"]), \
             "Eligibility should be checked"
 
-        # 4. Application submitted
+        # Task 10: Application submitted
         assert any(x in result_str for x in ["submitted", "application_id", "confirmation"]), \
             "Application should be submitted"
 
-        # 5. NSFAS processed (for eligible undergraduate)
+        # Tasks 11-14: NSFAS processed (Task 11 returns "yes" → Tasks 12-14 execute)
         assert any(x in result_str for x in ["nsfas", "funding", "financial"]), \
             "NSFAS should be processed"
 
@@ -224,11 +274,12 @@ class TestUndergraduateApplicationFlow:
     def test_documents_validated_before_submission(
         self, test_crew, eligible_undergraduate_profile
     ):
-        """Documents should be validated before submission."""
+        """Documents should be validated before submission (Task 6 before Task 10)."""
         result = test_crew.crew().kickoff(inputs=eligible_undergraduate_profile)
 
-        # Task 6 (document_validation_task) should run before Task 10 (application_submission)
-        # This is enforced by sequential process, but we verify the output
+        # Task 6 (document_validation_task) runs before Task 10 (application_submission_task)
+        # Sequential process enforces order: Tasks 1-14 execute in sequence
+        # This test verifies the output confirms validation occurred
         result_str = str(result).lower()
 
         assert any(x in result_str for x in ["document", "validated", "approved", "verified"]), \
@@ -249,17 +300,17 @@ class TestPostgraduateApplicationFlow:
     def test_postgrad_skips_nsfas_entirely(
         self, test_crew, postgraduate_profile
     ):
-        """Postgraduate applicants should skip all NSFAS tasks."""
+        """Postgraduate follows same 14-task flow but Task 11 returns 'no' → Tasks 12-14 skipped."""
         result = test_crew.crew().kickoff(inputs=postgraduate_profile)
         result_str = str(result).lower()
 
-        # Should have application submission
+        # Should have application submission (Task 10)
         assert any(x in result_str for x in ["submitted", "application", "msc"]), \
             "Application should be submitted"
 
-        # Should indicate NSFAS was skipped
+        # Task 11 should return "no" or "skip" → Tasks 12-14 not executed
         assert any(x in result_str for x in ["skip", "postgrad", "not applicable", "no_nsfas"]), \
-            "NSFAS should be skipped for postgraduate"
+            "NSFAS should be skipped for postgraduate (Task 11 returns 'no')"
 
     def test_research_proposal_handling(
         self, test_crew, postgraduate_profile
@@ -455,35 +506,35 @@ class TestNSFASConditional:
     def test_nsfas_ineligible_skips_funding(
         self, test_crew, nsfas_ineligible_profile
     ):
-        """NSFAS-ineligible student should skip funding tasks."""
+        """NSFAS-ineligible student executes Tasks 1-11, Task 11 returns 'no' → Tasks 12-14 skipped."""
         result = test_crew.crew().kickoff(inputs=nsfas_ineligible_profile)
         result_str = str(result).lower()
 
-        # Application should still be submitted
+        # Application should still be submitted (Task 10)
         assert any(x in result_str for x in ["submitted", "application"]), \
             "University application should still be submitted"
 
-        # NSFAS should be skipped
+        # Task 11 returns "no" → Tasks 12-14 skipped
         assert any(x in result_str for x in [
             "nsfas_skipped",
             "no_nsfas",
             "not eligible for nsfas",
             "skip"
-        ]), "NSFAS should be skipped"
+        ]), "NSFAS should be skipped (Task 11 returns 'no')"
 
     def test_postgrad_always_skips_nsfas(
         self, test_crew, postgraduate_profile
     ):
-        """Postgraduate should skip NSFAS regardless of nsfas_eligible flag."""
+        """Postgraduate executes same 14 tasks; Task 11 returns 'no' regardless of nsfas_eligible flag."""
         profile = postgraduate_profile.copy()
         profile["nsfas_eligible"] = True  # Even if marked eligible
 
         result = test_crew.crew().kickoff(inputs=profile)
         result_str = str(result).lower()
 
-        # Should indicate NSFAS was skipped due to postgrad status
+        # Task 11 should return "no" or "skip" due to postgrad status
         assert "postgrad" in result_str or "skip" in result_str, \
-            "Postgrad should skip NSFAS"
+            "Postgrad Task 11 should return 'no' → Tasks 12-14 skipped"
 ```
 
 ---

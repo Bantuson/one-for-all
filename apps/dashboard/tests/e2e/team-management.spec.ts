@@ -43,7 +43,7 @@ test.describe('Team Management', () => {
 
     // Check if we need authentication
     const currentUrl = page.url();
-    if (currentUrl.includes('/register') || currentUrl.includes('/sign-in')) {
+    if (currentUrl.includes('/register')) {
       // Try to authenticate if credentials are available
       const testEmail = process.env.E2E_TEST_EMAIL;
       const testPassword = process.env.E2E_TEST_PASSWORD;
